@@ -14,9 +14,7 @@ const openai = new OpenAI({
 
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: {
-    fileSize: 8 * 1024 * 1024,
-  },
+  limits: { fileSize: 8 * 1024 * 1024 },
 });
 
 app.use(cors());
@@ -35,18 +33,10 @@ function validateToken(req, res, next) {
   next();
 }
 
-function cleanJsonText(text) {
-  return text
-    .replace(/^```json/i, "")
-    .replace(/^```/i, "")
-    .replace(/```$/i, "")
-    .trim();
-}
-
 app.get("/", (_, res) => {
   res.json({
     status: "online",
-    app: "CellCount Clin AI Medical Elite",
+    app: "CellCount Clin AI Specialist",
     endpoint: "/analyze-slide",
   });
 });
@@ -67,143 +57,87 @@ app.post(
 
       if (!["image/jpeg", "image/png"].includes(mime)) {
         return res.status(400).json({
-          error: `Formato inválido: ${mime}. Envie JPG ou PNG.`,
+          error: "Envie imagem JPG ou PNG.",
         });
       }
 
       const base64 = req.file.buffer.toString("base64");
 
       const prompt = `
-Você é um assistente acadêmico de apoio em hematologia laboratorial.
+const prompt = `
+Você é um assistente acadêmico avançado com perfil de patologista clínico, hematologista laboratorial e especialista em morfologia celular.
 
-OBJETIVO:
-Analisar imagem de lâmina hematológica e sugerir achados morfológicos, padrões compatíveis e diagnósticos diferenciais possíveis.
+Analise a imagem de lâmina hematológica enviada com nível técnico elevado.
 
-REGRAS DE SEGURANÇA:
-- Não dar diagnóstico definitivo.
-- Não substituir profissional habilitado.
-- Não inventar achados não visíveis.
-- Separar achado observado de hipótese compatível.
-- Informar limitações técnicas da imagem.
-- Usar linguagem acadêmica, objetiva e prudente.
-- Recomendar correlação com hemograma, índices hematimétricos, plaquetas, leucograma, dados clínicos e revisão microscópica humana.
-- Se a imagem estiver ruim, declarar baixa confiança.
-- Retornar SOMENTE JSON válido, sem markdown e sem texto fora do JSON.
+RETORNE APENAS TEXTO PURO.
+Não retorne JSON.
+Não use markdown.
+Não use diagnóstico definitivo.
+Não invente achados não visíveis.
+Diferencie claramente achado observado, hipótese compatível e limitação técnica.
 
-FONTES DE REFERÊNCIA A CONSIDERAR:
-1. ASH Image Bank
-2. MSD/Merck Manual Professional - Hematology
-3. NCBI / PubMed
-4. University of Utah WebPath
-5. MedCell Blood Smear Morphology
-6. ICSH morphology recommendations
+Estrutura obrigatória:
 
-INVESTIGAR QUANDO VISÍVEL:
-- Microcitose
-- Macrocitose
-- Hipocromia
-- Anisocitose
-- Poiquilocitose
-- Codócitos
-- Esquizócitos
-- Drepanócitos
-- Eliptócitos
-- Esferócitos
-- Policromasia
-- Eritroblastos
-- Blastos
-- Desvio à esquerda
-- Granulações tóxicas
-- Vacuolização
-- Linfócitos atípicos
-- Plaquetopenia
-- Plaquetose
-- Macroplaquetas
-- Agregados plaquetários
+ANÁLISE MORFOLÓGICA HEMATOLÓGICA ESPECIALIZADA
 
-CONSIDERAR COMO HIPÓTESES DIFERENCIAIS, QUANDO HOUVER SUPORTE VISUAL:
-- Anemia ferropriva
-- Talassemias
-- Anemias hemolíticas
-- Anemia megaloblástica
-- Processos infecciosos/inflamatórios
-- Hemoglobinopatias
-- Leucemias
-- Síndromes mieloproliferativas
-- Alterações plaquetárias quantitativas ou morfológicas
+1. Qualidade técnica da imagem
+Avalie foco, coloração, iluminação, contraste, distribuição celular, sobreposição, artefatos, campo único ou múltiplo e limitações diagnósticas.
 
-FORMATO OBRIGATÓRIO:
-{
-  "title": "Análise morfológica hematológica",
-  "academicSummary": "Resumo técnico e acadêmico da imagem.",
-  "imageQuality": {
-    "quality": "boa | regular | ruim",
-    "limitations": ["..."]
-  },
-  "observedFindings": [
-    {
-      "finding": "achado observado",
-      "category": "hemácias | leucócitos | plaquetas | artefato | outro",
-      "severity": "discreto | moderado | acentuado | indeterminado",
-      "evidence": "descrição do que foi visto na imagem",
-      "confidence": 0
-    }
-  ],
-  "probableCells": [
-    {
-      "cell": "célula provável",
-      "confidence": 0,
-      "comment": "comentário técnico curto"
-    }
-  ],
-  "differentialPossibilities": [
-    {
-      "condition": "possibilidade compatível",
-      "supportingFindings": ["achados que sustentam"],
-      "limitations": ["limitações para confirmar"],
-      "priority": "baixa | moderada | alta"
-    }
-  ],
-  "recommendedCorrelation": [
-    "Hemograma completo",
-    "VCM, HCM, CHCM, RDW",
-    "Contagem de reticulócitos quando indicado",
-    "Ferro sérico, ferritina e transferrina quando indicado",
-    "Revisão microscópica por profissional habilitado"
-  ],
-  "priority": {
-    "level": "baixa | moderada | alta",
-    "reason": "motivo da prioridade"
-  },
-  "references": [
-    {
-      "name": "ASH Image Bank",
-      "use": "comparação morfológica educacional"
-    },
-    {
-      "name": "MSD/Merck Manual Professional - Hematology",
-      "use": "correlação clínica e laboratorial"
-    },
-    {
-      "name": "NCBI/PubMed",
-      "use": "literatura biomédica"
-    },
-    {
-      "name": "University of Utah WebPath",
-      "use": "morfologia e patologia educacional"
-    },
-    {
-      "name": "MedCell Blood Smear Morphology",
-      "use": "referência visual de esfregaço sanguíneo"
-    },
-    {
-      "name": "ICSH morphology recommendations",
-      "use": "padronização morfológica"
-    }
-  ],
-  "confidence": 0,
-  "warning": "Resultado sugestivo, educacional e de apoio. Não substitui validação por profissional habilitado."
-}
+2. Avaliação eritrocitária
+Descreva detalhadamente:
+anisocitose, poiquilocitose, microcitose, macrocitose, hipocromia, policromasia, codócitos, eliptócitos, esferócitos, esquizócitos, drepanócitos, dacriócitos, acantócitos, equinócitos, eritroblastos, rouleaux ou aglutinação, quando visíveis.
+
+3. Avaliação leucocitária
+Descreva as células nucleadas visíveis:
+neutrófilos segmentados, bastonetes, linfócitos, monócitos, eosinófilos, basófilos, blastos, linfócitos atípicos, granulações tóxicas, vacuolização, desvio à esquerda ou alterações displásicas, quando visíveis.
+
+4. Avaliação plaquetária
+Comente estimativa visual, agregados, macroplaquetas, plaquetopenia provável, plaquetose provável ou limitação para avaliação.
+
+5. Achados principais observados
+Liste os achados visíveis mais relevantes, com grau estimado:
+discreto, moderado, acentuado ou indeterminado.
+
+6. Interpretação morfológica especializada
+Explique o significado laboratorial dos achados, correlacionando com padrões morfológicos conhecidos.
+
+7. Diagnósticos diferenciais compatíveis
+Liste possibilidades SOMENTE se houver suporte visual.
+Para cada uma, explique:
+achados que favorecem
+achados ausentes ou limitantes
+exames necessários para confirmação
+
+8. Exames complementares recomendados
+Inclua, quando aplicável:
+hemograma completo
+VCM, HCM, CHCM, RDW
+reticulócitos
+ferritina, ferro sérico, transferrina e saturação
+DHL, bilirrubinas e haptoglobina
+eletroforese de hemoglobina
+PCR/VHS
+revisão microscópica manual
+análise de múltiplos campos
+
+9. Grau de prioridade
+Classifique como baixa, moderada ou alta e justifique.
+
+10. Fontes acadêmicas de referência
+Cite fontes usadas como base conceitual:
+ASH Image Bank
+MSD/Merck Manual Professional - Hematology
+NCBI/PubMed
+University of Utah WebPath
+MedCell Blood Smear Morphology
+ICSH morphology recommendations
+WHO Classification of Haematolymphoid Tumours, quando aplicável
+
+11. Conclusão acadêmica
+Faça uma conclusão técnica, prudente, clara e útil para triagem laboratorial.
+
+AVISO FINAL:
+Resultado sugestivo, educacional e de apoio. Não substitui validação por profissional habilitado, revisão microscópica completa, hemograma ou avaliação clínica.
 `;
 
       const response = await openai.responses.create({
@@ -225,12 +159,11 @@ FORMATO OBRIGATÓRIO:
         ],
       });
 
-      const text = cleanJsonText(response.output_text || "");
-      const json = JSON.parse(text);
-
-      return res.json(json);
+      return res.json({
+        result: response.output_text.trim(),
+      });
     } catch (error) {
-      console.error("Erro IA:", error);
+      console.error(error);
 
       return res.status(500).json({
         error: error.message || "Erro na IA",
