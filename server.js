@@ -25,9 +25,7 @@ function validateToken(req, res, next) {
   const token = auth.replace("Bearer ", "");
 
   if (token !== process.env.API_TOKEN) {
-    return res.status(401).json({
-      error: "Token inválido",
-    });
+    return res.status(401).json({ error: "Token inválido" });
   }
 
   next();
@@ -41,30 +39,23 @@ app.get("/", (_, res) => {
   });
 });
 
-app.post(
-  "/analyze-slide",
-  validateToken,
-  upload.single("image"),
-  async (req, res) => {
-    try {
-      if (!req.file) {
-        return res.status(400).json({
-          error: "Imagem não enviada",
-        });
-      }
+app.post("/analyze-slide", validateToken, upload.single("image"), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: "Imagem não enviada" });
+    }
 
-      const mime = req.file.mimetype || "image/jpeg";
+    const mime = req.file.mimetype || "image/jpeg";
 
-      if (!["image/jpeg", "image/png"].includes(mime)) {
-        return res.status(400).json({
-          error: "Envie imagem JPG ou PNG.",
-        });
-      }
+    if (!["image/jpeg", "image/png"].includes(mime)) {
+      return res.status(400).json({
+        error: "Envie imagem JPG ou PNG.",
+      });
+    }
 
-      const base64 = req.file.buffer.toString("base64");
+    const base64 = req.file.buffer.toString("base64");
 
-      const prompt = `
-const prompt = `
+    const prompt = `
 Você é um assistente acadêmico avançado com perfil de patologista clínico, hematologista laboratorial e especialista em morfologia celular.
 
 Analise a imagem de lâmina hematológica enviada com nível técnico elevado.
@@ -84,41 +75,25 @@ ANÁLISE MORFOLÓGICA HEMATOLÓGICA ESPECIALIZADA
 Avalie foco, coloração, iluminação, contraste, distribuição celular, sobreposição, artefatos, campo único ou múltiplo e limitações diagnósticas.
 
 2. Avaliação eritrocitária
-Descreva detalhadamente:
-anisocitose, poiquilocitose, microcitose, macrocitose, hipocromia, policromasia, codócitos, eliptócitos, esferócitos, esquizócitos, drepanócitos, dacriócitos, acantócitos, equinócitos, eritroblastos, rouleaux ou aglutinação, quando visíveis.
+Descreva detalhadamente anisocitose, poiquilocitose, microcitose, macrocitose, hipocromia, policromasia, codócitos, eliptócitos, esferócitos, esquizócitos, drepanócitos, dacriócitos, acantócitos, equinócitos, eritroblastos, rouleaux ou aglutinação, quando visíveis.
 
 3. Avaliação leucocitária
-Descreva as células nucleadas visíveis:
-neutrófilos segmentados, bastonetes, linfócitos, monócitos, eosinófilos, basófilos, blastos, linfócitos atípicos, granulações tóxicas, vacuolização, desvio à esquerda ou alterações displásicas, quando visíveis.
+Descreva as células nucleadas visíveis, incluindo neutrófilos segmentados, bastonetes, linfócitos, monócitos, eosinófilos, basófilos, blastos, linfócitos atípicos, granulações tóxicas, vacuolização, desvio à esquerda ou alterações displásicas, quando visíveis.
 
 4. Avaliação plaquetária
 Comente estimativa visual, agregados, macroplaquetas, plaquetopenia provável, plaquetose provável ou limitação para avaliação.
 
 5. Achados principais observados
-Liste os achados visíveis mais relevantes, com grau estimado:
-discreto, moderado, acentuado ou indeterminado.
+Liste os achados visíveis mais relevantes, com grau estimado: discreto, moderado, acentuado ou indeterminado.
 
 6. Interpretação morfológica especializada
 Explique o significado laboratorial dos achados, correlacionando com padrões morfológicos conhecidos.
 
 7. Diagnósticos diferenciais compatíveis
-Liste possibilidades SOMENTE se houver suporte visual.
-Para cada uma, explique:
-achados que favorecem
-achados ausentes ou limitantes
-exames necessários para confirmação
+Liste possibilidades somente se houver suporte visual. Para cada uma, explique achados que favorecem, achados ausentes ou limitantes e exames necessários para confirmação.
 
 8. Exames complementares recomendados
-Inclua, quando aplicável:
-hemograma completo
-VCM, HCM, CHCM, RDW
-reticulócitos
-ferritina, ferro sérico, transferrina e saturação
-DHL, bilirrubinas e haptoglobina
-eletroforese de hemoglobina
-PCR/VHS
-revisão microscópica manual
-análise de múltiplos campos
+Inclua, quando aplicável: hemograma completo, VCM, HCM, CHCM, RDW, reticulócitos, ferritina, ferro sérico, transferrina, saturação de transferrina, DHL, bilirrubinas, haptoglobina, eletroforese de hemoglobina, PCR, VHS, revisão microscópica manual e análise de múltiplos campos.
 
 9. Grau de prioridade
 Classifique como baixa, moderada ou alta e justifique.
@@ -140,37 +115,32 @@ AVISO FINAL:
 Resultado sugestivo, educacional e de apoio. Não substitui validação por profissional habilitado, revisão microscópica completa, hemograma ou avaliação clínica.
 `;
 
-      const response = await openai.responses.create({
-        model: process.env.OPENAI_MODEL || "gpt-4o",
-        input: [
-          {
-            role: "user",
-            content: [
-              {
-                type: "input_text",
-                text: prompt,
-              },
-              {
-                type: "input_image",
-                image_url: `data:${mime};base64,${base64}`,
-              },
-            ],
-          },
-        ],
-      });
+    const response = await openai.responses.create({
+      model: process.env.OPENAI_MODEL || "gpt-4o",
+      input: [
+        {
+          role: "user",
+          content: [
+            { type: "input_text", text: prompt },
+            {
+              type: "input_image",
+              image_url: `data:${mime};base64,${base64}`,
+            },
+          ],
+        },
+      ],
+    });
 
-      return res.json({
-        result: response.output_text.trim(),
-      });
-    } catch (error) {
-      console.error(error);
-
-      return res.status(500).json({
-        error: error.message || "Erro na IA",
-      });
-    }
+    return res.json({
+      result: response.output_text.trim(),
+    });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({
+      error: error.message || "Erro na IA",
+    });
   }
-);
+});
 
 const port = process.env.PORT || 3000;
 
