@@ -1,348 +1,372 @@
-import express from "express";
-import cors from "cors";
-import multer from "multer";
-import dotenv from "dotenv";
-import fs from "fs";
-import OpenAI from "openai";
-import { google } from "googleapis";
-
-dotenv.config();
+const express = require("express");
+const multer = require("multer");
+const cors = require("cors");
+const OpenAI = require("openai");
 
 const app = express();
-
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
-
-const upload = multer({
-  storage: multer.memoryStorage(),
-  limits: { fileSize: 10 * 1024 * 1024 },
-});
+const upload = multer({ storage: multer.memoryStorage() });
 
 app.use(cors());
-app.use(express.json({ limit: "2mb" }));
+app.use(express.json({ limit: "25mb" }));
 
-const PACKAGE_NAME =
-  process.env.PACKAGE_NAME || "com.rodrigueslucio.cellcountai";
+const PORT = process.env.PORT || 3000;
+const API_TOKEN = process.env.API_TOKEN || "cellcount_v13_token_seguro";
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
+
+const openai = new OpenAI({
+  apiKey: OPENAI_API_KEY,
+});
+
+const users = new Map();
 
 const PRODUCTS = {
   cellcount_100_ai_credits: 100,
   cellcount_1000_ai_credits: 1000,
 };
 
-const DB_FILE = "./cellcount_db.json";
+function auth(req, res, next) {
+  const header = req.headers.authorization || "";
+  const token = header.replace("Bearer ", "").trim();
 
-function loadDb() {
-  if (!fs.existsSync(DB_FILE)) {
-    return { users: {}, usedTokens: {} };
-  }
-  return JSON.parse(fs.readFileSync(DB_FILE, "utf8"));
-}
-
-function saveDb(db) {
-  fs.writeFileSync(DB_FILE, JSON.stringify(db, null, 2));
-}
-
-function getUser(db, userId) {
-  if (!db.users[userId]) {
-    db.users[userId] = {
-      freeUses: 20,
-      credits: 0,
-      totalUses: 0,
-      createdAt: new Date().toISOString(),
-    };
-  }
-  return db.users[userId];
-}
-
-function getUserId(req) {
-  return req.headers["x-user-id"] || "anonymous_device";
-}
-
-function validateToken(req, res, next) {
-  const auth = req.headers.authorization || "";
-  const token = auth.replace("Bearer ", "");
-
-  if (token !== process.env.API_TOKEN) {
+  if (token !== API_TOKEN) {
     return res.status(401).json({ error: "Token inválido" });
   }
 
   next();
 }
 
-async function getAndroidPublisher() {
-  const raw = process.env.GOOGLE_SERVICE_ACCOUNT_JSON;
-
-  if (!raw) {
-    throw new Error("GOOGLE_SERVICE_ACCOUNT_JSON não configurado");
-  }
-
-  const credentials = JSON.parse(raw);
-
-  const auth = new google.auth.GoogleAuth({
-    credentials,
-    scopes: ["https://www.googleapis.com/auth/androidpublisher"],
-  });
-
-  return google.androidpublisher({
-    version: "v3",
-    auth,
-  });
+function getUserId(req) {
+  return req.headers["x-user-id"] || "anonymous_device";
 }
 
-async function verifyGooglePurchase(productId, purchaseToken) {
-  const androidpublisher = await getAndroidPublisher();
-
-  const result = await androidpublisher.purchases.products.get({
-    packageName: PACKAGE_NAME,
-    productId,
-    token: purchaseToken,
-  });
-
-  const purchase = result.data;
-
-  if (purchase.purchaseState !== 0) {
-    throw new Error("Compra não está aprovada");
+function getUser(userId) {
+  if (!users.has(userId)) {
+    users.set(userId, {
+      userId,
+      freeUses: 20,
+      credits: 0,
+      totalUses: 0,
+      purchases: [],
+      learningCases: [],
+    });
   }
 
-  await androidpublisher.purchases.products.consume({
-    packageName: PACKAGE_NAME,
-    productId,
-    token: purchaseToken,
-  });
-
-  return purchase;
+  return users.get(userId);
 }
 
-const superPrompt = `
-Você é um assistente acadêmico de apoio em morfologia hematológica, hematologia laboratorial e ensino de esfregaço sanguíneo periférico.
-
-Objetivo:
-Produzir uma análise educacional, descritiva e acadêmica da imagem ou das imagens enviadas, com linguagem técnica de alto nível, sem diagnóstico definitivo.
-
-Regras de segurança:
-Não fornecer diagnóstico definitivo.
-Não substituir profissional habilitado.
-Não afirmar doença como certeza.
-Não inventar achados não visíveis.
-Sempre diferenciar: achado observado, padrão compatível, limitação técnica e exame necessário para confirmação.
-Se houver incerteza, declarar incerteza.
-A resposta deve ser em português do Brasil.
-Retorne texto puro, sem JSON e sem markdown.
-
-Estrutura obrigatória:
-
-ANÁLISE MORFOLÓGICA HEMATOLÓGICA AVANÇADA:
-
-1. Qualidade técnica das imagens:
-2. Comparação entre os campos:
-3. Contagem celular estimada:
-4. Avaliação eritrocitária:
-5. Padrões compatíveis com anemia:
-6. Avaliação leucocitária:
-7. Padrões compatíveis com infecção ou inflamação:
-8. Sinais de alerta hematológico:
-9. Avaliação plaquetária:
-10. Diagnósticos diferenciais morfológicos:
-11. Exames complementares recomendados:
-12. Classificação de prioridade:
-13. Fontes acadêmicas de referência:
-14. Parecer acadêmico final:
-
-Aviso final:
-Resultado sugestivo, educacional e de apoio. Não substitui validação por profissional habilitado, revisão microscópica completa, hemograma, exames complementares ou avaliação clínica.
-`;
-
-app.get("/", (_, res) => {
-  res.json({
-    status: "online",
-    app: "CellCount AI Backend Hospital",
-    packageName: PACKAGE_NAME,
-  });
-});
-
-app.get("/user/status", validateToken, (req, res) => {
-  const db = loadDb();
-  const userId = getUserId(req);
-  const user = getUser(db, userId);
-
-  saveDb(db);
-
-  res.json({
-    userId,
+function publicStatus(user) {
+  return {
+    userId: user.userId,
     freeUses: user.freeUses,
     credits: user.credits,
     totalAvailable: user.freeUses + user.credits,
     totalUses: user.totalUses,
-  });
-});
+  };
+}
 
-app.post("/purchase/verify", validateToken, async (req, res) => {
-  try {
-    const { productId, purchaseToken } = req.body;
-
-    if (!productId || !purchaseToken) {
-      return res.status(400).json({
-        error: "productId e purchaseToken são obrigatórios",
-      });
-    }
-
-    if (!PRODUCTS[productId]) {
-      return res.status(400).json({
-        error: "Produto inválido",
-      });
-    }
-
-    const db = loadDb();
-    const userId = getUserId(req);
-    const user = getUser(db, userId);
-
-    if (db.usedTokens[purchaseToken]) {
-      return res.status(409).json({
-        error: "Compra já utilizada",
-      });
-    }
-
-    await verifyGooglePurchase(productId, purchaseToken);
-
-    const creditsToAdd = PRODUCTS[productId];
-
-    user.credits += creditsToAdd;
-    db.usedTokens[purchaseToken] = {
-      userId,
-      productId,
-      creditsAdded: creditsToAdd,
-      usedAt: new Date().toISOString(),
-    };
-
-    saveDb(db);
-
-    res.json({
-      success: true,
-      creditsAdded: creditsToAdd,
-      freeUses: user.freeUses,
-      credits: user.credits,
-      totalAvailable: user.freeUses + user.credits,
-    });
-  } catch (error) {
-    console.error("Erro purchase verify:", error);
-
-    res.status(500).json({
-      error: error.message || "Erro ao verificar compra",
-    });
-  }
-});
-
-function consumeAiCredit(db, user) {
+function consumeAiCredit(user) {
   if (user.freeUses > 0) {
     user.freeUses -= 1;
     user.totalUses += 1;
-    return "free";
+    return;
   }
 
   if (user.credits > 0) {
     user.credits -= 1;
     user.totalUses += 1;
-    return "credit";
+    return;
   }
 
-  return null;
+  throw new Error("Sem usos gratuitos ou créditos disponíveis.");
 }
 
-function refundAiCredit(user, type) {
-  if (type === "free") user.freeUses += 1;
-  if (type === "credit") user.credits += 1;
-  if (type) user.totalUses = Math.max(0, user.totalUses - 1);
+function imageToDataUrl(file) {
+  const mime = file.mimetype || "image/jpeg";
+  const base64 = file.buffer.toString("base64");
+  return `data:${mime};base64,${base64}`;
 }
 
-app.post(
-  "/analyze-slide",
-  validateToken,
-  upload.any(),
-  async (req, res) => {
-    const db = loadDb();
-    const userId = getUserId(req);
-    const user = getUser(db, userId);
+function safeJsonParse(text) {
+  try {
+    const cleaned = text
+      .replace(/```json/g, "")
+      .replace(/```/g, "")
+      .trim();
 
-    let consumedType = null;
+    return JSON.parse(cleaned);
+  } catch (_) {
+    return null;
+  }
+}
 
-    try {
-      if (!req.files || req.files.length === 0) {
-        return res.status(400).json({
-          error: "Nenhuma imagem enviada",
-        });
-      }
+const hospitalPrompt = `
+Você é um assistente acadêmico avançado de apoio em hematologia laboratorial, morfologia celular e triagem de esfregaços sanguíneos.
 
-      consumedType = consumeAiCredit(db, user);
+OBJETIVO:
+Gerar uma avaliação morfológica estruturada, conservadora, educacional e revisável por profissional habilitado.
 
-      if (!consumedType) {
-        saveDb(db);
-        return res.status(402).json({
-          error: "Sem usos gratuitos ou créditos disponíveis",
-          freeUses: user.freeUses,
-          credits: user.credits,
-        });
-      }
+LIMITAÇÃO OBRIGATÓRIA:
+Você NÃO fornece diagnóstico definitivo.
+Você NÃO substitui médico, biomédico, farmacêutico, hematologista ou profissional habilitado.
+Você NÃO deve afirmar leucemia, síndrome mielodisplásica ou neoplasia como certeza.
+Você deve indicar revisão humana quando houver achado suspeito.
 
-      saveDb(db);
+ANÁLISE OBRIGATÓRIA:
+1. Qualidade da imagem:
+- foco
+- coloração
+- iluminação
+- artefatos
+- campo representativo
+- limitação técnica
 
-      const content = [
+2. Triagem de blastos:
+Sempre procurar célula imatura/blástica.
+Não omitir blasto.
+Não chamar automaticamente de linfócito quando houver:
+- núcleo grande
+- alta relação núcleo/citoplasma
+- cromatina fina, frouxa ou laxa
+- nucléolo possível ou evidente
+- citoplasma escasso ou basofílico
+- ausência de granulações maduras
+- célula mononuclear grande azulada/arroxeada
+
+Se houver dúvida, classifique como:
+"indeterminado com suspeita de célula imatura/blástica".
+
+3. Diferencial obrigatório:
+- blasto
+- linfócito reativo
+- eritroblasto
+- célula linfoide madura
+- artefato / célula fora de foco
+
+4. Hemácias:
+Avaliar anisocitose, poiquilocitose, hipocromia, microcitose, macrocitose, policromasia, codócitos, eliptócitos, esquizócitos, drepanócitos, rouleaux e artefatos.
+
+5. Leucócitos:
+Avaliar maturação granulocítica, segmentados, bastonetes, linfócitos, monócitos, eosinófilos, basófilos e células imaturas.
+
+6. Plaquetas:
+Avaliar presença, agregação e estimativa qualitativa.
+
+7. Risco:
+Classificar suspeita morfológica como:
+- baixo
+- moderado
+- alto
+
+8. Revisão humana:
+Se houver suspeita moderada ou alta de blasto/célula imatura, requiresHumanReview deve ser true.
+
+FORMATO DE SAÍDA:
+Responder SOMENTE em JSON válido, sem markdown, sem texto fora do JSON.
+
+JSON obrigatório:
+{
+  "imageQuality": {
+    "overall": "boa | moderada | ruim",
+    "focus": "adequado | parcial | inadequado",
+    "staining": "adequada | parcial | inadequada",
+    "artifacts": ["..."],
+    "limitations": ["..."]
+  },
+  "blastSuspicion": {
+    "present": true,
+    "score": 0,
+    "riskLevel": "baixo | moderado | alto",
+    "confidence": "baixo | moderado | alto",
+    "approximateSuspiciousCells": 0,
+    "morphologicReasons": ["..."]
+  },
+  "differential": [
+    {
+      "hypothesis": "Blasto",
+      "probability": 0,
+      "supportingFindings": ["..."],
+      "againstFindings": ["..."]
+    }
+  ],
+  "erythrocyteFindings": {
+    "summary": "...",
+    "findings": ["..."]
+  },
+  "leukocyteFindings": {
+    "summary": "...",
+    "findings": ["..."]
+  },
+  "plateletFindings": {
+    "summary": "...",
+    "findings": ["..."]
+  },
+  "morphologyFlags": ["..."],
+  "requiresHumanReview": true,
+  "alert": "...",
+  "educationalConclusion": "...",
+  "plainTextReport": "..."
+}
+
+REGRAS:
+- score deve ir de 0 a 100.
+- Se houver célula grande mononuclear com cromatina frouxa e alta relação núcleo/citoplasma, score não deve ser zero.
+- Se imagem for limitada, declarar limitação.
+- Resposta em português do Brasil.
+`;
+
+app.get("/", (req, res) => {
+  res.json({
+    status: "online",
+    app: "CellCount Backend Hospital IA",
+    endpoints: ["/user/status", "/purchase/verify", "/analyze-slide", "/learning/save-case"],
+  });
+});
+
+app.get("/user/status", auth, (req, res) => {
+  const user = getUser(getUserId(req));
+  res.json(publicStatus(user));
+});
+
+app.post("/analyze-slide", auth, upload.any(), async (req, res) => {
+  try {
+    const user = getUser(getUserId(req));
+
+    if (!req.files || req.files.length === 0) {
+      return res.status(400).json({ error: "Nenhuma imagem enviada." });
+    }
+
+    if (req.files.length > 3) {
+      return res.status(400).json({ error: "Envie no máximo 3 imagens." });
+    }
+
+    consumeAiCredit(user);
+
+    const imageParts = req.files.map((file) => ({
+      type: "image_url",
+      image_url: {
+        url: imageToDataUrl(file),
+      },
+    }));
+
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o",
+      temperature: 0.1,
+      messages: [
         {
-          type: "input_text",
-          text: superPrompt,
+          role: "system",
+          content: hospitalPrompt,
         },
-      ];
+        {
+          role: "user",
+          content: [
+            {
+              type: "text",
+              text:
+                "Analise as imagens da lâmina. Priorize triagem de célula imatura/blástica, qualidade da imagem e diferencial morfológico. Retorne somente JSON válido.",
+            },
+            ...imageParts,
+          ],
+        },
+      ],
+    });
 
-      for (const file of req.files.slice(0, 3)) {
-        let mime = file.mimetype || "image/jpeg";
+    const raw =
+      response.choices?.[0]?.message?.content ||
+      "";
 
-        if (mime === "application/octet-stream") {
-          mime = "image/jpeg";
-        }
+    const structured = safeJsonParse(raw);
 
-        if (!["image/jpeg", "image/png", "image/webp"].includes(mime)) {
-          mime = "image/jpeg";
-        }
-
-        const base64 = file.buffer.toString("base64");
-
-        content.push({
-          type: "input_image",
-          image_url: `data:${mime};base64,${base64}`,
-        });
-      }
-
-      const response = await openai.responses.create({
-        model: process.env.OPENAI_MODEL || "gpt-4o",
-        input: [
-          {
-            role: "user",
-            content,
-          },
-        ],
-      });
-
-      res.json({
-        result: response.output_text.trim(),
-        freeUses: user.freeUses,
-        credits: user.credits,
-        totalAvailable: user.freeUses + user.credits,
-      });
-    } catch (error) {
-      refundAiCredit(user, consumedType);
-      saveDb(db);
-
-      console.error("Erro IA:", error);
-
-      res.status(500).json({
-        error: error.message || "Erro IA",
+    if (!structured) {
+      return res.json({
+        result: raw || "Não foi possível gerar análise estruturada.",
+        structured: null,
+        requiresHumanReview: true,
+        ...publicStatus(user),
       });
     }
+
+    res.json({
+      result: structured.plainTextReport || structured.educationalConclusion || "Análise gerada.",
+      structured,
+      requiresHumanReview: structured.requiresHumanReview === true,
+      ...publicStatus(user),
+    });
+  } catch (error) {
+    console.error("Erro /analyze-slide:", error);
+
+    res.status(500).json({
+      error: error.message || "Erro ao analisar lâmina.",
+    });
   }
-);
+});
 
-const port = process.env.PORT || 3000;
+app.post("/purchase/verify", auth, async (req, res) => {
+  try {
+    const user = getUser(getUserId(req));
+    const { productId, purchaseToken } = req.body;
 
-app.listen(port, "0.0.0.0", () => {
-  console.log(`CellCount Backend Hospital rodando na porta ${port}`);
+    if (!productId || !purchaseToken) {
+      return res.status(400).json({
+        error: "productId e purchaseToken são obrigatórios.",
+      });
+    }
+
+    if (!PRODUCTS[productId]) {
+      return res.status(400).json({
+        error: "Produto inválido.",
+      });
+    }
+
+    if (user.purchases.includes(purchaseToken)) {
+      return res.status(409).json({
+        error: "Compra já utilizada.",
+      });
+    }
+
+    user.credits += PRODUCTS[productId];
+    user.purchases.push(purchaseToken);
+
+    res.json({
+      success: true,
+      addedCredits: PRODUCTS[productId],
+      ...publicStatus(user),
+    });
+  } catch (error) {
+    console.error("Erro /purchase/verify:", error);
+
+    res.status(500).json({
+      error: error.message || "Erro ao verificar compra.",
+    });
+  }
+});
+
+app.post("/learning/save-case", auth, (req, res) => {
+  try {
+    const user = getUser(getUserId(req));
+
+    const item = {
+      createdAt: new Date().toISOString(),
+      validation: req.body.validation || "",
+      correction: req.body.correction || "",
+      aiResult: req.body.aiResult || "",
+      structured: req.body.structured || null,
+      imageCount: req.body.imageCount || 0,
+    };
+
+    user.learningCases.push(item);
+
+    res.json({
+      success: true,
+      message: "Caso salvo para aprendizado assistido.",
+      totalCases: user.learningCases.length,
+    });
+  } catch (error) {
+    res.status(500).json({
+      error: error.message || "Erro ao salvar caso.",
+    });
+  }
+});
+
+app.listen(PORT, () => {
+  console.log(`CellCount Backend Hospital IA rodando na porta ${PORT}`);
 });
