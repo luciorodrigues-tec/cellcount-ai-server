@@ -1,6 +1,6 @@
 // ============================================================================
 // CELLCOUNT ELITE HOSPITAL AI
-// GPT-4o HEMATOLOGY ENTERPRISE SERVER
+// GPT-4o HEMATOLOGY ENTERPRISE SERVER V6 SAFE HYBRID
 // ============================================================================
 
 import express from "express";
@@ -8,6 +8,56 @@ import cors from "cors";
 import multer from "multer";
 import dotenv from "dotenv";
 import OpenAI from "openai";
+import crypto from "crypto";
+
+import {
+  performance,
+} from "perf_hooks";
+
+import {
+  correlateHematology,
+} from './services/medicalCorrelationEngine.js';
+
+// ============================================================================
+// ENGINES
+// ============================================================================
+
+import {
+  analyzeErythrocytes,
+} from "./ai/erythrocyteEngine.js";
+
+import {
+  analyzeLeukocytes,
+} from "./ai/leukocyteEngine.js";
+
+import {
+  analyzePlatelets,
+} from "./ai/plateletEngine.js";
+
+import {
+  buildDiagnosticCorrelation,
+} from "./ai/diagnosticCorrelationEngine.js";
+
+import {
+  buildConfidenceAnalysis,
+} from "./ai/confidenceEngine.js";
+
+import {
+  validateHematologyAnalysis,
+} from "./ai/hematologySafetyEngine.js";
+
+import {
+  buildHematologyConsensus,
+} from "./ai/hematologyConsensusEngine.js";
+
+// ============================================================================
+// IMAGE ENGINE
+// ============================================================================
+
+import {
+  enhanceMicroscopyImage,
+  buildGPTImagePayload,
+} from "./ai/imageEnhancer.js";
 
 // ============================================================================
 // ENV
@@ -19,7 +69,7 @@ console.log(
   "OPENAI:",
   process.env.OPENAI_API_KEY
     ? "CARREGADA"
-    : "NÃO ENCONTRADA"
+    : "NÃO ENCONTRADA",
 );
 
 // ============================================================================
@@ -35,9 +85,9 @@ const app = express();
 const PORT =
   process.env.PORT || 3000;
 
-const AUTH_TOKEN =
-  process.env.AUTH_TOKEN ||
-  "cellcount_v13_token_seguro";
+const API_TOKEN =
+  process.env.API_TOKEN ||
+  "cellcount_enterprise_2026_secure_ai_v4";
 
 const OPENAI_MODEL =
   process.env.OPENAI_MODEL ||
@@ -61,27 +111,27 @@ app.use(
 
   cors({
 
-    origin: '*',
+    origin: "*",
 
     methods: [
 
-      'GET',
-      'POST',
-      'PUT',
-      'DELETE',
-      'OPTIONS',
+      "GET",
+      "POST",
+      "PUT",
+      "DELETE",
+      "OPTIONS",
     ],
 
     allowedHeaders: [
 
-      'Content-Type',
-      'Authorization',
-      'x-user-id',
+      "Content-Type",
+      "Authorization",
+      "x-user-id",
     ],
   }),
 );
 
-app.options('*', cors());
+app.options("*", cors());
 
 // ============================================================================
 // EXPRESS
@@ -89,14 +139,14 @@ app.options('*', cors());
 
 app.use(express.json({
 
-  limit: '50mb',
+  limit: "50mb",
 }));
 
 app.use(express.urlencoded({
 
   extended: true,
 
-  limit: '50mb',
+  limit: "50mb",
 }));
 
 // ============================================================================
@@ -105,11 +155,13 @@ app.use(express.urlencoded({
 
 const upload = multer({
 
-  storage: multer.memoryStorage(),
+  storage:
+    multer.memoryStorage(),
 
   limits: {
 
-    fileSize: 25 * 1024 * 1024,
+    fileSize:
+      25 * 1024 * 1024,
 
     files: 4,
   },
@@ -120,6 +172,210 @@ const upload = multer({
 // ============================================================================
 
 const users = new Map();
+
+// ============================================================================
+// LOGGER
+// ============================================================================
+
+function logStep(
+  requestId,
+  step,
+  start,
+) {
+
+  const elapsed =
+    Math.round(
+      performance.now() - start,
+    );
+
+  console.log(
+    `🧠 [${requestId}] ${step} - ${elapsed}ms`,
+  );
+
+  return elapsed;
+}
+
+// ============================================================================
+// REQUEST ID
+// ============================================================================
+
+function generateRequestId() {
+
+  return crypto.randomUUID();
+}
+
+// ============================================================================
+// SAFE JSON PARSE
+// ============================================================================
+
+function safeJsonParse(
+  text = "{}",
+) {
+
+  try {
+
+    return JSON.parse(text);
+
+  } catch (error) {
+
+    console.error(
+      "SAFE JSON PARSE ERROR:",
+      error,
+    );
+
+    return {};
+  }
+}
+
+// ============================================================================
+// NORMALIZE RESPONSE
+// ============================================================================
+
+function normalizeMedicalResponse(
+  data = {},
+) {
+
+  return {
+
+    summary:
+      data.summary || "",
+
+    riskLevel:
+      data.riskLevel || "Indefinido",
+
+    observations:
+      data.observations || "",
+
+    alerts:
+      Array.isArray(data.alerts)
+        ? data.alerts
+        : [],
+
+    morphologies:
+      Array.isArray(
+        data.morphologies,
+      )
+        ? data.morphologies
+        : [],
+
+    counts:
+      typeof data.counts === "object"
+        ? data.counts
+        : {},
+
+    microscopyQualityScore:
+      typeof data.microscopyQualityScore === "object"
+        ? data.microscopyQualityScore
+        : {},
+
+    educationalPearls:
+      Array.isArray(
+        data.educationalPearls,
+      )
+        ? data.educationalPearls
+        : [],
+
+    heatmapRegions:
+      Array.isArray(
+        data.heatmapRegions,
+      )
+        ? data.heatmapRegions
+        : [],
+
+    imageQuality:
+      typeof data.imageQuality ===
+      "object"
+        ? data.imageQuality
+        : {},
+
+    erythrocyteFindings:
+      typeof data
+        .erythrocyteFindings ===
+      "object"
+        ? data
+            .erythrocyteFindings
+        : {},
+
+    leukocyteFindings:
+      typeof data
+        .leukocyteFindings ===
+      "object"
+        ? data
+            .leukocyteFindings
+        : {},
+
+    plateletFindings:
+      typeof data
+        .plateletFindings ===
+      "object"
+        ? data
+            .plateletFindings
+        : {},
+
+    blastSuspicion:
+      typeof data
+        .blastSuspicion ===
+      "object"
+        ? data
+            .blastSuspicion
+        : {},
+
+    overallAssessment:
+      typeof data
+        .overallAssessment ===
+      "object"
+        ? data
+            .overallAssessment
+        : {},
+
+    structuredReport:
+      typeof data
+        .structuredReport ===
+      "object"
+        ? data
+            .structuredReport
+        : {},
+
+    differentialDiagnosis:
+      Array.isArray(
+        data.differentialDiagnosis,
+      )
+        ? data
+            .differentialDiagnosis
+        : [],
+
+    criticalFlags:
+      Array.isArray(
+        data.criticalFlags,
+      )
+        ? data.criticalFlags
+        : [],
+
+    analysisSource:
+      data.analysisSource ||
+      "ai_visual",
+
+    manualCounts:
+      typeof data.manualCounts ===
+      "object"
+        ? data.manualCounts
+        : {},
+
+    aiDetectedCounts:
+      typeof data.aiDetectedCounts ===
+      "object"
+        ? data.aiDetectedCounts
+        : {},
+
+    hybridValidation:
+      typeof data.hybridValidation ===
+      "object"
+        ? data.hybridValidation
+        : {},
+
+    ...data,
+  };
+}
 
 // ============================================================================
 // AUTH
@@ -133,15 +389,21 @@ function auth(
 
   try {
 
-    const header =
-      req.headers.authorization || "";
-
     const token =
-      header
-        .replace("Bearer ", "")
-        .trim();
+      req.headers.authorization
+        ?.replace(
+          "Bearer ",
+          "",
+        );
 
-    if (token !== AUTH_TOKEN) {
+    if (
+
+      !token ||
+
+      token.trim() !==
+        API_TOKEN.trim()
+
+    ) {
 
       return res.status(401).json({
 
@@ -198,357 +460,1082 @@ function getUser(req) {
 }
 
 // ============================================================================
-// MIME
+// TEXT NORMALIZER
 // ============================================================================
 
-function mimeFromFile(file) {
+function normalizeSemanticText(
+  value = "",
+) {
 
-  if (
-    file?.mimetype &&
-    file.mimetype.startsWith(
-      "image/"
+  return String(value)
+
+    .normalize("NFD")
+
+    .replace(
+      /[\u0300-\u036f]/g,
+      "",
     )
-  ) {
 
-    return file.mimetype;
-  }
+    .replace(
+      /[^a-zA-Z0-9\s]/g,
+      " ",
+    )
 
-  return "image/jpeg";
+    .replace(
+      /\s+/g,
+      " ",
+    )
+
+    .toLowerCase()
+
+    .trim();
 }
 
 // ============================================================================
-// HOSPITAL SUPER PROMPT
+// ANALYSIS SOURCE
+// ============================================================================
+
+function normalizeAnalysisSource(
+  source = "",
+) {
+
+  const normalized =
+    String(source)
+      .toLowerCase()
+      .trim();
+
+  if (
+    normalized === "manual"
+  ) {
+
+    return "manual";
+  }
+
+  if (
+    normalized === "hybrid"
+  ) {
+
+    return "hybrid";
+  }
+
+  return "ai_visual";
+}
+
+function buildSafeManualMetadata({
+
+  analysisSource,
+
+  manualCounts = {},
+}) {
+
+  const hasManualData =
+    Object.keys(
+      manualCounts,
+    ).length > 0;
+
+  return {
+
+    analysisSource,
+
+    manualMode:
+      analysisSource ===
+      "manual",
+
+    hybridMode:
+      analysisSource ===
+      "hybrid",
+
+    aiVisualMode:
+      analysisSource ===
+      "ai_visual",
+
+    hasManualData,
+  };
+}
+
+// ============================================================================
+// SEMANTIC EXTRACTION
+// ============================================================================
+
+function buildSemanticText(
+  parsed = {},
+) {
+
+  const blocks = [
+
+    parsed.summary,
+
+    parsed.observations,
+
+    parsed.riskLevel,
+
+    parsed.morphologicInterpretation,
+
+    parsed.hematologicCorrelation,
+
+    parsed.educationalConclusion,
+
+    parsed.plainTextReport,
+
+    parsed.mainImpression,
+
+    parsed.morphologySummary,
+
+    parsed.structuredReport
+      ?.morphologySummary,
+
+    parsed.structuredReport
+      ?.educationalConclusion,
+
+    parsed.structuredReport
+      ?.plainTextReport,
+
+    parsed.overallAssessment
+      ?.mainImpression,
+
+    parsed.overallAssessment
+      ?.recommendedCorrelation,
+
+    parsed.imageQuality
+      ?.limitations,
+
+    parsed.imageQuality
+      ?.artifacts,
+
+    parsed.erythrocyteFindings
+      ?.summary,
+
+    parsed.erythrocyteFindings
+      ?.findings,
+
+    parsed.erythrocyteFindings
+      ?.suspectedPatterns,
+
+    parsed.leukocyteFindings
+      ?.summary,
+
+    parsed.leukocyteFindings
+      ?.findings,
+
+    parsed.leukocyteFindings
+      ?.leftShift,
+
+    parsed.leukocyteFindings
+      ?.toxicChanges,
+
+    parsed.leukocyteFindings
+      ?.dysplasiaSuspicion,
+
+    parsed.blastSuspicion
+      ?.morphologicReasons,
+
+    parsed.blastSuspicion
+      ?.againstBlast,
+
+    parsed.plateletFindings
+      ?.summary,
+
+    parsed.plateletFindings
+      ?.findings,
+
+    parsed.differentialDiagnosis,
+
+    parsed.criticalFlags,
+
+    parsed.educationalPearls,
+
+    parsed.morphologies,
+
+    parsed.alerts,
+
+    parsed.heatmapRegions,
+
+    parsed.analise,
+  ];
+
+  return normalizeSemanticText(
+
+    blocks
+
+      .flat(Infinity)
+
+      .filter(Boolean)
+
+      .map((item) => {
+
+        if (
+          typeof item ===
+          "string"
+        ) {
+
+          return item;
+        }
+
+        return JSON.stringify(
+          item,
+        );
+      })
+
+      .join(" "),
+  );
+}
+
+// ============================================================================
+// HEMATOLOGY PIPELINE PROMPT V7
+// CELLCOUNT ELITE HOSPITAL AI
 // ============================================================================
 
 const hospitalPrompt = `
 
-VOCÊ É UMA IA HEMATOLÓGICA HOSPITALAR PREMIUM.
+VOCÊ É UMA IA HEMATOLÓGICA HOSPITALAR DE ALTA COMPLEXIDADE.
 
-ESPECIALIZAÇÃO:
-- Hematologia clínica
-- Hematopatologia
-- Morfologia hematológica
-- Citologia hematológica
-- Medicina laboratorial
-- Análises clínicas
-- Leucemias agudas e crônicas
-- Síndromes mielodisplásicas
-- Alterações eritrocitárias
-- Diagnóstico morfológico hematológico
+ESPECIALIZAÇÕES:
+- hematologia clínica
+- hematopatologia
+- morfologia hematológica
+- citologia hematológica
+- microscopia digital
+- sangue periférico
+- medula óssea
+- revisão microscópica educacional
+- análise morfológica avançada
 
-SEU COMPORTAMENTO DEVE SIMULAR:
+MISSÃO:
+Executar análise hematológica EDUCACIONAL altamente segura, estruturada e semelhante à revisão microscópica hospitalar real.
 
-- Médico hematologista experiente
-- Morfologista hematológico hospitalar
-- Especialista em microscopia hematológica
-- Professor universitário hematologia
-- Pós-doutorado em análises clínicas
+====================================================================
+REGRAS ABSOLUTAS
+====================================================================
 
-IMPORTANTE:
-A análise é EDUCACIONAL.
-NÃO emitir diagnóstico definitivo.
-NÃO substituir profissional habilitado.
-NÃO substituir avaliação médica especializada.
-Os resultados devem ser interpretados junto ao contexto clínico e laboratorial do paciente.
+NUNCA:
 
-======================================================================
-OBJETIVO
-======================================================================
+- emitir diagnóstico definitivo
+- confirmar leucemia
+- confirmar malignidade
+- afirmar neoplasia hematológica
+- afirmar blastose verdadeira
+- substituir hematologista
+- inventar células
+- inferir estruturas não visualizadas
+- ignorar limitações técnicas
+- extrapolar achados
+- gerar linguagem conclusiva
+- utilizar linguagem alarmista
+- interpretar contagem manual como evidência visual
 
-Analisar imagens de esfregaço sanguíneo periférico.
+PROIBIDO USAR:
 
-Avaliar:
-- leucócitos
-- hemácias
-- plaquetas
-- artefatos
-- qualidade microscópica
-- coerência morfológica
-- correlação hematológica
+- “diagnóstico de”
+- “confirmado”
+- “compatível definitivamente”
+- “leucemia”
+- “neoplasia confirmada”
+- “maligno”
+- “blastos confirmados”
 
-======================================================================
-RACIOCÍNIO MORFOLÓGICO AVANÇADO
-======================================================================
+UTILIZAR SOMENTE:
 
-A IA deve agir como morfologista hematológico experiente.
+- suspeita morfológica
+- hipótese educacional
+- requer correlação
+- sugestivo de
+- achado não conclusivo
+- possível presença
+- baixa evidência visual
+- moderada evidência visual
+- revisão microscópica recomendada
 
-Para CADA alteração detectada:
-- justificar critérios morfológicos observados
-- explicar por que considera verdadeiro achado
-- diferenciar alterações reais de artefatos
-- discutir limitações da análise
-- correlacionar achados entre si
+====================================================================
+REGRA MAIS IMPORTANTE
+====================================================================
 
-NUNCA responder apenas:
-- "anisocitose leve"
-- "poiquilocitose discreta"
-- "alterações inespecíficas"
+PRIMEIRO:
+DESCREVER O QUE ESTÁ VISUALMENTE PRESENTE.
 
-A IA deve:
-- descrever o padrão observado
-- correlacionar os achados
-- discutir coerência hematológica
+DEPOIS:
+VALIDAR MORFOLOGIA.
 
-EXEMPLO CORRETO:
-"Observa-se discreta anisopoquilocitose com presença ocasional de codócitos e policromasia leve."
+DEPOIS:
+CALCULAR EVIDÊNCIA.
 
-EXEMPLO INCORRETO:
-"Anisocitose leve."
+DEPOIS:
+VALIDAR SEGURANÇA.
 
-======================================================================
-ANÁLISE MULTICAMPO
-======================================================================
+SOMENTE NO FINAL:
+GERAR CORRELAÇÃO EDUCACIONAL.
 
-Quando múltiplas imagens forem enviadas:
+NUNCA INTERPRETAR ANTES DA ANÁLISE VISUAL.
 
-- correlacionar TODOS os campos
-- confirmar repetição dos achados
-- detectar heterogeneidade
-- evitar conclusões baseadas em único campo
-- aumentar confiança apenas quando achados forem repetidos
+====================================================================
+MODO IA VISUAL ISOLADA — PADRÃO ESPECIALISTA
+====================================================================
 
-======================================================================
-DESCRIÇÃO CELULAR OBRIGATÓRIA
-======================================================================
+Quando analysisSource === "ai_visual":
 
-Quando identificar células suspeitas,
-descrever SEMPRE:
+Atuar como hematologista especialista em microscopia.
 
+NÃO informar apenas achados simples.
+
+Para cada alteração observada explicar:
+
+1. O QUE FOI OBSERVADO
+- tipo celular predominante
+- maturação nuclear
 - cromatina
-- nucléolos
 - citoplasma
 - granulações
-- vacuolização
-- relação núcleo/citoplasma
-- segmentação nuclear
-- regularidade de membrana
+- alterações eritrocitárias
+- plaquetas
 
-======================================================================
-BLASTOS
-======================================================================
+2. SIGNIFICADO MORFOLÓGICO
+Explicar o possível significado biológico.
 
-SER EXTREMAMENTE RIGOROSO.
+Usar:
+"pode estar associado"
+"pode ser observado em"
+"é compatível morfologicamente com"
 
-Diferenciar:
-- linfócito reacional
-- monócito ativado
-- célula degenerada
-- artefato
-- blasto verdadeiro
+Nunca:
+"diagnostica"
+"confirma"
 
-Blastos verdadeiros geralmente possuem:
-- cromatina frouxa
-- nucléolos evidentes
-- alta relação núcleo/citoplasma
-- contornos delicados
-- aspecto imaturo
+3. RACIOCÍNIO HEMATOLÓGICO
 
-Quando houver critérios suficientes,
-a IA pode sugerir:
-- suspeita de blastos
-- células imaturas suspeitas
-- população atípica
+Explicar:
+- por que aquele padrão ocorre
+- quais mecanismos celulares podem justificar
+- quais achados aumentariam suspeição
+- quais achados tranquilizam
 
-Desde que:
-- descreva os critérios observados
-- informe nível de confiança
-- recomende correlação especializada
+4. CORRELAÇÕES POSSÍVEIS
 
-REDUZIR confiança se:
-- cromatina condensada
-- imagem desfocada
-- nucléolo ausente
-- foco inadequado
+Gerar correlações baseadas na literatura:
 
-======================================================================
-ESQUIZÓCITOS
-======================================================================
+Exemplos:
+neutrofilia madura:
+- resposta inflamatória
+- infecção bacteriana
+- estresse fisiológico
+- corticoterapia
 
-Só sugerir:
-- quando fragmentos típicos forem repetidos
-- múltiplos campos
-- fragmentação verdadeira
+linfócitos reacionais:
+- resposta viral
+- ativação imunológica
 
-NÃO sugerir:
-- hemácia deformada isolada
-- artefato
-- hemácia dobrada
+blastos:
+- necessidade de investigação hematológica urgente
 
-======================================================================
-ERITRÓCITOS
-======================================================================
+anisocitose:
+- deficiência nutricional
+- regeneração eritroide
+- alterações eritrocitárias diversas
+
+Sempre deixar claro:
+"Sugestões educacionais, dependentes de confirmação clínica e laboratorial."
+
+5. PROFUNDIDADE
+
+Cada campo textual deve conter no mínimo:
+500 caracteres.
+
+Evitar respostas genéricas.
+
+====================================================================
+MODO MANUAL
+====================================================================
+
+SE analysisSource === "manual":
+
+- NÃO assumir presença real de blastos
+- NÃO interpretar como leucemia
+- NÃO concluir proliferação
+- reduzir agressividade diagnóstica
+- informar que contagem foi digitada manualmente
+- recomendar revisão microscópica real
+
+SE analysisSource === "hybrid":
+
+- diferenciar claramente:
+  - achado visual IA
+  - contagem manual
+  - correlação híbrida
+
+====================================================================
+PIPELINE OBRIGATÓRIO
+====================================================================
+
+ETAPA 1 — IMAGE QUALITY
 
 Avaliar:
+
+- foco
+- nitidez
+- coloração
+- iluminação
+- artefatos
+- compressão
+- sobreposição celular
+- resolução
+- distorções
+- áreas inadequadas
+
+====================================================================
+
+ETAPA 2 — VISUAL EXTRACTION
+
+Descrever SOMENTE estruturas VISUALMENTE observadas:
+
+- neutrófilos
+- linfócitos
+- monócitos
+- eosinófilos
+- basófilos
+- blastos suspeitos
+- células imaturas
+- eritroblastos
+- plaquetas
+- agregados
+- artefatos
+
+NÃO interpretar ainda.
+
+====================================================================
+
+ETAPA 3 — MORPHOLOGY ANALYSIS
+
+Avaliar:
+
+ERITRÓCITOS:
 - anisocitose
 - poiquilocitose
 - policromasia
 - hipocromia
 - macrocitose
 - microcitose
-- rouleaux
-- drepanócitos
 - esquizócitos
-- codócitos
-- acantócitos
-- equinócitos
-- eliptócitos
 - dacriócitos
-- estomatócitos
-- corpos de Howell-Jolly
+- acantócitos
+- codócitos
+- eliptócitos
+- drepanócitos
+- inclusões eritrocitárias
 
-======================================================================
-LEUCÓCITOS
-======================================================================
-
-Avaliar:
-- desvio à esquerda
-- toxicidade
+LEUCÓCITOS:
+- relação núcleo/citoplasma
+- cromatina
+- nucléolos
+- granulação
 - vacuolização
-- hipersegmentação
-- blastos
-- atipias
-- linfócitos reativos
-- granulações tóxicas
+- segmentação
+- toxicidade
+- displasia
+- imaturidade
 
-======================================================================
-PLAQUETAS
-======================================================================
+PLAQUETAS:
+- número
+- agregação
+- gigantismo
+- anisoplaquetose
 
-Avaliar:
-- agregados
-- macroplaquetas
-- trombocitopenia aparente
-- pseudoplaquetopenia
+GERAR morphologyAnalysis.summary:
 
-======================================================================
-CORRELAÇÃO HEMATOLÓGICA
-======================================================================
+Texto obrigatório.
 
-A IA deve correlacionar:
-- série branca
-- série vermelha
-- plaquetas
-- qualidade microscópica
+Descrever como especialista:
+- população celular predominante
+- características nucleares
+- padrão de cromatina
+- citoplasma
+- granulações
+- alterações eritrocitárias
+- distribuição plaquetária
 
-Discutir:
-- coerência dos achados
-- limitações
-- padrões hematológicos possíveis
+Não interpretar doenças aqui.
 
-======================================================================
-VALIDAÇÃO DE COERÊNCIA
-======================================================================
+Apenas:
+"O que é observado na lâmina".
 
-NÃO permitir:
-- blasto com cromatina madura
-- esquizócito sem fragmentação típica
-- displasia baseada em célula isolada
-- desvio à esquerda sem imaturas
+====================================================================
 
-======================================================================
-QUALIDADE MICROSCÓPICA
-======================================================================
+ETAPA 4 — VISUAL EVIDENCE ENGINE
 
-Avaliar:
-- foco
-- coloração
-- representatividade
-- iluminação
+OBRIGATÓRIO:
+
+Calcular:
+
+- visualEvidenceScore (0-100)
+- evidenceLevel
+- morphologyConfidence
+- imageReliability
+- artifactInterference
+
+CLASSIFICAÇÃO:
+
+0-39:
+baixa evidência visual
+
+40-69:
+moderada evidência visual
+
+70-100:
+alta evidência visual
+
+====================================================================
+
+ETAPA 5 — BLAST VALIDATION
+
+CRÍTICO:
+
+NUNCA afirmar leucemia.
+
+SE blastos suspeitos:
+
+VALIDAR:
+
+- cromatina
+- nucléolos
+- relação N/C
+- padrão citoplasmático
+- qualidade da imagem
 - artefatos
-- compressão
-- resolução
+- sobreposição celular
 
-======================================================================
-FORMATO OBRIGATÓRIO
-======================================================================
+SE visualEvidenceScore < 70:
 
-RETORNAR APENAS JSON VÁLIDO.
+PROIBIDO:
+- usar “leucemia”
+- usar “blastose”
+- usar “malignidade”
 
-NUNCA markdown.
-NUNCA comentários.
-NUNCA texto extra.
+SUBSTITUIR POR:
 
-FORMATO:
+- células imaturas suspeitas
+- achado inconclusivo
+- suspeita morfológica limitada
+- revisão hematológica recomendada
+
+====================================================================
+
+ETAPA 6 — SAFETY VALIDATION
+
+VALIDAR:
+
+- contradições internas
+- exagero diagnóstico
+- inferências indevidas
+- limitações técnicas
+- qualidade insuficiente
+- inconsistência morfológica
+
+SE inconsistência detectada:
+
+REDUZIR:
+- confidence
+- agressividade diagnóstica
+
+====================================================================
+
+ETAPA 7 — CONSENSUS ENGINE
+
+Comparar:
+
+- visual findings
+- morphology analysis
+- evidence engine
+- safety validation
+
+VALIDAR:
+
+- coerência hematológica
+- coerência visual
+- coerência morfológica
+- coerência de confiança
+
+====================================================================
+
+ETAPA 8 — CLINICAL CORRELATION
+
+SOMENTE AGORA:
+
+Gerar:
+- hipóteses educacionais
+- possibilidades morfológicas
+- recomendações
+- necessidade de revisão
+
+NUNCA:
+- diagnóstico definitivo
+- confirmação clínica
+
+====================================================================
+IMPRESSÃO HEMATOLÓGICA EDUCACIONAL — overallAssessment.mainImpression
+====================================================================
+
+Gerar obrigatoriamente overallAssessment.mainImpression.
+
+Criar uma conclusão educacional final semelhante a uma revisão hematológica.
+
+Deve conter:
+
+1. RESUMO MORFOLÓGICO
+- principais células observadas
+- padrão predominante
+- alterações celulares relevantes
+
+2. INTERPRETAÇÃO EDUCACIONAL
+Explicar:
+- possível significado dos achados
+- contexto hematológico provável
+- relevância da alteração
+
+Usar:
+"pode sugerir"
+"pode estar associado"
+"deve ser correlacionado"
+
+3. LIMITAÇÕES
+
+Informar:
+- análise baseada apenas nas imagens enviadas
+- necessidade de hemograma completo
+- revisão microscópica profissional quando indicada
+
+NUNCA:
+- fechar diagnóstico
+- substituir laudo laboratorial
+- afirmar doença
+
+Texto mínimo:
+400 caracteres.
+
+====================================================================
+SIGNIFICADO DOS ACHADOS — clinicalMeaning
+====================================================================
+
+Gerar obrigatoriamente o campo clinicalMeaning.
+
+Objetivo:
+explicar o significado prático dos achados observados.
+
+Usar linguagem segura:
+- "pode ser sugestivo de"
+- "pode estar associado a"
+- "requer correlação com"
+- "não permite diagnóstico isolado"
+
+Nunca afirmar diagnóstico.
+
+Sempre correlacionar com:
+- hemograma completo
+- dados clínicos
+- revisão microscópica profissional
+
+====================================================================
+RESPOSTA OBRIGATÓRIA
+====================================================================
+
+RESPONDER SOMENTE JSON VÁLIDO.
+
+ESTRUTURA OBRIGATÓRIA:
 
 {
-  "summary": "",
+  "imageQuality": {},
+  "visualExtraction": {},
+  "morphologyAnalysis": {},
 
-  "riskLevel": "",
+  "interpretiveSynthesis":
+  "Texto acadêmico avançado obrigatório. Descrever em detalhes os achados morfológicos observados, linhagens celulares envolvidas, maturação nuclear, características citoplasmáticas e interpretação hematológica educacional.",
 
-  "observations": "",
+  "clinicalMeaning":
+  "Texto obrigatório com no mínimo 500 caracteres. Explicar o significado dos achados encontrados, possíveis mecanismos fisiológicos associados e correlação clínico-laboratorial necessária. Nunca afirmar diagnóstico.",
 
-  "erythrocyteFindings": "",
+  "hematologicReasoning":
+  "Texto obrigatório com no mínimo 500 caracteres. Explicar raciocínio hematológico especialista considerando morfologia celular, maturação, alterações reacionais, sinais de alerta e limitações da imagem.",
 
-  "leukocyteFindings": "",
+  "educationalImpact":
+  "Texto obrigatório explicando valor educacional, limitações e quais exames ou dados complementares poderiam auxiliar.",
 
-  "plateletFindings": "",
-
-  "morphologicInterpretation": "",
-
-  "hematologicCorrelation": "",
-
-  "suspectedConditions": [],
-
-  "alerts": [],
-
-  "morphologies": [],
-
-  "counts": {
-
-    "Blasto": 0,
-    "Promielócito": 0,
-    "Mielócito": 0,
-    "Metamielócito": 0,
-    "Bastonete": 0,
-    "Segmentado": 0,
-    "Linfócito": 0,
-    "Linfócito Reativo": 0,
-    "Monócito": 0,
-    "Eosinófilo": 0,
-    "Basófilo": 0,
-    "Eritroblasto": 0
-  },
-
-  "microscopyQualityScore": {
-
-    "focus": 0,
-    "staining": 0,
-    "artifactInterference": 0,
-    "representativity": 0,
-    "overall": 0
-  },
-
-  "morphologicConfidenceMatrix": {
-
-    "blastConfidence": 0,
-    "schistocyteConfidence": 0,
-    "dysplasiaConfidence": 0,
-    "leftShiftConfidence": 0
-  },
-
-  "hematologicUrgency": {
-
-    "level": "",
-
-    "requiresImmediateReview": false,
-
-    "reasons": []
-  },
-
-  "educationalPearls": []
+  "visualEvidence": {},
+  "confidenceAnalysis": {},
+  "safetyValidation": {},
+  "consensusAnalysis": {},
+  "clinicalCorrelation": {},
+  "erythrocyteFindings": {},
+  "leukocyteFindings": {},
+  "plateletFindings": {},
+  "blastSuspicion": {},
+  "overallAssessment": {},
+  "structuredReport": {},
+  "criticalFlags": [],
+  "educationalPearls": [],
+  "limitations": [],
+  "recommendedCorrelation": [],
+  "heatmapRegions": []
 }
 
-EXEMPLO DE ESTILO ESPERADO:
+====================================================================
+ESTILO
+====================================================================
 
-"Observa-se discreta anisopoquilocitose com predomínio de hemácias alongadas e ocasionais codócitos. Série branca sem evidência clara de blastos; células linfocitárias apresentam cromatina condensada e ausência de nucléolos evidentes, favorecendo padrão maduro. Plaquetas presentes em quantidade aparentemente preservada, com pequenos agregados ocasionais."
+Utilizar:
+- linguagem hospitalar
+- linguagem acadêmica
+- terminologia hematológica real
+- descrição objetiva
+- segurança clínica máxima
+
+====================================================================
+PRINCÍPIO FUNDAMENTAL
+====================================================================
+
+NUNCA CONCLUIR ALÉM DA EVIDÊNCIA VISUAL DISPONÍVEL.
+
+PRIORIZE SEGURANÇA CLÍNICA SOBRE SENSACIONALISMO.
 
 `;
+
+// ============================================================================
+// OPENAI ANALYSIS
+// ============================================================================
+
+// ============================================================================
+// OPENAI MULTI-STAGE ANALYSIS V7
+// ============================================================================
+
+async function analyzeWithOpenAI({
+  images,
+  analysisSource = "ai_visual",
+  manualCounts = {},
+}) {
+  const requestId = generateRequestId();
+  const pipelineStart = performance.now();
+
+  try {
+    const imageStart = performance.now();
+    const imagesPayload = [];
+    const imageMetadata = [];
+
+    for (const file of images) {
+      const enhanced = await enhanceMicroscopyImage(file.buffer);
+      if (enhanced?.metadata) {
+        imageMetadata.push(enhanced.metadata);
+      }
+
+      const payload = buildGPTImagePayload(enhanced, "image/jpeg", {
+        maxTiles: Number(process.env.GPT_IMAGE_TILES || 0),
+      });
+
+      imagesPayload.push(...payload);
+    }
+
+    const imageTiming = logStep(requestId, "IMAGE ENHANCEMENT TURBO", imageStart);
+
+    const manualMetadata = buildSafeManualMetadata({
+      analysisSource,
+      manualCounts,
+    });
+
+    const contextualPrompt = `
+ANALYSIS SOURCE: ${analysisSource}
+MANUAL COUNTS: ${JSON.stringify(manualCounts)}
+
+MODOS DE ANÁLISE:
+
+ai_visual:
+- Super IA independente.
+- Avaliar exclusivamente a imagem enviada.
+- Não exigir contagem diferencial.
+- Não gerar erro por ausência de valores manuais.
+- Focar em morfologia celular e qualidade da lâmina.
+
+hybrid:
+- Super IA + calculadora diferencial.
+- Integrar achados visuais com os valores informados.
+- Diferenciar claramente:
+  achado observado pela IA
+  versus
+  dado informado pelo usuário.
+
+manual:
+- Dados inseridos pelo usuário.
+- Não assumir que representam achados visuais.
+
+REGRA PRINCIPAL:
+A calculadora diferencial é opcional.
+A Super IA deve funcionar completamente sem ela.
+
+Execute o pipeline completo em UMA resposta JSON única, preservando:
+imageQuality, visualExtraction, morphologyAnalysis, visualEvidence,
+erythrocyteFindings, leukocyteFindings, plateletFindings, blastSuspicion,
+overallAssessment, structuredReport, possibleClinicalCorrelations,
+associatedEducationalHypotheses, clinicalCorrelationNeeds, clinicalMeaning,
+educationalImpact, interpretiveSynthesis e hematologicReasoning.
+`;
+
+    const visualStart = performance.now();
+
+    const completion = await openai.chat.completions.create({
+      model: OPENAI_MODEL,
+      temperature: 0.12,
+      response_format: { type: "json_object" },
+      messages: [
+        {
+          role: "system",
+          content: `${hospitalPrompt}
+
+MODO TURBO ENTERPRISE:
+Gerar a estrutura completa obrigatória em uma única chamada, com escrita acadêmica, segura e não diagnóstica. Nunca retornar campos vazios.`,
+        },
+        {
+          role: "user",
+          content: [
+            { type: "text", text: contextualPrompt },
+            ...imagesPayload,
+          ],
+        },
+      ],
+    });
+
+    const parsed = safeJsonParse(
+      completion?.choices?.[0]?.message?.content || "{}",
+    );
+
+    const visualTiming = logStep(requestId, "OPENAI TURBO ANALYSIS", visualStart);
+
+    const mergedAnalysis = normalizeMedicalResponse({
+      ...parsed,
+      analysisSource,
+      manualCounts,
+      manualMetadata,
+    });
+
+    // Campos avançados sempre presentes para evitar cards vazios no Flutter.
+    mergedAnalysis.possibleClinicalCorrelations =
+      Array.isArray(mergedAnalysis.possibleClinicalCorrelations) &&
+      mergedAnalysis.possibleClinicalCorrelations.length > 0
+        ? mergedAnalysis.possibleClinicalCorrelations
+        : [
+            "Resposta inflamatória ou infecciosa, conforme correlação com leucograma e clínica.",
+            "Padrão reacional fisiológico, dependendo do contexto do paciente.",
+            "Alterações hematológicas secundárias que exigem correlação com hemograma completo.",
+            "Necessidade de revisão microscópica profissional para confirmação ou retificação dos achados.",
+          ];
+
+
+    mergedAnalysis.associatedEducationalHypotheses =
+      Array.isArray(mergedAnalysis.associatedEducationalHypotheses) &&
+      mergedAnalysis.associatedEducationalHypotheses.length > 0
+        ? mergedAnalysis.associatedEducationalHypotheses
+        : [
+            "Padrão morfológico reacional relacionado a estímulos fisiológicos ou imunológicos.",
+            "Alterações secundárias que devem ser avaliadas em conjunto com parâmetros hematimétricos.",
+            "Possíveis respostas adaptativas da medula óssea conforme contexto clínico-laboratorial.",
+            "Necessidade de excluir artefatos de lâmina, coloração ou preparação antes de qualquer conclusão.",
+          ];
+
+
+    mergedAnalysis.clinicalCorrelationNeeds = Array.isArray(mergedAnalysis.clinicalCorrelationNeeds)
+      ? mergedAnalysis.clinicalCorrelationNeeds
+      : ["Hemograma completo", "Quadro clínico", "Revisão microscópica profissional"];
+    mergedAnalysis.clinicalMeaning =
+      mergedAnalysis.clinicalMeaning ||
+      mergedAnalysis.clinicalCorrelation?.summary ||
+      mergedAnalysis.overallAssessment?.recommendedCorrelation ||
+      "Os achados morfológicos identificados devem ser interpretados considerando sua relevância biológica. Alterações celulares podem refletir respostas fisiológicas, processos reacionais ou outras condições hematológicas que necessitam avaliação conjunta com hemograma completo, parâmetros quantitativos, histórico clínico e revisão microscópica profissional.";
+
+    mergedAnalysis.interpretiveSynthesis =
+      mergedAnalysis.interpretiveSynthesis ||
+      mergedAnalysis.structuredReport?.morphologySummary ||
+      mergedAnalysis.structuredReport?.plainTextReport ||
+      mergedAnalysis.leukocyteFindings?.summary ||
+      mergedAnalysis.erythrocyteFindings?.summary ||
+      mergedAnalysis.overallAssessment?.mainImpression ||
+      "A avaliação morfológica digital descreve características celulares observáveis na imagem analisada, incluindo padrões de maturação, alterações nucleares, citoplasmáticas e distribuição celular. A interpretação deve considerar qualidade da amostra, limitações técnicas e correlação com dados laboratoriais complementares.";
+    mergedAnalysis.hematologicReasoning =
+      mergedAnalysis.hematologicReasoning ||
+      "A avaliação hematológica considera inicialmente a linhagem celular predominante, características nucleares, padrão de cromatina, relação núcleo/citoplasma, alterações citoplasmáticas e maturação celular. Esses elementos auxiliam na diferenciação entre padrões reacionais, fisiológicos ou alterações que necessitam investigação complementar. A análise digital deve sempre ser correlacionada com hemograma completo, histórico clínico e revisão microscópica profissional.";
+    const extractedText = buildSemanticText(mergedAnalysis);
+
+    const engineStart = performance.now();
+    const [erythrocyteAnalysis, leukocyteAnalysis, plateletAnalysis] = await Promise.all([
+      analyzeErythrocytes(extractedText),
+      analyzeLeukocytes(extractedText),
+      analyzePlatelets(extractedText),
+    ]);
+    const engineTiming = logStep(requestId, "HEMATOLOGY ENGINES", engineStart);
+
+    const safetyStart = performance.now();
+    const safetyValidation = validateHematologyAnalysis({
+      analysis: mergedAnalysis,
+      extractedText,
+      erythrocyteAnalysis,
+      leukocyteAnalysis,
+      plateletAnalysis,
+      diagnosticCorrelation: {},
+      confidenceAnalysis: {},
+      analysisSource,
+    });
+    const safetyTiming = logStep(requestId, "SAFETY ENGINE", safetyStart);
+
+    const consensusStart = performance.now();
+    const consensusAnalysis = buildHematologyConsensus({
+      analysis: mergedAnalysis,
+      leukocyteAnalysis,
+      erythrocyteAnalysis,
+      plateletAnalysis,
+      confidenceAnalysis: {},
+      diagnosticCorrelation: {},
+      safetyValidation,
+      analysisSource,
+    });
+    const consensusTiming = logStep(requestId, "CONSENSUS ENGINE", consensusStart);
+
+    let diagnosticCorrelation = buildDiagnosticCorrelation({
+      extractedText,
+      erythrocyteAnalysis,
+      leukocyteAnalysis,
+      plateletAnalysis,
+      consensusAnalysis,
+      analysisSource,
+    });
+
+    if (safetyValidation?.safeDiagnosticGate === true && process.env.ENABLE_ADVANCED_CORRELATION === "true") {
+      try {
+        const advancedCorrelation = await Promise.race([
+          correlateHematology({
+            manualMetadata,
+            extractedText,
+            visualExtraction: mergedAnalysis.visualExtraction || {},
+            morphologyAnalysis: mergedAnalysis.morphologyAnalysis || {},
+            evidenceAnalysis: mergedAnalysis.visualEvidence || {},
+            erythrocyteAnalysis,
+            leukocyteAnalysis,
+            plateletAnalysis,
+            consensusAnalysis,
+            analysisSource,
+          }),
+          new Promise((resolve) => setTimeout(() => resolve({ timeout: true }), 8000)),
+        ]);
+        diagnosticCorrelation = { ...diagnosticCorrelation, advancedCorrelation };
+      } catch (error) {
+        diagnosticCorrelation = {
+          ...diagnosticCorrelation,
+          advancedCorrelation: { skipped: true, reason: error.message },
+        };
+      }
+    }
+
+    const confidenceStart = performance.now();
+    const confidenceAnalysis = buildConfidenceAnalysis({
+      analysis: mergedAnalysis,
+      extractedText,
+      erythrocyteAnalysis,
+      leukocyteAnalysis,
+      plateletAnalysis,
+      diagnosticCorrelation,
+      consensusResult: consensusAnalysis,
+      analysisSource,
+    });
+    const confidenceTiming = logStep(requestId, "CONFIDENCE ENGINE", confidenceStart);
+
+    let finalStructuredReport = mergedAnalysis?.structuredReport || {};
+
+    if (!safetyValidation?.safeDiagnosticGate) {
+      finalStructuredReport = {
+        ...finalStructuredReport,
+        recommendation: finalStructuredReport?.recommendation ||
+          "Revisão microscópica manual recomendada.",
+      };
+
+      mergedAnalysis.overallAssessment = {
+        ...(mergedAnalysis.overallAssessment || {}),
+        requiresHumanReview: true,
+        safeMode: true,
+        recommendedCorrelation:
+          mergedAnalysis.overallAssessment?.recommendedCorrelation ||
+          "Correlação hematológica presencial recomendada.",
+      };
+    }
+
+    const totalPipelineTime = logStep(requestId, "TOTAL PIPELINE TURBO", pipelineStart);
+
+    return {
+      ...mergedAnalysis,
+      structuredReport: finalStructuredReport,
+      manualMetadata,
+      extractedText,
+      erythrocyteAnalysis,
+      leukocyteAnalysis,
+      plateletAnalysis,
+      diagnosticCorrelation,
+      confidenceAnalysis,
+      consensusAnalysis,
+      safetyValidation,
+      pipeline: {
+        version: "V8_TURBO_ENTERPRISE",
+        source: analysisSource,
+        multiStagePipeline: true,
+        turboSingleOpenAICall: true,
+        visualExtraction: true,
+        morphologyValidation: true,
+        evidenceEngine: true,
+        safetyGate: true,
+        consensusValidation: true,
+        clinicalCorrelation: safetyValidation?.safeDiagnosticGate === true,
+        safeClinicalMode: !safetyValidation?.safeDiagnosticGate || consensusAnalysis?.safeClinicalMode || false,
+        manualMode: analysisSource === "manual",
+        hybridMode: analysisSource === "hybrid",
+        aiVisualMode: analysisSource === "ai_visual",
+      },
+      metadata: {
+        requestId,
+        model: OPENAI_MODEL,
+        pipelineVersion: "V8_TURBO_ENTERPRISE",
+        architecture: "turbo_semantic_hematology_engine",
+        hospitalGrade: true,
+        educationalMode: true,
+        images: images.length,
+        imageMetadata,
+        visualEvidenceScore: safetyValidation?.visualEvidenceScore || 0,
+        morphologyCoherence: safetyValidation?.morphologyCoherence || 0,
+        falsePositiveRisk: safetyValidation?.falsePositiveRisk || 0,
+        diagnosticReliability: safetyValidation?.diagnosticReliability || 0,
+        artifactProbability: safetyValidation?.artifactProbability || 0,
+        safeDiagnosticGate: safetyValidation?.safeDiagnosticGate || false,
+        analysisSource,
+        performance: {
+          imageTiming,
+          visualTiming,
+          engineTiming,
+          safetyTiming,
+          consensusTiming,
+          confidenceTiming,
+          totalPipelineTime,
+        },
+      },
+    };
+  } catch (error) {
+    console.error("TURBO PIPELINE ERROR:", error);
+
+    return {
+      success: false,
+      summary: "Erro interno no pipeline hematológico turbo.",
+      riskLevel: "Erro",
+      observations: error.message,
+      safetyValidation: { safeDiagnosticGate: false },
+      pipeline: { failed: true, version: "V8_TURBO_ENTERPRISE" },
+    };
+  }
+}
+
 
 // ============================================================================
 // VALIDATION
 // ============================================================================
 
-function validateAIResult(result) {
+function validateAIResult(
+  result,
+) {
 
   if (!result) {
 
@@ -582,6 +1569,7 @@ function validateAIResult(result) {
   }
 
   if (!result.riskLevel) {
+
     result.riskLevel =
       "Indefinido";
   }
@@ -592,125 +1580,6 @@ function validateAIResult(result) {
 
     result,
   };
-}
-
-// ============================================================================
-// OPENAI ANALYSIS
-// ============================================================================
-
-async function analyzeWithOpenAI(
-  images,
-) {
-
-  try {
-
-    const content = [
-
-      {
-        type: "text",
-
-        text:
-          hospitalPrompt,
-      },
-    ];
-
-    for (const file of images) {
-
-      const base64 =
-        file.buffer.toString(
-          "base64"
-        );
-
-      content.push({
-
-        type: "image_url",
-
-        image_url: {
-
-          url:
-            `data:${mimeFromFile(file)};base64,${base64}`,
-        },
-      });
-    }
-
-    const response =
-      await openai.chat.completions.create({
-
-        model:
-          OPENAI_MODEL,
-
-        temperature: 0.15,
-
-        response_format: {
-
-          type:
-            "json_object",
-        },
-
-        messages: [
-
-          {
-            role: "user",
-
-            content,
-          },
-        ],
-      });
-
-    const text =
-      response.choices?.[0]
-        ?.message?.content || "{}";
-
-    try {
-
-      const cleaned =
-        text
-          .replace(/```json/g, '')
-          .replace(/```/g, '')
-          .trim();
-
-      return JSON.parse(
-        cleaned
-      );
-
-    } catch (error) {
-
-      console.error(
-        "ERRO JSON:",
-        text
-      );
-
-      return {
-
-        summary:
-          "Erro interpretação IA.",
-
-        riskLevel:
-          "Indeterminado",
-
-        observations:
-          "Falha ao interpretar resposta da IA.",
-
-        alerts: [
-
-          "JSON inválido retornado pela IA",
-        ],
-
-        morphologies: [],
-
-        counts: {},
-      };
-    }
-
-  } catch (error) {
-
-    console.error(
-      "Erro OpenAI:",
-      error.message
-    );
-
-    throw error;
-  }
 }
 
 // ============================================================================
@@ -733,6 +1602,9 @@ app.get(
 
       status:
         "online",
+
+      version:
+        "V6_SAFE_HYBRID",
     });
   }
 );
@@ -757,6 +1629,10 @@ app.get(
 
       model:
         OPENAI_MODEL,
+
+      timestamp:
+        new Date()
+          .toISOString(),
     });
   }
 );
@@ -772,7 +1648,7 @@ app.post(
   auth,
 
   upload.array(
-    'image',
+    "image",
     4,
   ),
 
@@ -804,18 +1680,73 @@ app.post(
         });
       }
 
+      // ====================================================================
+      // ANALYSIS SOURCE
+      // ====================================================================
+
+      const analysisSource =
+        normalizeAnalysisSource(
+
+          req.body
+            ?.analysisSource,
+        );
+
+      // ====================================================================
+      // MANUAL COUNTS
+      // ====================================================================
+
+      let manualCounts = {};
+
+      try {
+
+        manualCounts =
+          typeof req.body
+            ?.manualCounts ===
+          "string"
+
+            ? JSON.parse(
+                req.body
+                  .manualCounts,
+              )
+
+            : req.body
+                ?.manualCounts || {};
+
+      } catch {
+
+        manualCounts = {};
+      }
+
       console.log(
-        `🔬 ${uploadedFiles.length} imagens recebidas`
+        `🔬 ${uploadedFiles.length} imagens recebidas`,
       );
 
+      console.log(
+        `🧠 SOURCE: ${analysisSource}`,
+      );
+
+      // ====================================================================
+      // AI ANALYSIS
+      // ====================================================================
+
       const structured =
-        await analyzeWithOpenAI(
-          uploadedFiles,
-        );
+        await analyzeWithOpenAI({
+
+          images:
+            uploadedFiles,
+
+          analysisSource,
+
+          manualCounts,
+        });
+
+      // ====================================================================
+      // VALIDATION
+      // ====================================================================
 
       const validation =
         validateAIResult(
-          structured
+          structured,
         );
 
       if (
@@ -832,6 +1763,10 @@ app.post(
       }
 
       data.totalUses++;
+
+      // ====================================================================
+      // RESPONSE
+      // ====================================================================
 
       return res.json({
 
@@ -853,14 +1788,19 @@ app.post(
             uploadedFiles.length,
 
           userId,
+
+          totalUses:
+            data.totalUses,
+
+          analysisSource,
         },
       });
 
     } catch (error) {
 
       console.error(
-        "Erro analyze-slide:",
-        error
+        "ANALYZE-SLIDE ERROR:",
+        error,
       );
 
       return res.status(500).json({
@@ -878,27 +1818,186 @@ app.post(
 );
 
 // ============================================================================
-// START
+// HEMA ASK
+// ============================================================================
+
+app.post(
+  "/hema-ask",
+
+  auth,
+
+  upload.array(
+    "files",
+    4,
+  ),
+
+  async (req, res) => {
+
+    try {
+
+      const {
+        question = "",
+      } = req.body || {};
+
+
+      const uploadedFiles =
+        req.files || [];
+
+
+      const content = [
+        {
+          type: "text",
+
+          text: `
+
+Você é o HemaAsk AI.
+
+Atue como:
+- professor universitário de hematologia
+- hematologista especialista
+- tutor acadêmico avançado
+
+Explique imagens, exames e perguntas.
+
+OBJETIVO:
+Ensinar o raciocínio hematológico.
+
+Responder sempre:
+
+1. O que estou observando
+2. Explicação morfológica
+3. Significado hematológico
+4. Possíveis correlações associadas
+5. Diferenciais educacionais
+6. Limitações
+7. Quando procurar validação profissional
+
+
+REGRAS:
+- Não emitir diagnóstico definitivo
+- Não substituir profissional habilitado
+- Usar "pode sugerir", "pode estar associado"
+- Explicar como professor experiente
+
+
+Pergunta:
+${question}
+
+`
+        }
+      ];
+
+
+      for (const file of uploadedFiles) {
+
+        const base64 =
+          file.buffer.toString("base64");
+
+
+        content.push({
+
+          type: "image_url",
+
+          image_url: {
+
+            url:
+              `data:${file.mimetype};base64,${base64}`,
+
+          },
+        });
+      }
+
+
+      const completion =
+        await openai.chat.completions.create({
+
+          model:
+            OPENAI_MODEL,
+
+          temperature:
+            0.25,
+
+          messages: [
+
+            {
+              role:
+                "user",
+
+              content,
+            },
+          ],
+        });
+
+
+      const answer =
+        completion
+          ?.choices?.[0]
+          ?.message
+          ?.content ||
+        "Não foi possível gerar resposta.";
+
+
+      return res.json({
+
+        success:
+          true,
+
+        answer,
+
+        attachments:
+          uploadedFiles.length,
+
+      });
+
+
+    } catch (error) {
+
+
+      console.error(
+        "HEMA ASK ERROR:",
+        error,
+      );
+
+
+      return res.status(500).json({
+
+        success:
+          false,
+
+        error:
+          error.message,
+
+      });
+    }
+  },
+);
+
+// ============================================================================
+// START SERVER
 // ============================================================================
 
 app.listen(
 
   PORT,
 
-  '0.0.0.0',
+  "0.0.0.0",
 
   () => {
 
     console.log(
-      `🔥 CELLCOUNT ELITE HOSPITAL rodando na porta ${PORT}`
+      `🔥 CELLCOUNT ELITE HOSPITAL rodando na porta ${PORT}`,
     );
 
     console.log(
-      `🧠 Modelo: ${OPENAI_MODEL}`
+      `🧠 Modelo: ${OPENAI_MODEL}`,
     );
 
     console.log(
-      `🩸 IA hematológica online`
+      "🩸 IA hematológica online",
+    );
+
+    console.log(
+      "🚀 PIPELINE ENTERPRISE V6 SAFE HYBRID ONLINE",
     );
   }
 );
