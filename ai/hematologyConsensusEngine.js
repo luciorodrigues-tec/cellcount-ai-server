@@ -1,357 +1,699 @@
 // ============================================================================
 // CELLCOUNT ENTERPRISE
-// HEMATOLOGY CONSENSUS ENGINE
+// HEMATOLOGY CONSENSUS ENGINE V7 HOSPITAL EDITION
+// SAFE MULTI-LAYER CONSENSUS SYSTEM
+// MANUAL / AI VISUAL / HYBRID SEPARATION
 // ============================================================================
 
-export function buildConsensusAnalysis(
-  analyses = [],
-) {
+export function buildHematologyConsensus({
 
-  // ========================================================================
-  // EMPTY
-  // ========================================================================
+  analysis = {},
 
-  if (
-    !analyses ||
-    !analyses.length
-  ) {
+  leukocyteAnalysis = {},
 
-    return {
+  erythrocyteAnalysis = {},
 
-      confidenceLevel:
-        'low',
+  plateletAnalysis = {},
 
-      consistencyScore: 0,
+  confidenceAnalysis = {},
 
-      repeatedFindings: [],
+  diagnosticCorrelation = {},
 
-      divergentFindings: [],
+  safetyValidation = {},
 
-      finalInterpretation:
-        'Sem análises suficientes.',
-    };
-  }
+  analysisSource = "ai_visual",
+}) {
 
-  // ========================================================================
-  // STORAGE
-  // ========================================================================
+  // ==========================================================================
+  // BASE
+  // ==========================================================================
 
-  const morphologyFrequency =
-    new Map();
+  const consensus = {
 
-  const alertFrequency =
-    new Map();
+    analysisSource,
 
-  const conditionFrequency =
-    new Map();
+    finalClassification: "indeterminate",
 
-  const confidenceMap = {
+    clinicalPriority: "routine",
 
-    blasts: [],
+    overallRiskScore: 0,
 
-    schistocytes: [],
+    requiresHumanReview: false,
 
-    dysplasia: [],
+    safeClinicalMode: false,
 
-    leftShift: [],
+    confidenceLevel: "low",
+
+    summary: "",
+
+    alerts: [],
+
+    recommendations: [],
+
+    diagnosticSuggestions: [],
+
+    supportingFindings: [],
+
+    rejectedFindings: [],
+
+    visualEvidenceScore: 0,
+
+    manualMode: analysisSource === "manual",
+
+    hybridMode: analysisSource === "hybrid",
+
+    aiVisualMode: analysisSource === "ai_visual",
   };
 
-  // ========================================================================
-  // LOOP
-  // ========================================================================
+  // ==========================================================================
+  // SAFETY
+  // ==========================================================================
 
-  for (const analysis of analyses) {
+  const contradictionFlags =
+    safetyValidation?.contradictionFlags || [];
 
-    // ======================================================================
-    // MORPHOLOGIES
-    // ======================================================================
+  const safetyAlerts =
+    safetyValidation?.alerts || [];
 
-    const morphologies =
-      analysis?.morphologies || [];
+  const safetySeverity =
+    safetyValidation?.severity || "low";
 
-    for (const morphology of morphologies) {
+  // ==========================================================================
+  // VISUAL EVIDENCE
+  // ==========================================================================
 
-      morphologyFrequency.set(
+  const visualEvidenceScore =
+    calculateVisualEvidence({
 
-        morphology,
+      analysis,
 
-        (morphologyFrequency.get(
-          morphology,
-        ) || 0) + 1,
-      );
-    }
+      leukocyteAnalysis,
 
-    // ======================================================================
-    // ALERTS
-    // ======================================================================
+      erythrocyteAnalysis,
+    });
 
-    const alerts =
-      analysis?.alerts || [];
+  consensus.visualEvidenceScore =
+    visualEvidenceScore;
 
-    for (const alert of alerts) {
+  // ==========================================================================
+  // MANUAL MODE
+  // ==========================================================================
 
-      alertFrequency.set(
+  if (analysisSource === "manual") {
 
-        alert,
+    consensus.requiresHumanReview =
+      true;
 
-        (alertFrequency.get(
-          alert,
-        ) || 0) + 1,
-      );
-    }
+    consensus.safeClinicalMode =
+      true;
 
-    // ======================================================================
-    // CONDITIONS
-    // ======================================================================
+    consensus.finalClassification =
+      "manual_correlation_required";
 
-    const conditions =
-      analysis?.suspectedConditions || [];
+    consensus.clinicalPriority =
+      "review";
 
-    for (const condition of conditions) {
+    consensus.summary =
+      "Contagem diferencial manual detectada. Correlação microscópica obrigatória.";
 
-      conditionFrequency.set(
+    consensus.alerts.push(
+      "Modo manual ativo.",
+    );
 
-        condition,
+    consensus.alerts.push(
+      "Achados dependem de validação humana.",
+    );
+  }
 
-        (conditionFrequency.get(
-          condition,
-        ) || 0) + 1,
-      );
-    }
+  // ==========================================================================
+  // SCORES
+  // ==========================================================================
 
-    // ======================================================================
-    // CONFIDENCE MATRIX
-    // ======================================================================
+  const blastConfidence =
+    normalize(
 
-    const matrix =
       analysis
-        ?.morphologicConfidenceMatrix;
-
-    if (matrix) {
-
-      confidenceMap.blasts.push(
-
-        matrix
-          ?.blastAssessment
-          ?.confidence || 0,
-      );
-
-      confidenceMap.schistocytes.push(
-
-        matrix
-          ?.schistocyteAssessment
-          ?.confidence || 0,
-      );
-
-      confidenceMap.dysplasia.push(
-
-        matrix
-          ?.dysplasiaAssessment
-          ?.confidence || 0,
-      );
-
-      confidenceMap.leftShift.push(
-
-        matrix
-          ?.leftShiftAssessment
-          ?.confidence || 0,
-      );
-    }
-  }
-
-  // ========================================================================
-  // REPEATED FINDINGS
-  // ========================================================================
-
-  const repeatedFindings = [];
-
-  const divergentFindings = [];
-
-  for (const [
-    morphology,
-    frequency,
-  ] of morphologyFrequency.entries()) {
-
-    const ratio =
-      frequency / analyses.length;
-
-    if (ratio >= 0.5) {
-
-      repeatedFindings.push({
-
-        morphology,
-
-        frequency,
-
-        confidence:
-          Math.round(
-            ratio * 100,
-          ),
-      });
-
-    } else {
-
-      divergentFindings.push({
-
-        morphology,
-
-        frequency,
-      });
-    }
-  }
-
-  // ========================================================================
-  // CONFIDENCE
-  // ========================================================================
-
-  const blastConsensus =
-    average(
-      confidenceMap.blasts,
+        ?.morphologicConfidenceMatrix
+        ?.blastAssessment
+        ?.confidence || 0,
     );
 
-  const schistocyteConsensus =
-    average(
-      confidenceMap.schistocytes,
+  const schistocyteConfidence =
+    normalize(
+
+      analysis
+        ?.morphologicConfidenceMatrix
+        ?.schistocyteAssessment
+        ?.confidence || 0,
     );
 
-  const dysplasiaConsensus =
-    average(
-      confidenceMap.dysplasia,
+  const dysplasiaConfidence =
+    normalize(
+
+      analysis
+        ?.morphologicConfidenceMatrix
+        ?.dysplasiaAssessment
+        ?.confidence || 0,
     );
 
-  const leftShiftConsensus =
-    average(
-      confidenceMap.leftShift,
-    );
+  // ==========================================================================
+  // BLAST SAFETY
+  // ==========================================================================
 
-  // ========================================================================
-  // CONSISTENCY SCORE
-  // ========================================================================
+  const immatureDetected =
+    leukocyteAnalysis
+      ?.immatureFeaturesDetected || false;
 
-  const consistencyScore =
-    Math.round(
+  const blastRisk =
+    leukocyteAnalysis
+      ?.blastRisk || "low";
 
-      (
-        blastConsensus +
-        schistocyteConsensus +
-        dysplasiaConsensus +
-        leftShiftConsensus
-      ) / 4,
-    );
+  const noLeukocytesDetected =
+    !leukocyteAnalysis
+      ?.leukocyteFindings ||
 
-  // ========================================================================
-  // LEVEL
-  // ========================================================================
+    leukocyteAnalysis
+      ?.leukocyteFindings
+      ?.length === 0;
 
-  let confidenceLevel =
-    'low';
-
-  if (consistencyScore >= 70) {
-
-    confidenceLevel =
-      'high';
-
-  } else if (
-    consistencyScore >= 40
-  ) {
-
-    confidenceLevel =
-      'moderate';
-  }
-
-  // ========================================================================
-  // INTERPRETATION
-  // ========================================================================
-
-  let finalInterpretation =
-    'Achados morfológicos discretos e sem forte consistência multicampo.';
+  // ==========================================================================
+  // INVALID BLAST
+  // ==========================================================================
 
   if (
-    repeatedFindings.length >= 3
+    noLeukocytesDetected &&
+    blastConfidence > 25
   ) {
 
-    finalInterpretation =
-      'Achados morfológicos repetidos em múltiplos campos, aumentando confiabilidade hematológica.';
+    consensus.rejectedFindings.push(
+      "Suspeita blástica rejeitada por ausência de leucócitos detectáveis.",
+    );
   }
+
+  // ==========================================================================
+  // SAFE BLAST DETECTION
+  // ==========================================================================
+
+  const safeBlastDetection = (
+
+    blastConfidence >= 65 &&
+
+    immatureDetected &&
+
+    blastRisk !== "low" &&
+
+    visualEvidenceScore >= 45 &&
+
+    contradictionFlags.length <= 2 &&
+
+    analysisSource !== "manual"
+  );
+
+  // ==========================================================================
+  // PROLIFERATIVE
+  // ==========================================================================
+
+  if (safeBlastDetection) {
+
+    consensus.finalClassification =
+      "proliferative_pattern";
+
+    consensus.clinicalPriority =
+      "urgent";
+
+    consensus.overallRiskScore =
+      normalize(
+
+        blastConfidence * 0.9,
+      );
+
+    consensus.requiresHumanReview =
+      true;
+
+    consensus.alerts.push(
+      "Presença de padrão proliferativo/imaturidade hematológica.",
+    );
+
+    consensus.recommendations.push(
+      "Correlação hematológica especializada.",
+    );
+
+    consensus.recommendations.push(
+      "Revisão microscópica obrigatória.",
+    );
+
+    consensus.diagnosticSuggestions.push(
+      "Investigação de processo proliferativo hematológico.",
+    );
+
+    consensus.supportingFindings.push(
+      "Presença de células imaturas.",
+    );
+  }
+
+  // ==========================================================================
+  // SCHISTOCYTES
+  // ==========================================================================
 
   if (
-    blastConsensus >= 70
+    schistocyteConfidence >= 70 &&
+
+    analysisSource !== "manual"
   ) {
 
-    finalInterpretation +=
-      ' Presença consistente de células imaturas suspeitas.';
+    consensus.alerts.push(
+      "Fragmentação eritrocitária relevante detectada.",
+    );
+
+    consensus.diagnosticSuggestions.push(
+      "Investigar hemólise microangiopática.",
+    );
+
+    consensus.supportingFindings.push(
+      "Presença de fragmentação eritrocitária.",
+    );
+
+    consensus.requiresHumanReview =
+      true;
   }
+
+  // ==========================================================================
+  // DYSPLASIA
+  // ==========================================================================
 
   if (
-    schistocyteConsensus >= 60
+    dysplasiaConfidence >= 60
   ) {
 
-    finalInterpretation +=
-      ' Fragmentação eritrocitária repetida observada.';
+    consensus.supportingFindings.push(
+      "Alterações displásicas identificadas.",
+    );
+
+    consensus.diagnosticSuggestions.push(
+      "Correlacionar com avaliação medular.",
+    );
   }
 
-  // ========================================================================
+  // ==========================================================================
+  // LOW QUALITY
+  // ==========================================================================
+
+  const quality =
+    normalizeQuality(
+
+      analysis
+        ?.microscopyQualityScore
+        ?.overall || 55,
+    );
+
+  if (quality < 45) {
+
+    consensus.requiresHumanReview =
+      true;
+
+    consensus.safeClinicalMode =
+      true;
+
+    consensus.alerts.push(
+      "Baixa qualidade microscópica.",
+    );
+
+    consensus.recommendations.push(
+      "Nova captura de imagem recomendada.",
+    );
+  }
+
+  // ==========================================================================
+  // SAFETY SEVERITY
+  // ==========================================================================
+
+  if (
+    safetySeverity === "high" ||
+
+    safetySeverity === "critical"
+  ) {
+
+    consensus.requiresHumanReview =
+      true;
+
+    consensus.safeClinicalMode =
+      true;
+
+    consensus.alerts.push(
+      "Resultado com inconsistências hematológicas.",
+    );
+  }
+
+  // ==========================================================================
+  // NO VISUAL EVIDENCE
+  // ==========================================================================
+
+  if (
+    visualEvidenceScore < 25
+  ) {
+
+    consensus.requiresHumanReview =
+      true;
+
+    consensus.safeClinicalMode =
+      true;
+
+    consensus.alerts.push(
+      "Baixa evidência visual automatizada.",
+    );
+
+    consensus.recommendations.push(
+      "Revisão microscópica recomendada.",
+    );
+  }
+
+  // ==========================================================================
+  // MANUAL SAFETY LOCK
+  // ==========================================================================
+
+  if (analysisSource === "manual") {
+
+    consensus.finalClassification =
+      "manual_correlation_required";
+
+    consensus.overallRiskScore =
+      Math.min(
+        consensus.overallRiskScore,
+        45,
+      );
+
+    consensus.diagnosticSuggestions =
+      sanitizeDiagnosticSuggestions(
+
+        consensus
+          .diagnosticSuggestions,
+      );
+  }
+
+  // ==========================================================================
+  // TEXT SANITIZATION
+  // ==========================================================================
+
+  consensus.summary =
+    sanitizeDiagnosticLanguage(
+      consensus.summary,
+    );
+
+  consensus.alerts =
+    consensus.alerts.map(
+      sanitizeDiagnosticLanguage,
+    );
+
+  consensus.recommendations =
+    consensus.recommendations.map(
+      sanitizeDiagnosticLanguage,
+    );
+
+  consensus.diagnosticSuggestions =
+    consensus.diagnosticSuggestions.map(
+      sanitizeDiagnosticLanguage,
+    );
+
+  // ==========================================================================
+  // CONFIDENCE LEVEL
+  // ==========================================================================
+
+  consensus.confidenceLevel =
+    buildConfidenceLevel({
+
+      visualEvidenceScore,
+
+      contradictionFlags,
+
+      quality,
+    });
+
+  // ==========================================================================
+  // FINAL DEFAULT
+  // ==========================================================================
+
+  if (
+    consensus.summary
+      .trim()
+      .length === 0
+  ) {
+
+    consensus.summary =
+      "Achados hematológicos inespecíficos. Correlação clínica recomendada.";
+  }
+
+  // ==========================================================================
   // RETURN
-  // ========================================================================
+  // ==========================================================================
 
   return {
 
-    confidenceLevel,
+    ...consensus,
 
-    consistencyScore,
+    alerts:
+      unique(consensus.alerts),
 
-    repeatedFindings,
+    recommendations:
+      unique(
+        consensus.recommendations,
+      ),
 
-    divergentFindings,
+    diagnosticSuggestions:
+      unique(
+        consensus
+          .diagnosticSuggestions,
+      ),
 
-    confidenceMatrix: {
+    supportingFindings:
+      unique(
+        consensus
+          .supportingFindings,
+      ),
 
-      blastConsensus,
-
-      schistocyteConsensus,
-
-      dysplasiaConsensus,
-
-      leftShiftConsensus,
-    },
-
-    finalInterpretation,
-
-    metadata: {
-
-      analyzedFields:
-        analyses.length,
-
-      repeatedFindingsCount:
-        repeatedFindings.length,
-
-      divergentFindingsCount:
-        divergentFindings.length,
-    },
+    rejectedFindings:
+      unique(
+        consensus
+          .rejectedFindings,
+      ),
   };
 }
 
 // ============================================================================
-// AVERAGE
+// VISUAL EVIDENCE
 // ============================================================================
 
-function average(values = []) {
+function calculateVisualEvidence({
 
-  if (!values.length) {
+  analysis,
 
-    return 0;
+  leukocyteAnalysis,
+
+  erythrocyteAnalysis,
+}) {
+
+  let score = 0;
+
+  const heatmaps =
+    analysis?.heatmapRegions || [];
+
+  const leukocyteFindings =
+    leukocyteAnalysis
+      ?.leukocyteFindings || [];
+
+  const immature =
+    leukocyteAnalysis
+      ?.immatureFeaturesDetected || false;
+
+  const blastRisk =
+    leukocyteAnalysis
+      ?.blastRisk || "low";
+
+  const erythroMorphology =
+    erythrocyteAnalysis
+      ?.dominantMorphology || "";
+
+  // ==========================================================================
+  // HEATMAPS
+  // ==========================================================================
+
+  if (heatmaps.length > 0) {
+
+    score += 25;
   }
 
-  const total =
-    values.reduce(
+  // ==========================================================================
+  // LEUKOCYTES
+  // ==========================================================================
 
-      (sum, value) =>
-        sum + value,
+  if (
+    leukocyteFindings.length > 0
+  ) {
 
-      0,
+    score += 30;
+  }
+
+  // ==========================================================================
+  // IMMATURE
+  // ==========================================================================
+
+  if (immature) {
+
+    score += 25;
+  }
+
+  // ==========================================================================
+  // BLAST
+  // ==========================================================================
+
+  if (
+    blastRisk === "high" ||
+    blastRisk === "moderate"
+  ) {
+
+    score += 20;
+  }
+
+  // ==========================================================================
+  // RBC
+  // ==========================================================================
+
+  if (
+    erythroMorphology
+      .length > 0
+  ) {
+
+    score += 10;
+  }
+
+  return normalize(score);
+}
+
+// ============================================================================
+// SANITIZATION
+// ============================================================================
+
+function sanitizeDiagnosticLanguage(
+  text = "",
+) {
+
+  return text
+
+    .replace(
+      /leucemia/gi,
+      "alteração hematológica",
+    )
+
+    .replace(
+      /neoplasia/gi,
+      "processo hematológico",
+    )
+
+    .replace(
+      /malignidade/gi,
+      "alteração relevante",
+    )
+
+    .replace(
+      /processo bl[aá]stico/gi,
+      "células imaturas",
+    )
+
+    .replace(
+      /c[aâ]ncer/gi,
+      "condição hematológica",
     );
+}
 
-  return Math.round(
-    total / values.length,
+// ============================================================================
+// SUGGESTIONS
+// ============================================================================
+
+function sanitizeDiagnosticSuggestions(
+  arr = [],
+) {
+
+  return arr.map(
+    sanitizeDiagnosticLanguage,
   );
+}
+
+// ============================================================================
+// CONFIDENCE LEVEL
+// ============================================================================
+
+function buildConfidenceLevel({
+
+  visualEvidenceScore,
+
+  contradictionFlags,
+
+  quality,
+}) {
+
+  let score = 0;
+
+  score += visualEvidenceScore;
+
+  score += quality * 0.5;
+
+  score -=
+    contradictionFlags.length * 12;
+
+  if (score >= 80) {
+    return "high";
+  }
+
+  if (score >= 50) {
+    return "moderate";
+  }
+
+  return "low";
+}
+
+// ============================================================================
+// NORMALIZE
+// ============================================================================
+
+function normalize(
+  value,
+) {
+
+  return Math.max(
+
+    0,
+
+    Math.min(
+      100,
+      Math.round(value),
+    ),
+  );
+}
+
+// ============================================================================
+// QUALITY
+// ============================================================================
+
+function normalizeQuality(
+  value,
+) {
+
+  if (value <= 5) {
+
+    return normalize(
+      value * 20,
+    );
+  }
+
+  return normalize(value);
+}
+
+// ============================================================================
+// UNIQUE
+// ============================================================================
+
+function unique(
+  arr = [],
+) {
+
+  return [...new Set(arr)];
 }

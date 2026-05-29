@@ -1,0 +1,66 @@
+path: C:/CCellCount_Enterprise v4/backend/ai/datasets/hematology_yolo
+train: images/train
+val: images/val
+
+nc: 60
+names:
+  0: Acantocitos
+  1: Agregacao_Plaquetaria
+  2: Anisocitose
+  3: Basofilo
+  4: Bastonete
+  5: Codocitos
+  6: Dacriocitos
+  7: Drepanocitos
+  8: Eliptocitos
+  9: Eosinofilo
+  10: Esquizocitos
+  11: Estomatocitos
+  12: Flower_Cell
+  13: Granulacoes_Toxicas
+  14: Hairy_Cells
+  15: Hemacias_Crenadas
+  16: Hemacias_Macrociticas
+  17: Hemacias_Microciticas
+  18: Howell_Jolly
+  19: Leucemia_Prolinfocitica
+  20: Linfoblasto
+  21: Linfocito
+  22: Linfocito_Atipico
+  23: Linfoma
+  24: LLA
+  25: LLC
+  26: LMA_M2
+  27: LMA_M3
+  28: LMA_M4
+  29: LMA_M4_Eosinofilica
+  30: LMC
+  31: Macroplaquetas
+  32: Manchas_Gumprecht
+  33: Medula_Aplasica
+  34: Medula_Infiltrada
+  35: Medula_Ossea_Normal
+  36: Metamielocito
+  37: Mieloblasto
+  38: Mielocito
+  39: Mieloma_Multiplo
+  40: Monoblasto
+  41: Monocito
+  42: Monocitos_Vacuolizados
+  43: Neutrofilos_Hipersegmentados
+  44: Neutrofilo_Segmentado
+  45: Ovalocitos
+  46: Plaquetas_Normais
+  47: Plasmocito
+  48: Plasmodium_Falciparum
+  49: Plasmodium_Vivax
+  50: Poiquilocitose
+  51: Policitemia_Vera
+  52: Policromasia
+  53: Pontilhado_Basofilico
+  54: Prolinfocito
+  55: Promielocito
+  56: Promonocito
+  57: Reticulocitos
+  58: Rouleaux
+  59: Trypanosoma_Cruzi

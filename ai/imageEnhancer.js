@@ -9,11 +9,11 @@ import sharp from "sharp";
 // CONFIG
 // ============================================================================
 
-const DEFAULT_SIZE = 2048;
+const DEFAULT_SIZE = Number(process.env.IMAGE_ENHANCE_SIZE || 1280);
 
 const TILE_SIZE = 1024;
 
-const JPEG_QUALITY = 95;
+const JPEG_QUALITY = Number(process.env.IMAGE_JPEG_QUALITY || 88);
 
 // ============================================================================
 // MAIN ENHANCER
@@ -338,9 +338,14 @@ async function generateTiles(
 export function buildGPTImagePayload(
   enhancedResult,
   mime = 'image/jpeg',
+  options = {},
 ) {
 
   const payload = [];
+
+  const maxTiles = Number(
+    options.maxTiles ?? process.env.GPT_IMAGE_TILES ?? 0,
+  );
 
   // ========================================================================
   // ENHANCED MAIN IMAGE
@@ -378,17 +383,17 @@ export function buildGPTImagePayload(
   }
 
   // ========================================================================
-  // TILES
+  // TILES — opcional para evitar timeout em web/produção
   // ========================================================================
 
-  for (const tile of enhancedResult.tiles) {
+  const tiles = Array.isArray(enhancedResult.tiles)
+    ? enhancedResult.tiles.slice(0, Math.max(0, maxTiles))
+    : [];
 
+  for (const tile of tiles) {
     payload.push({
-
       type: 'image_url',
-
       image_url: {
-
         url:
           `data:${mime};base64,${tile.buffer.toString('base64')}`,
       },
