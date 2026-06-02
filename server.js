@@ -66,10 +66,15 @@ import {
 dotenv.config();
 
 console.log(
-  "OPENAI:",
+  "🔑 OpenAI API:",
   process.env.OPENAI_API_KEY
-    ? "CARREGADA"
-    : "NÃO ENCONTRADA",
+    ? "CONFIGURADA"
+    : "NÃO CONFIGURADA",
+);
+
+console.log(
+  "🧠 Modelo:",
+  process.env.OPENAI_MODEL || "gpt-4o",
 );
 
 // ============================================================================
@@ -263,10 +268,32 @@ function normalizeMedicalResponse(
         ? data.counts
         : {},
 
-    microscopyQualityScore:
-      typeof data.microscopyQualityScore === "object"
-        ? data.microscopyQualityScore
-        : {},
+    morphologyAnalysis: {
+
+      overview:
+        data?.morphologyAnalysis?.overview || "",
+
+      erythrocyteReview:
+        data?.morphologyAnalysis?.erythrocyteReview || "",
+
+      leukocyteReview:
+        data?.morphologyAnalysis?.leukocyteReview || "",
+
+      plateletReview:
+        data?.morphologyAnalysis?.plateletReview || "",
+
+      absentFindings:
+        data?.morphologyAnalysis?.absentFindings || "",
+
+      biologicalInterpretation:
+        data?.morphologyAnalysis?.biologicalInterpretation || "",
+
+      differentialDiagnosis:
+        data?.morphologyAnalysis?.differentialDiagnosis || "",
+
+      summary:
+        data?.morphologyAnalysis?.summary || "",
+    },
 
     educationalPearls:
       Array.isArray(
@@ -287,6 +314,24 @@ function normalizeMedicalResponse(
       "object"
         ? data.imageQuality
         : {},
+
+    patternRecognition: {
+
+      erythrocytePattern:
+        data?.patternRecognition?.erythrocytePattern || "",
+
+      leukocytePattern:
+        data?.patternRecognition?.leukocytePattern || "",
+
+      plateletPattern:
+        data?.patternRecognition?.plateletPattern || "",
+
+      artifactPattern:
+        data?.patternRecognition?.artifactPattern || "",
+
+      overallPattern:
+        data?.patternRecognition?.overallPattern || "",
+    },
 
     erythrocyteFindings:
       typeof data
@@ -373,7 +418,7 @@ function normalizeMedicalResponse(
         ? data.hybridValidation
         : {},
 
-    ...data,
+  rawResponse: data,
   };
 }
 
@@ -901,59 +946,277 @@ NÃO interpretar ainda.
 
 ====================================================================
 
-ETAPA 3 — MORPHOLOGY ANALYSIS
+ETAPA 3 — ADVANCED MORPHOLOGY ANALYSIS V8
+
+====================================================================
+
+OBJETIVO
+
+Executar análise morfológica hematológica equivalente a revisão realizada por hematologista, hematopatologista e especialista em microscopia digital.
+
+PRIMEIRO DESCREVER.
+
+DEPOIS INTERPRETAR.
+
+NUNCA INTERPRETAR ANTES DA DESCRIÇÃO.
+
+====================================================================
+
+VISÃO GLOBAL DO CAMPO
+
+Descrever obrigatoriamente:
+
+- celularidade observada
+- distribuição celular
+- qualidade do esfregaço
+- qualidade da coloração
+- nitidez
+- preservação celular
+- artefatos presentes
+- representatividade do campo
+- limitações técnicas
+
+====================================================================
+
+SÉRIE ERITROCITÁRIA
 
 Avaliar:
 
-ERITRÓCITOS:
+TAMANHO
+
+- normocitose
+- microcitose
+- macrocitose
+- dimorfismo eritrocitário
+
+COLORAÇÃO
+
+- normocromia
+- hipocromia
+- policromasia
+
+DISTRIBUIÇÃO
+
 - anisocitose
 - poiquilocitose
-- policromasia
-- hipocromia
-- macrocitose
-- microcitose
+
+PESQUISAR OBRIGATORIAMENTE
+
 - esquizócitos
+- codócitos
+- drepanócitos
 - dacriócitos
 - acantócitos
-- codócitos
+- equinócitos
 - eliptócitos
-- drepanócitos
+- ovalócitos
+- estomatócitos
+- esferócitos
+- queratócitos
+- hemácias em lápis
+- rouleaux
+- aglutinação eritrocitária
+- corpos de Howell-Jolly
+- pontilhado basofílico
+- anéis de Cabot
 - inclusões eritrocitárias
 
-LEUCÓCITOS:
-- relação núcleo/citoplasma
-- cromatina
-- nucléolos
-- granulação
-- vacuolização
-- segmentação
-- toxicidade
-- displasia
-- imaturidade
+Descrever presença OU ausência.
 
-PLAQUETAS:
-- número
+====================================================================
+
+SÉRIE LEUCOCITÁRIA
+
+Avaliar:
+
+- heterogeneidade celular
+- monomorfismo celular
+- população predominante
+
+NEUTRÓFILOS
+
+Avaliar:
+
+- segmentação
+- hipersegmentação
+- hipossegmentação
+- granulações tóxicas
+- vacuolização
+- corpúsculos de Döhle
+
+LINFÓCITOS
+
+Avaliar:
+
+- maturação
+- reatividade
+- atipias
+
+MONÓCITOS
+
+Avaliar:
+
+- morfologia
+- maturação
+
+EOSINÓFILOS
+
+Avaliar:
+
+- quantidade
+- morfologia
+
+BASÓFILOS
+
+Avaliar:
+
+- quantidade
+- morfologia
+
+PESQUISAR OBRIGATORIAMENTE
+
+- blastos
+- mieloblastos
+- monoblastos
+- promielócitos
+- plasmócitos
+- plasmoblastos
+- imunoblastos
+- eritroblastos
+- células pilosas
+- células plasmocitoides
+- células linfomatosas
+- células atípicas
+
+====================================================================
+
+ANÁLISE NUCLEAR
+
+Descrever:
+
+- relação núcleo/citoplasma
+- padrão de cromatina
+- nucléolos
+- irregularidades nucleares
+- lobulação
+- excentricidade nuclear
+- maturação nuclear
+
+====================================================================
+
+ANÁLISE CITOPLASMÁTICA
+
+Descrever:
+
+- basofilia
+- granulações
+- vacuolização
+- halo perinuclear
+- inclusões
+- projeções citoplasmáticas
+
+====================================================================
+
+SÉRIE PLAQUETÁRIA
+
+Avaliar:
+
+- quantidade aparente
 - agregação
 - gigantismo
 - anisoplaquetose
+- alterações morfológicas
 
-GERAR morphologyAnalysis.summary:
+====================================================================
 
-Texto obrigatório.
+ACHADOS IMPORTANTES NÃO IDENTIFICADOS
 
-Descrever como especialista:
-- população celular predominante
-- características nucleares
-- padrão de cromatina
-- citoplasma
-- granulações
-- alterações eritrocitárias
-- distribuição plaquetária
+Criar obrigatoriamente seção específica contendo:
 
-Não interpretar doenças aqui.
+- ausência de bastonetes de Auer
+- ausência de blastos inequívocos
+- ausência de esquizócitos
+- ausência de rouleaux
+- ausência de displasia marcante
 
-Apenas:
-"O que é observado na lâmina".
+Somente quando realmente ausentes.
+
+====================================================================
+
+INTERPRETAÇÃO BIOLÓGICA
+
+Explicar:
+
+- significado dos achados
+- possíveis mecanismos celulares envolvidos
+- relevância hematológica
+
+Utilizar:
+
+- pode estar associado a
+- pode ser observado em
+- pode sugerir
+
+NUNCA:
+
+- confirma
+- diagnostica
+- representa definitivamente
+
+====================================================================
+
+DIAGNÓSTICO DIFERENCIAL EDUCACIONAL
+
+Construir ranking:
+
+1. hipótese morfológica mais provável
+2. hipótese intermediária
+3. hipótese menos provável
+
+Justificar cada uma.
+
+Utilizar exclusivamente linguagem educacional.
+
+====================================================================
+
+IMPRESSÃO MORFOLÓGICA
+
+Produzir resumo integrado semelhante a revisão hematopatológica.
+
+Obrigatoriamente incluir:
+
+- principais achados observados
+- principais achados ausentes
+- relevância morfológica
+- limitações da imagem
+
+Mínimo 1200 caracteres.
+
+====================================================================
+
+PROFUNDIDADE OBRIGATÓRIA
+
+Responder como:
+
+- hematologista
+- hematopatologista
+- professor universitário
+- pesquisador PhD
+- especialista em morfologia hematológica
+
+Evitar respostas superficiais.
+
+Descrever:
+
+O QUE ESTÁ PRESENTE
+
+O QUE ESTÁ AUSENTE
+
+O SIGNIFICADO DOS ACHADOS
+
+AS LIMITAÇÕES DA IMAGEM
+
+========================================================================================================================================
 
 ====================================================================
 
@@ -1141,7 +1404,25 @@ ESTRUTURA OBRIGATÓRIA:
 {
   "imageQuality": {},
   "visualExtraction": {},
-  "morphologyAnalysis": {},
+
+  "morphologyAnalysis": {
+    "overview": "",
+    "erythrocyteReview": "",
+    "leukocyteReview": "",
+    "plateletReview": "",
+    "absentFindings": "",
+    "biologicalInterpretation": "",
+    "differentialDiagnosis": "",
+    "summary": ""
+  },
+
+  "patternRecognition": {
+    "erythrocytePattern": "",
+    "leukocytePattern": "",
+    "plateletPattern": "",
+    "artifactPattern": "",
+    "overallPattern": ""
+  },
 
   "interpretiveSynthesis":
   "Texto acadêmico avançado obrigatório. Descrever em detalhes os achados morfológicos observados, linhagens celulares envolvidas, maturação nuclear, características citoplasmáticas e interpretação hematológica educacional.",
@@ -1284,9 +1565,21 @@ educationalImpact, interpretiveSynthesis e hematologicReasoning.
           content: `${hospitalPrompt}
 
 MODO TURBO ENTERPRISE:
-Gerar a estrutura completa obrigatória em uma única chamada, com escrita acadêmica, segura e não diagnóstica. Nunca retornar campos vazios.`,
+Gerar a estrutura completa obrigatória em uma única chamada, com escrita acadêmica, segura e não diagnóstica.
+
+Nunca retornar campos vazios.
+Nunca retornar morphologyAnalysis vazio.
+Nunca retornar patternRecognition vazio.
+Todos os campos obrigatórios devem ser preenchidos.
+Quando um achado não estiver presente, descrever explicitamente a ausência.
+Quando a imagem não permitir avaliação segura, informar a limitação no próprio campo.
+Nunca usar null.
+Nunca usar undefined.
+Nunca usar objeto vazio {} em campos obrigatórios.
+Nunca usar array vazio [] quando houver recomendação educacional aplicável.`,
         },
         {
+
           role: "user",
           content: [
             { type: "text", text: contextualPrompt },
@@ -1299,6 +1592,11 @@ Gerar a estrutura completa obrigatória em uma única chamada, com escrita acad�
     const parsed = safeJsonParse(
       completion?.choices?.[0]?.message?.content || "{}",
     );
+
+    console.log("🔥 RAW OPENAI RESPONSE:");
+    console.log(JSON.stringify(parsed, null, 2));
+
+
 
     const visualTiming = logStep(requestId, "OPENAI TURBO ANALYSIS", visualStart);
 
