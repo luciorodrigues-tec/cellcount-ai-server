@@ -333,6 +333,18 @@ function normalizeMedicalResponse(
         data?.patternRecognition?.overallPattern || "",
     },
 
+    interpretiveSynthesis:
+      data?.interpretiveSynthesis || "",
+
+    clinicalMeaning:
+      data?.clinicalMeaning || "",
+
+    hematologicReasoning:
+      data?.hematologicReasoning || "",
+
+    educationalImpact:
+      data?.educationalImpact || "",
+
     erythrocyteFindings:
       typeof data
         .erythrocyteFindings ===
