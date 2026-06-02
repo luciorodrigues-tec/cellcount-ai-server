@@ -240,24 +240,6 @@ function normalizeMedicalResponse(
   data = {},
 ) {
 
-  console.log(
-    "🔥 MORPHOLOGY ANALYSIS:",
-    JSON.stringify(
-      response.morphologyAnalysis,
-      null,
-      2
-    )
-  );
-
-  console.log(
-    "🔥 STRUCTURED REPORT:",
-    JSON.stringify(
-      response.structuredReport,
-      null,
-      2
-    )
-  );
-
   return {
 
     summary:
