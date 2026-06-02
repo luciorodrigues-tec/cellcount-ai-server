@@ -240,6 +240,24 @@ function normalizeMedicalResponse(
   data = {},
 ) {
 
+  console.log(
+    "🔥 MORPHOLOGY ANALYSIS:",
+    JSON.stringify(
+      response.morphologyAnalysis,
+      null,
+      2
+    )
+  );
+
+  console.log(
+    "🔥 STRUCTURED REPORT:",
+    JSON.stringify(
+      response.structuredReport,
+      null,
+      2
+    )
+  );
+
   return {
 
     summary:
@@ -1605,12 +1623,16 @@ Nunca usar array vazio [] quando houver recomendação educacional aplicável.`,
       completion?.choices?.[0]?.message?.content || "{}",
     );
 
-    console.log("🔥 RAW OPENAI RESPONSE:");
+    console.log("================================");
+    console.log("RAW GPT RESPONSE");
     console.log(JSON.stringify(parsed, null, 2));
+    console.log("================================");
 
-
-
-    const visualTiming = logStep(requestId, "OPENAI TURBO ANALYSIS", visualStart);
+    const visualTiming = logStep(
+      requestId,
+      "OPENAI TURBO ANALYSIS",
+      visualStart,
+    );
 
     const mergedAnalysis = normalizeMedicalResponse({
       ...parsed,
@@ -1619,6 +1641,9 @@ Nunca usar array vazio [] quando houver recomendação educacional aplicável.`,
       manualMetadata,
     });
 
+    console.log("================================");
+    console.log("NORMALIZED RESPONSE");
+    console.log(JSON.stringify(mergedAnalysis, null, 2));
     console.log("================================");
     console.log("MORPHOLOGY ANALYSIS");
     console.log(
