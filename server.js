@@ -1607,6 +1607,17 @@ Nunca usar array vazio [] quando houver recomendação educacional aplicável.`,
       manualMetadata,
     });
 
+    console.log("================================");
+    console.log("MORPHOLOGY ANALYSIS");
+    console.log(
+      JSON.stringify(
+        mergedAnalysis.morphologyAnalysis,
+        null,
+        2,
+      ),
+    );
+    console.log("================================");
+
     console.log("🔥 NORMALIZED RESPONSE:");
     console.log(
       JSON.stringify(
