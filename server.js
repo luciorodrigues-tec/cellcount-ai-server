@@ -1607,6 +1607,23 @@ Nunca usar array vazio [] quando houver recomendação educacional aplicável.`,
       manualMetadata,
     });
 
+    console.log("🔥 NORMALIZED RESPONSE:");
+    console.log(
+      JSON.stringify(
+        {
+          morphologyAnalysis: mergedAnalysis.morphologyAnalysis,
+          patternRecognition: mergedAnalysis.patternRecognition,
+          structuredReport: mergedAnalysis.structuredReport,
+          overallAssessment: mergedAnalysis.overallAssessment,
+          interpretiveSynthesis: mergedAnalysis.interpretiveSynthesis,
+          clinicalMeaning: mergedAnalysis.clinicalMeaning,
+          hematologicReasoning: mergedAnalysis.hematologicReasoning,
+        },
+        null,
+        2,
+      ),
+    );
+
     // Campos avançados sempre presentes para evitar cards vazios no Flutter.
     mergedAnalysis.possibleClinicalCorrelations =
       Array.isArray(mergedAnalysis.possibleClinicalCorrelations) &&
