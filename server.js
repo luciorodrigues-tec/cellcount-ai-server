@@ -3,6 +3,9 @@
 // GPT-4o HEMATOLOGY ENTERPRISE SERVER V6 SAFE HYBRID
 // ============================================================================
 
+import validateConsistency
+  from "./utils/validateConsistency.js";
+
 import express from "express";
 import cors from "cors";
 import multer from "multer";
@@ -136,7 +139,7 @@ app.use(
   }),
 );
 
-app.options("*", cors());
+app.options("/*", cors());
 
 // ============================================================================
 // EXPRESS
@@ -242,6 +245,18 @@ function normalizeMedicalResponse(
 
   return {
 
+  normalityBlocked:
+    data.normalityBlocked || false,
+
+  blockNormalReason:
+    Array.isArray(data.blockNormalReason)
+      ? data.blockNormalReason
+      : [],
+
+  morphologicRiskClass:
+    data.morphologicRiskClass ||
+    "CLASS_0_NORMAL",
+
     summary:
       data.summary || "",
 
@@ -267,6 +282,49 @@ function normalizeMedicalResponse(
       typeof data.counts === "object"
         ? data.counts
         : {},
+
+    findings: {
+
+      largeMononuclearCells:
+        Boolean(
+          data.findings?.largeMononuclearCells
+        ),
+
+      plasmacytoidCells:
+        Boolean(
+          data.findings?.plasmacytoidCells
+        ),
+
+      plasmocytes:
+        Boolean(
+          data.findings?.plasmocytes
+        ),
+
+      plasmablasts:
+        Boolean(
+          data.findings?.plasmablasts
+        ),
+
+      atypicalLymphocytes:
+        Boolean(
+          data.findings?.atypicalLymphocytes
+        ),
+
+      monomorphicPopulation:
+        Boolean(
+          data.findings?.monomorphicPopulation
+        ),
+
+      immatureCells:
+        Boolean(
+          data.findings?.immatureCells
+        ),
+
+      blastSuspicion:
+        Boolean(
+          data.findings?.blastSuspicion
+        ),
+    },
 
     morphologyAnalysis: {
 
@@ -822,6 +880,93 @@ SOMENTE NO FINAL:
 GERAR CORRELAÇÃO EDUCACIONAL.
 
 NUNCA INTERPRETAR ANTES DA ANÁLISE VISUAL.
+
+
+====================================================================
+ANTI FALSE NORMAL ENGINE
+====================================================================
+
+A prioridade máxima é evitar falso normal.
+
+Antes de concluir qualquer análise:
+
+Procurar obrigatoriamente:
+
+- células mononucleares grandes
+- células plasmocitoides
+- plasmócitos
+- plasmoblastos
+- linfócitos atípicos
+- células imaturas
+- blastos suspeitos
+- população monomórfica
+- halo perinuclear
+- citoplasma intensamente basofílico
+- núcleos excêntricos
+
+SE QUALQUER UM DESSES ACHADOS ESTIVER PRESENTE:
+
+É PROIBIDO ESCREVER:
+
+- padrão normal
+- sem alterações
+- morfologia normal
+- ausência de alterações patológicas
+- estado hematológico normal
+
+Substituir por:
+
+"HÁ ACHADOS MORFOLÓGICOS QUE IMPEDEM A CLASSIFICAÇÃO DE NORMALIDADE."
+
+Definir:
+
+requiresHumanReview = true
+
+Classificar risco mínimo:
+
+CLASS_2_ATYPICAL_POPULATION
+
+====================================================================
+ANÁLISE DE MONOMORFISMO CELULAR
+====================================================================
+
+Avaliar obrigatoriamente a arquitetura populacional.
+
+Determinar se a população celular observada é:
+
+- Polimórfica
+- Oligomórfica
+- Monomórfica
+
+POPULAÇÃO MONOMÓRFICA
+
+Se mais de 50% das células nucleadas apresentarem:
+
+- tamanho semelhante
+- cromatina semelhante
+- citoplasma semelhante
+- padrão maturativo semelhante
+
+considerar população monomórfica.
+
+População monomórfica:
+
+- impede classificação como normal
+- aumenta suspeita de processo clonal
+- exige revisão humana
+- exige inclusão em blockNormalReason
+
+Se identificada:
+
+monomorphicPopulation = true
+
+normalityBlocked = true
+
+Classificação mínima:
+
+morphologicRiskClass = "CLASS_3_POSSIBLE_CLONALITY"
+
+A IA deve explicar por que considerou a população monomórfica.
 
 ====================================================================
 MODO IA VISUAL ISOLADA — PADRÃO ESPECIALISTA
@@ -1417,6 +1562,31 @@ ESTRUTURA OBRIGATÓRIA:
   "imageQuality": {},
   "visualExtraction": {},
 
+  "normalityBlocked": false,
+
+  "blockNormalReason": [],
+
+  "morphologicRiskClass": "CLASS_0_NORMAL",
+
+  "findings": {
+
+    "largeMononuclearCells": false,
+
+    "plasmacytoidCells": false,
+
+    "plasmocytes": false,
+
+    "plasmablasts": false,
+
+    "atypicalLymphocytes": false,
+
+    "monomorphicPopulation": false,
+
+    "immatureCells": false,
+
+    "blastSuspicion": false
+  },
+
   "morphologyAnalysis": {
     "overview": "",
     "erythrocyteReview": "",
@@ -1465,6 +1635,59 @@ ESTRUTURA OBRIGATÓRIA:
   "recommendedCorrelation": [],
   "heatmapRegions": []
 }
+
+====================================================================
+REGRAS OBRIGATÓRIAS PARA O OBJETO findings
+====================================================================
+
+Os campos do objeto findings são obrigatórios.
+
+NÃO deixar todos como false automaticamente.
+
+Cada campo deve refletir a avaliação morfológica real da imagem.
+
+Se houver células mononucleares grandes:
+largeMononuclearCells = true
+
+Se houver células plasmocitoides:
+plasmacytoidCells = true
+
+Se houver plasmócitos identificáveis:
+plasmocytes = true
+
+Se houver plasmoblastos suspeitos:
+plasmablasts = true
+
+Se houver linfócitos atípicos:
+atypicalLymphocytes = true
+
+Se houver população monomórfica:
+monomorphicPopulation = true
+
+Se houver células imaturas:
+immatureCells = true
+
+Se houver suspeita morfológica de blastos:
+blastSuspicion = true
+
+Se qualquer campo acima for true:
+
+normalityBlocked = true
+
+Adicionar justificativa em blockNormalReason.
+
+morphologicRiskClass nunca pode ser CLASS_0_NORMAL.
+
+Classificação mínima:
+CLASS_2_ATYPICAL_POPULATION
+
+Se houver monomorfismo, plasmócitos/plasmoblastos ou forte suspeita de clonalidade:
+CLASS_3_POSSIBLE_CLONALITY
+
+Se houver suspeita blástica:
+CLASS_4_BLAST_SUSPICION
+
+Nunca retornar normalidade se houver população atípica, plasmocitoide, monomórfica, imatura ou suspeita blástica.
 
 ====================================================================
 ESTILO
@@ -1701,6 +1924,70 @@ Nunca usar array vazio [] quando houver recomendação educacional aplicável.`,
       "A avaliação hematológica considera inicialmente a linhagem celular predominante, características nucleares, padrão de cromatina, relação núcleo/citoplasma, alterações citoplasmáticas e maturação celular. Esses elementos auxiliam na diferenciação entre padrões reacionais, fisiológicos ou alterações que necessitam investigação complementar. A análise digital deve sempre ser correlacionada com hemograma completo, histórico clínico e revisão microscópica profissional.";
     const extractedText = buildSemanticText(mergedAnalysis);
 
+  function semanticAtypiaEngine(text = "") {
+    const t = text.toLowerCase();
+
+    return {
+      largeMononuclearCells:
+        t.includes("celulas mononucleares grandes") ||
+        t.includes("celulas grandes"),
+
+      plasmacytoidCells:
+        t.includes("plasmocitoide") ||
+        t.includes("plasmocitoides"),
+
+      plasmocytes:
+        t.includes("plasmocito") ||
+        t.includes("plasmocitos"),
+
+      plasmablasts:
+        t.includes("plasmoblasto") ||
+        t.includes("plasmoblastos") ||
+        t.includes("plasmoblastico"),
+
+      monomorphicPopulation:
+        t.includes("monomorfica") ||
+        t.includes("monomorfismo"),
+
+      blastSuspicion:
+        t.includes("blasto suspeito") ||
+        t.includes("suspeita blastica"),
+    };
+  }
+
+    const semanticFindings =
+      semanticAtypiaEngine(
+        extractedText,
+      );
+
+    mergedAnalysis.findings = {
+      ...mergedAnalysis.findings,
+
+      largeMononuclearCells:
+        mergedAnalysis.findings.largeMononuclearCells ||
+        semanticFindings.largeMononuclearCells,
+
+      plasmacytoidCells:
+        mergedAnalysis.findings.plasmacytoidCells ||
+        semanticFindings.plasmacytoidCells,
+
+      plasmocytes:
+        mergedAnalysis.findings.plasmocytes ||
+        semanticFindings.plasmocytes,
+
+      plasmablasts:
+        mergedAnalysis.findings.plasmablasts ||
+        semanticFindings.plasmablasts,
+
+      monomorphicPopulation:
+        mergedAnalysis.findings.monomorphicPopulation ||
+        semanticFindings.monomorphicPopulation,
+
+      blastSuspicion:
+        mergedAnalysis.findings.blastSuspicion ||
+        semanticFindings.blastSuspicion,
+    };
+
     const engineStart = performance.now();
     const [erythrocyteAnalysis, leukocyteAnalysis, plateletAnalysis] = await Promise.all([
       analyzeErythrocytes(extractedText),
@@ -1805,6 +2092,7 @@ Nunca usar array vazio [] quando houver recomendação educacional aplicável.`,
     const totalPipelineTime = logStep(requestId, "TOTAL PIPELINE TURBO", pipelineStart);
 
     return {
+
       ...mergedAnalysis,
       structuredReport: finalStructuredReport,
       manualMetadata,
@@ -2107,11 +2395,103 @@ app.post(
         });
       }
 
+      validation.result =
+        validateConsistency(
+          validation.result,
+        );
+
+      if (
+        validation.result.findings?.blastSuspicion
+      ) {
+
+        validation.result.morphologicRiskClass =
+          "CLASS_4_BLAST_SUSPICION";
+      }
+
+      if (
+        validation.result.findings?.plasmablasts &&
+        validation.result.findings?.monomorphicPopulation
+      ) {
+
+        validation.result.morphologicRiskClass =
+          "CLASS_5_HIGH_NEOPLASTIC_SUSPICION";
+      }
+
+      const reportText =
+        JSON.stringify(
+          validation.result,
+        ).toLowerCase();
+
+      if (
+
+        validation.result
+          .normalityBlocked &&
+
+        (
+          reportText.includes("padrão hematológico normal") ||
+          reportText.includes("padrao hematologico normal") ||
+          reportText.includes("sem alterações patológicas") ||
+          reportText.includes("sem alteracoes patologicas") ||
+          reportText.includes("morfologia normal") ||
+          reportText.includes("estado hematológico normal") ||
+          reportText.includes("estado hematologico normal")
+        )
+
+      ) {
+
+        validation.result.criticalFlags =
+          Array.isArray(validation.result.criticalFlags)
+            ? validation.result.criticalFlags
+            : [];
+
+        validation.result.criticalFlags.push(
+          "Contradição interna detectada"
+        );
+
+        validation.result.overallAssessment =
+          validation.result.overallAssessment || {};
+
+        validation.result.overallAssessment.requiresHumanReview =
+          true;
+      }
+
       data.totalUses++;
 
       // ====================================================================
       // RESPONSE
       // ====================================================================
+
+      console.log("================================");
+      console.log("FINAL VALIDATED RESULT");
+      console.log(
+        JSON.stringify(
+          {
+            normalityBlocked:
+              validation.result.normalityBlocked,
+
+            morphologicRiskClass:
+              validation.result.morphologicRiskClass,
+
+            riskLevel:
+              validation.result.riskLevel,
+
+            requiresHumanReview:
+              validation.result.overallAssessment?.requiresHumanReview,
+
+            findings:
+              validation.result.findings,
+
+            blockNormalReason:
+              validation.result.blockNormalReason,
+
+            confidenceAnalysis:
+              validation.result.confidenceAnalysis,
+          },
+          null,
+          2,
+        ),
+      );
+      console.log("================================");
 
       return res.json({
 
