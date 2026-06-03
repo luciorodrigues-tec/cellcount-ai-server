@@ -1,6 +1,6 @@
 // ============================================================================
 // CELLCOUNT ELITE HOSPITAL AI
-// GPT-4o HEMATOLOGY ENTERPRISE SERVER V6 SAFE HYBRID
+// CELLCOUNT HEMATOLOGY ENTERPRISE SERVER V6 SAFE HYBRID
 // ============================================================================
 
 import validateConsistency
@@ -77,7 +77,7 @@ console.log(
 
 console.log(
   "🧠 Modelo:",
-  process.env.OPENAI_MODEL || "gpt-4o",
+  process.env.OPENAI_MODEL || "gpt-4.1",
 );
 
 // ============================================================================
@@ -99,7 +99,7 @@ const API_TOKEN =
 
 const OPENAI_MODEL =
   process.env.OPENAI_MODEL ||
-  "gpt-4o";
+  "gpt-4.1";
 
 // ============================================================================
 // OPENAI
