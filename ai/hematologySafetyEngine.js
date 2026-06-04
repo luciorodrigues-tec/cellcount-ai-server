@@ -1233,24 +1233,56 @@ function validateHeatmaps({
   safetyAlerts = [],
   modifiedFields = [],
 }) {
-  const heatmaps = analysis?.heatmapRegions || [];
+  const heatmaps = Array.isArray(analysis?.heatmapRegions)
+    ? analysis.heatmapRegions
+    : [];
 
-  for (const region of heatmaps) {
-    if (!isFinite(region.x)) region.x = 0;
-    if (!isFinite(region.y)) region.y = 0;
-    if (!isFinite(region.width)) region.width = 40;
-    if (!isFinite(region.height)) region.height = 40;
+  const safeHeatmaps = heatmaps
+    .filter(
+      (region) =>
+        region &&
+        typeof region === "object" &&
+        !Array.isArray(region),
+    )
+    .map((region) => {
+      const safeRegion = { ...region };
 
-    region.confidence = normalize(region.confidence || 0);
+      safeRegion.x =
+        Number.isFinite(Number(safeRegion.x))
+          ? Number(safeRegion.x)
+          : 0;
 
-    modifiedFields.push("heatmapRegions");
+      safeRegion.y =
+        Number.isFinite(Number(safeRegion.y))
+          ? Number(safeRegion.y)
+          : 0;
 
+      safeRegion.width =
+        Number.isFinite(Number(safeRegion.width))
+          ? Number(safeRegion.width)
+          : 40;
+
+      safeRegion.height =
+        Number.isFinite(Number(safeRegion.height))
+          ? Number(safeRegion.height)
+          : 40;
+
+      safeRegion.confidence =
+        normalize(safeRegion.confidence || 0);
+
+      return safeRegion;
+    });
+
+  analysis.heatmapRegions = safeHeatmaps;
+
+  modifiedFields.push("heatmapRegions");
+
+  for (const region of safeHeatmaps) {
     if (region.width <= 0 || region.height <= 0) {
       safetyAlerts.push("Heatmap inválido detectado.");
     }
   }
 }
-
 // ============================================================================
 // STRUCTURE
 // ============================================================================

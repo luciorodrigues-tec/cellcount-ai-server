@@ -1830,7 +1830,12 @@ Nunca usar array vazio [] quando houver recomendação educacional aplicável.`,
 
     parsed.heatmapRegions =
       Array.isArray(parsed.heatmapRegions)
-        ? parsed.heatmapRegions
+        ? parsed.heatmapRegions.filter(
+            (region) =>
+              region &&
+              typeof region === "object" &&
+              !Array.isArray(region),
+          )
         : [];
 
     console.log("================================");
