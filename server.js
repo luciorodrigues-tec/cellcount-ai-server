@@ -1828,6 +1828,11 @@ Nunca usar array vazio [] quando houver recomendação educacional aplicável.`,
       completion?.choices?.[0]?.message?.content || "{}",
     );
 
+    parsed.heatmapRegions =
+      Array.isArray(parsed.heatmapRegions)
+        ? parsed.heatmapRegions
+        : [];
+
     console.log("================================");
     console.log("RAW GPT RESPONSE");
     console.log(JSON.stringify(parsed, null, 2));
