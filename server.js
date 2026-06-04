@@ -1246,6 +1246,36 @@ PESQUISAR OBRIGATORIAMENTE
 - células atípicas
 
 ====================================================================
+REGRA CRÍTICA — LINFÓCITO REATIVO vs MONÓCITO
+====================================================================
+
+Antes de classificar célula mononuclear grande como monócito, avaliar obrigatoriamente se pode representar linfócito reativo/virocito.
+
+Linfócitos reativos/virocitos costumam apresentar:
+- citoplasma abundante;
+- citoplasma basofílico intenso;
+- bordas citoplasmáticas irregulares;
+- citoplasma moldando-se às hemácias adjacentes;
+- núcleo irregular ou excêntrico;
+- cromatina relativamente densa ou parcialmente condensada;
+- heterogeneidade morfológica entre as células.
+
+Monócitos maduros costumam apresentar:
+- citoplasma cinza-azulado amplo;
+- núcleo dobrado, reniforme ou convoluto;
+- cromatina frouxa delicada;
+- vacuolização possível;
+- ausência de basofilia periférica intensa moldando hemácias.
+
+Se houver citoplasma basofílico abundante, contorno irregular e moldagem às hemácias, NÃO classificar primariamente como monócito.
+
+Preferir:
+"linfócitos reativos/atípicos compatíveis com resposta imunológica".
+
+Se houver população heterogênea de células mononucleares grandes sem critérios inequívocos de blasto, não sugerir leucemia aguda. Descrever como:
+"linfócitos reativos/atípicos, requerendo correlação clínica e hemograma".
+
+====================================================================
 
 ANÁLISE NUCLEAR
 
@@ -1938,9 +1968,22 @@ Nunca usar array vazio [] quando houver recomendação educacional aplicável.`,
     const t = text.toLowerCase();
 
     return {
+
       largeMononuclearCells:
         t.includes("celulas mononucleares grandes") ||
         t.includes("celulas grandes"),
+
+      reactiveLymphocytes:
+        t.includes("linfocitos reativos") ||
+        t.includes("linfocito reativo") ||
+        t.includes("linfocitos atipicos") ||
+        t.includes("linfocito atipico") ||
+        t.includes("virocito") ||
+        t.includes("virocitos"),
+
+      atypicalLymphocytes:
+        t.includes("linfocitos atipicos") ||
+        t.includes("linfocito atipico"),
 
       plasmacytoidCells:
         t.includes("plasmocitoide") ||
@@ -1976,6 +2019,14 @@ Nunca usar array vazio [] quando houver recomendação educacional aplicável.`,
       largeMononuclearCells:
         mergedAnalysis.findings.largeMononuclearCells ||
         semanticFindings.largeMononuclearCells,
+
+      reactiveLymphocytes:
+        mergedAnalysis.findings.reactiveLymphocytes ||
+        semanticFindings.reactiveLymphocytes,
+
+      atypicalLymphocytes:
+        mergedAnalysis.findings.atypicalLymphocytes ||
+        semanticFindings.atypicalLymphocytes,
 
       plasmacytoidCells:
         mergedAnalysis.findings.plasmacytoidCells ||

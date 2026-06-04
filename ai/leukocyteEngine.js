@@ -126,13 +126,50 @@ export function analyzeLeukocytes(
   ];
 
   const reactiveFeatures = [
+
     "reactive lymphocyte",
     "linfocito reativo",
+
+    "reactive lymphocytes",
+    "linfocitos reativos",
+
     "activated lymphocyte",
-    "viral pattern",
-    "reativo",
-    "reactive pattern",
+    "activated lymphocytes",
+
     "linfocito ativado",
+    "linfocitos ativados",
+
+    "viral pattern",
+    "reactive pattern",
+
+    "atipia reacional",
+    "reativo",
+
+    "abundant cytoplasm",
+    "cytoplasm abundant",
+
+    "citoplasma abundante",
+    "citoplasma amplo",
+
+    "basophilic cytoplasm",
+    "cytoplasmic basophilia",
+
+    "citoplasma basofilico",
+    "citoplasma levemente basofilico",
+
+    "irregular cytoplasmic borders",
+    "scalloped cytoplasm",
+
+    "bordas irregulares",
+    "moldando hemacias",
+
+    "skirting",
+
+    "immunoblast",
+    "immunoblastic",
+
+    "imunoblasto",
+    "imunoblastico",
   ];
 
   const blastHits =
@@ -152,6 +189,9 @@ export function analyzeLeukocytes(
       text,
       reactiveFeatures,
     );
+
+  const strongReactivePattern =
+    reactiveHits >= 2;
 
   const hasLooseChromatin =
     hasPositiveFinding(
@@ -288,15 +328,27 @@ export function analyzeLeukocytes(
   // ==========================================================================
 
   if (
-    matureHits >= 1 ||
-    normalLeukocytePattern
+    reactiveHits >= 1 &&
+    !noLeukocytesDetected
   ) {
-    scores.maturationCoherence += 4;
-    scores.blast = Math.max(0, scores.blast - 5);
-    scores.reactivePattern += 1;
+
+    scores.reactivePattern +=
+      strongReactivePattern
+        ? 8
+        : 4;
 
     reasoning.push(
-      "Padrão leucocitário maduro reduz probabilidade de blastos verdadeiros.",
+      "Padrão linfocitário reacional identificado.",
+    );
+
+    correlations.push(
+      "Infecção viral",
+      "Resposta imunológica",
+      "Ativação linfocitária reacional",
+    );
+
+    findings.push(
+      "Características compatíveis com linfócitos reativos.",
     );
   }
 
@@ -599,21 +651,36 @@ export function analyzeLeukocytes(
   // RETURN
   // ==========================================================================
 
-  return {
-    leukocyteFindings: findings,
-    leukocyteAlerts: unique(alerts),
-    leukocyteCorrelations: unique(correlations),
-    leukocyteReasoning: unique(reasoning),
-    contradictionFlags: unique(contradictionFlags),
-    leukocyteSummary,
-    primaryPattern,
-    secondaryPattern,
-    dominantPattern: primaryPattern,
-    immatureFeaturesDetected,
-    leukocyteScores: scores,
-    blastRisk,
-  };
-}
+    return {
+      leukocyteFindings: findings,
+      leukocyteAlerts: unique(alerts),
+      leukocyteCorrelations: unique(correlations),
+      leukocyteReasoning: unique(reasoning),
+      contradictionFlags: unique(contradictionFlags),
+
+      leukocyteSummary:
+        strongReactivePattern
+          ? 'Linfócitos com características reacionais/ativadas, compatíveis com resposta imunológica. Ausência de critérios morfológicos inequívocos para blastos.'
+          : leukocyteSummary,
+
+      primaryPattern:
+        strongReactivePattern
+          ? 'Padrão linfocitário reacional'
+          : primaryPattern,
+
+      secondaryPattern,
+
+      dominantPattern:
+        strongReactivePattern
+          ? 'Padrão linfocitário reacional'
+          : primaryPattern,
+
+      reactivePatternDetected: strongReactivePattern,
+      immatureFeaturesDetected,
+      leukocyteScores: scores,
+      blastRisk,
+    };
+  }
 
 // ============================================================================
 // NORMALIZE

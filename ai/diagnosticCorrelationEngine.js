@@ -130,6 +130,49 @@ export function buildDiagnosticCorrelation({
   }
 
   // ==========================================================================
+  // REACTIVE LYMPHOCYTE / MONONUCLEOSIS-LIKE PATTERN
+  // ==========================================================================
+
+  if (reactiveLymphocytes) {
+    findings.push(
+      "Presença de linfócitos reativos/atípicos com padrão compatível com ativação imunológica.",
+    );
+
+    differentialDiagnosis.push({
+      condition:
+        "Resposta linfocitária reacional",
+      probability:
+        "high",
+    });
+
+    differentialDiagnosis.push({
+      condition:
+        "Síndrome mononucleósica / infecção viral",
+      probability:
+        "moderate",
+    });
+
+    recommendations.push(
+      "Correlacionar com hemograma completo, linfocitose absoluta, sorologia para EBV/CMV e contexto clínico.",
+    );
+  }
+
+  if (
+    largeMononuclearCells &&
+    !monomorphicPopulation &&
+    !reactiveLymphocytes &&
+    blastRisk === "low"
+  ) {
+    findings.push(
+      "Células mononucleares grandes observadas sem critérios suficientes para definição de monócitos ou blastos.",
+    );
+
+    recommendations.push(
+      "Considerar diferencial entre linfócitos reativos, monócitos maduros e imunoblastos, com revisão microscópica profissional.",
+    );
+  }
+
+  // ==========================================================================
   // PLATELETS
   // ==========================================================================
 
