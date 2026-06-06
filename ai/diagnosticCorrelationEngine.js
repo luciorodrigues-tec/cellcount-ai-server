@@ -42,6 +42,23 @@ export function buildDiagnosticCorrelation({
     confidenceAnalysis
       ?.requiresHumanReview === true;
 
+  const reactiveLymphocytes =
+    analysis?.findings?.reactiveLymphocytes === true ||
+    leukocyteAnalysis?.reactiveLymphocytes === true;
+
+  const atypicalLymphocytes =
+    analysis?.findings?.atypicalLymphocytes === true ||
+    leukocyteAnalysis?.atypicalLymphocytes === true;
+
+  const largeMononuclearCells = Boolean(
+    analysis?.findings?.largeMononuclearCells ||
+    leukocyteAnalysis?.largeMononuclearCells
+  );
+
+  const monomorphicPopulation = Boolean(
+    analysis?.findings?.monomorphicPopulation ||
+    leukocyteAnalysis?.monomorphicPopulation
+  );
   // ==========================================================================
   // FINDINGS
   // ==========================================================================
@@ -129,38 +146,42 @@ export function buildDiagnosticCorrelation({
     });
   }
 
-  // ==========================================================================
-  // REACTIVE LYMPHOCYTE / MONONUCLEOSIS-LIKE PATTERN
-  // ==========================================================================
+// ==========================================================================
+// REACTIVE LYMPHOCYTE / MONONUCLEOSIS-LIKE PATTERN
+// ==========================================================================
 
-  if (reactiveLymphocytes) {
-    findings.push(
-      "Presença de linfócitos reativos/atípicos com padrão compatível com ativação imunológica.",
-    );
+if (
+  reactiveLymphocytes ||
+  atypicalLymphocytes
+) {
+  findings.push(
+    "Presença de linfócitos reativos/atípicos com padrão compatível com ativação imunológica.",
+  );
 
-    differentialDiagnosis.push({
-      condition:
-        "Resposta linfocitária reacional",
-      probability:
-        "high",
-    });
+  differentialDiagnosis.push({
+    condition:
+      "Resposta linfocitária reacional",
+    probability:
+      "high",
+  });
 
-    differentialDiagnosis.push({
-      condition:
-        "Síndrome mononucleósica / infecção viral",
-      probability:
-        "moderate",
-    });
+  differentialDiagnosis.push({
+    condition:
+      "Síndrome mononucleósica / infecção viral",
+    probability:
+      "moderate",
+  });
 
-    recommendations.push(
-      "Correlacionar com hemograma completo, linfocitose absoluta, sorologia para EBV/CMV e contexto clínico.",
-    );
-  }
+  recommendations.push(
+    "Correlacionar com hemograma completo, linfocitose absoluta, sorologia para EBV/CMV e contexto clínico.",
+  );
+}
 
   if (
     largeMononuclearCells &&
     !monomorphicPopulation &&
     !reactiveLymphocytes &&
+    !atypicalLymphocytes &&
     blastRisk === "low"
   ) {
     findings.push(
@@ -287,10 +308,8 @@ export function buildDiagnosticCorrelation({
     aiVisualMode,
 
     confidenceLevel:
-      confidenceAnalysis
-        ?.confidenceLevel ||
-
-      "low",
+      confidenceAnalysis?.confidenceLevel ||
+      "moderate",
 
     engineVersion:
       "DIAGNOSTIC_CORRELATION_V6_SAFE_HYBRID",
