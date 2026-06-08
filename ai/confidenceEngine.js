@@ -271,6 +271,38 @@ export function buildConfidenceAnalysis({
 // SAFETY PROFILE
 // ============================================================================
 
+function extractVisualEvidenceScore(
+  analysis = {},
+  safetyValidation = {},
+) {
+  if (
+    typeof safetyValidation?.visualEvidenceScore === "number"
+  ) {
+    return safetyValidation.visualEvidenceScore;
+  }
+
+  if (
+    typeof analysis?.visualEvidence?.visualEvidenceScore === "number"
+  ) {
+    return analysis.visualEvidence.visualEvidenceScore;
+  }
+
+  if (
+    typeof analysis?.visualEvidence === "string" &&
+    analysis.visualEvidence.trim().length > 0
+  ) {
+    return 65;
+  }
+
+  if (
+    typeof analysis?.confidenceAnalysis?.visualEvidenceScore === "number"
+  ) {
+    return analysis.confidenceAnalysis.visualEvidenceScore;
+  }
+
+  return 0;
+}
+
 function buildSafetyProfile({
   safetyValidation = {},
   visualEvidence = {},
@@ -281,10 +313,10 @@ function buildSafetyProfile({
 }) {
   const visualEvidenceScore =
     normalize(
-      safetyValidation?.visualEvidenceScore ??
-        analysis?.visualEvidence?.visualEvidenceScore ??
-        analysis?.confidenceAnalysis?.visualEvidenceScore ??
-        0,
+      extractVisualEvidenceScore(
+        analysis,
+        safetyValidation,
+      ),
     );
 
   const diagnosticReliability =
