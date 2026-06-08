@@ -324,6 +324,20 @@ function buildSafetyProfile({
   text = "",
   analysis = {},
 }) {
+
+  console.log(
+    "VISUAL EVIDENCE INPUT",
+    JSON.stringify(
+      {
+        visualEvidence,
+        analysisVisualEvidence:
+          analysis?.visualEvidence,
+      },
+      null,
+      2,
+    ),
+  );
+
   const visualEvidenceScore =
     normalize(
       safetyValidation?.visualEvidenceScore ||
