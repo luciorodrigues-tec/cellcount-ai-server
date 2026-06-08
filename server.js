@@ -387,6 +387,17 @@ function normalizeMedicalResponse(
     );
   }
 
+  const visualEvidence =
+    typeof data.visualEvidence === "object" &&
+    data.visualEvidence !== null
+      ? data.visualEvidence
+      : (
+          typeof data.rawResponse?.visualEvidence === "object" &&
+          data.rawResponse.visualEvidence !== null
+            ? data.rawResponse.visualEvidence
+            : {}
+        );
+
   return {
 
     normalityBlocked,
@@ -550,6 +561,8 @@ function normalizeMedicalResponse(
       data.imageQuality !== null
         ? data.imageQuality
         : {},
+
+    visualEvidence,
 
     patternRecognition: {
 
