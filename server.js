@@ -3160,7 +3160,7 @@ async function analyzeWithOpenAI({
       }
 
       const payload = buildGPTImagePayload(enhanced, "image/jpeg", {
-        maxTiles: Number(process.env.GPT_IMAGE_TILES || 0),
+        maxTiles: Number(process.env.GPT_IMAGE_TILES || 1),
       });
 
       imagesPayload.push(...payload);
@@ -3212,9 +3212,21 @@ educationalImpact, interpretiveSynthesis e hematologicReasoning.
 
     const visualStart = performance.now();
 
+    console.log("================================");
+    console.log("PROMPT SIZE");
+    console.log(
+      JSON.stringify({
+        contextualPromptLength: contextualPrompt.length,
+        hospitalPromptLength: hospitalPrompt.length,
+        imagesPayloadLength: imagesPayload.length,
+      }, null, 2)
+    );
+    console.log("================================");
+
     const completion = await openai.chat.completions.create({
       model: OPENAI_MODEL,
       temperature: 0.12,
+      max_tokens: 1800,
       response_format: { type: "json_object" },
       messages: [
         {
@@ -4532,7 +4544,6 @@ ${question}
           },
         });
       }
-
 
       const completion =
         await openai.chat.completions.create({
