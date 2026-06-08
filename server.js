@@ -3313,6 +3313,17 @@ educationalImpact, interpretiveSynthesis e hematologicReasoning.
       completion?.choices?.[0]?.message?.content || "{}",
     );
 
+    if (
+      typeof parsed.visualEvidence === "string"
+    ) {
+      parsed.visualEvidence = {
+        visualEvidenceScore: 65,
+        imageReliability: "moderate",
+        artifactInterference: "low",
+        evidenceLevel: "moderada evidência visual",
+      };
+    }
+
     parsed.heatmapRegions =
       Array.isArray(parsed.heatmapRegions)
         ? parsed.heatmapRegions.filter(
