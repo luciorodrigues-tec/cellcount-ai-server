@@ -289,7 +289,7 @@ function buildSafetyProfile({
   const diagnosticReliability =
     normalize(
       safetyValidation?.diagnosticReliability ||
-        analysis?.metadata?.diagnosticReliability ||
+        analysis?.visualEvidence?.diagnosticReliability ||
         0,
     );
 
@@ -333,6 +333,10 @@ function buildSafetyProfile({
     visualEvidenceScore >= 55 ||
     diagnosticReliability >= 55 ||
     morphologyCoherence >= 55 ||
+    analysis?.findings?.atypicalLymphocytes === true ||
+    analysis?.findings?.reactiveLymphocytes === true ||
+    analysis?.findings?.largeMononuclearCells === true ||
+    analysis?.normalityBlocked === true ||
     containsAny(text, [
       "neutrofil",
       "linfocit",
@@ -395,7 +399,13 @@ function buildSafetyProfile({
       "plasmocitoides",
 
       "blasto",
-      "blastos"
+      "blastos",
+
+      "atypicallymphocytes",
+      "reactivelymphocytes",
+      "monocytoidatypicallymphocytes",
+      "downeylikecells",
+
     ]);
 
   const normalPattern =
@@ -916,6 +926,23 @@ function calculateInflammatoryConfidence({
       qualityScore,
       "standard",
     );
+
+  if (
+    hasPositiveFinding(text, [
+      "linfocito reativo",
+      "linfocitos reativos",
+      "linfocito atipico",
+      "linfocitos atipicos",
+      "reactive lymphocyte",
+      "atypical lymphocyte",
+      "downey",
+      "ativacao linfoide",
+      "reactive lymphoid activation",
+      "mononucleosis"
+    ])
+  ) {
+    score += 35;
+  }
 
   return normalize(score);
 }
