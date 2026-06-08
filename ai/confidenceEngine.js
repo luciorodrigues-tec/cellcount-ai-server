@@ -16,6 +16,21 @@ export function buildConfidenceAnalysis({
   diagnosticCorrelation = null,
 }) {
   if (!analysis) {
+
+  console.log(
+    "CONFIDENCE DEBUG",
+    JSON.stringify({
+      visualEvidenceScore: safetyProfile.visualEvidenceScore,
+      diagnosticReliability: safetyProfile.diagnosticReliability,
+      morphologyCoherence: safetyProfile.morphologyCoherence,
+      artifactProbability: safetyProfile.artifactProbability,
+      falsePositiveRisk: safetyProfile.falsePositiveRisk,
+      safeDiagnosticGate: safetyProfile.safeDiagnosticGate,
+      globalConfidenceScore,
+      hematologicRisk,
+    }, null, 2)
+  );
+
     return buildEmptyConfidence();
   }
 
