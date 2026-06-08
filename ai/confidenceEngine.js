@@ -60,6 +60,19 @@ export function buildConfidenceAnalysis({
   const consensusMatrix =
     consensusResult?.confidenceMatrix || {};
 
+  console.log(
+    "VISUAL EVIDENCE INPUT",
+    JSON.stringify(
+      {
+        visualEvidence,
+        analysisVisualEvidence:
+          analysis?.visualEvidence,
+      },
+      null,
+      2,
+    ),
+  );
+
   const safetyProfile =
     buildSafetyProfile({
       safetyValidation,
@@ -313,10 +326,10 @@ function buildSafetyProfile({
 }) {
   const visualEvidenceScore =
     normalize(
-      extractVisualEvidenceScore(
-        analysis,
-        safetyValidation,
-      ),
+      safetyValidation?.visualEvidenceScore ||
+      visualEvidence?.visualEvidenceScore ||
+      analysis?.visualEvidence?.visualEvidenceScore ||
+      0,
     );
 
   const diagnosticReliability =
