@@ -6,6 +6,10 @@
 import validateConsistency
   from "./utils/validateConsistency.js";
 
+import {
+  applyFieldAdequacyRules,
+} from "./fieldAdequacyEngine.js";
+
 import express from "express";
 import cors from "cors";
 import multer from "multer";
@@ -243,25 +247,154 @@ function normalizeMedicalResponse(
   data = {},
 ) {
 
+  const findings =
+    data.findings || {};
+
+    const atypicalLymphocyteSubtype =
+      findings.atypicalLymphocyteSubtype ||
+      data.atypicalLymphocyteSubtype ||
+      "none";
+
+    const downeyLikeCells =
+      Boolean(
+        findings.downeyLikeCells ||
+        data.downeyLikeCells
+      );
+
+    const downeyType =
+      findings.downeyType ||
+      data.downeyType ||
+      "none";
+
+    const monocytoidAtypicalLymphocytes =
+      Boolean(
+        findings.monocytoidAtypicalLymphocytes ||
+        data.monocytoidAtypicalLymphocytes ||
+        atypicalLymphocyteSubtype === "monocytoid"
+      );
+
+    const lymphocytoidAtypicalLymphocytes =
+      Boolean(
+        findings.lymphocytoidAtypicalLymphocytes ||
+        data.lymphocytoidAtypicalLymphocytes ||
+        atypicalLymphocyteSubtype === "lymphocytoid"
+      );
+
+    const immunoblastoidCells =
+      Boolean(
+        findings.immunoblastoidCells ||
+        data.immunoblastoidCells ||
+        atypicalLymphocyteSubtype === "immunoblastoid"
+      );
+
+  const reactiveLymphoidPattern =
+    Boolean(
+
+      data.reactiveLymphoidPattern ||
+
+      findings.reactiveLymphocytes ||
+
+      findings.atypicalLymphocytes ||
+
+      findings.largeMononuclearCells ||
+
+      findings.plasmacytoidCells ||
+
+      findings.plasmocytes ||
+
+      findings.plasmablasts ||
+
+      findings.downeyLikeCells ||
+
+      findings.monocytoidAtypicalLymphocytes ||
+
+      findings.immunoblastoidCells
+    );
+
+  const mononucleosisSuspicion =
+    Boolean(
+
+      data.mononucleosisSuspicion ||
+
+      findings.downeyLikeCells ||
+
+      findings.monocytoidAtypicalLymphocytes ||
+
+      findings.immunoblastoidCells ||
+
+      findings.atypicalLymphocyteSubtype ===
+        "monocytoid" ||
+
+      findings.atypicalLymphocyteSubtype ===
+        "immunoblastoid"
+    );
+
+  const normalityBlocked =
+    Boolean(
+      data.normalityBlocked ||
+      reactiveLymphoidPattern ||
+      findings.monomorphicPopulation
+    );
+
+  const blockNormalReason =
+    Array.isArray(data.blockNormalReason)
+      ? [...data.blockNormalReason]
+      : [];
+
+  if (reactiveLymphoidPattern) {
+    blockNormalReason.push(
+      "Linfócitos atípicos, linfócitos reativos ou células mononucleares ativadas impedem classificação como normal."
+    );
+  }
+
   return {
 
-  normalityBlocked:
-    data.normalityBlocked || false,
+    normalityBlocked,
 
-  blockNormalReason:
-    Array.isArray(data.blockNormalReason)
-      ? data.blockNormalReason
-      : [],
+    blockNormalReason:
+      [...new Set(blockNormalReason)],
 
-  morphologicRiskClass:
-    data.morphologicRiskClass ||
-    "CLASS_0_NORMAL",
+    morphologicRiskClass:
+      mononucleosisSuspicion
+
+        ? "CLASS_2_REACTIVE_MONONUCLEOSIS_PATTERN"
+
+        : normalityBlocked
+
+          ? (
+              data.morphologicRiskClass ===
+                  "CLASS_0_NORMAL" ||
+              !data.morphologicRiskClass
+
+                ? "CLASS_2_ATYPICAL_POPULATION"
+
+                : data.morphologicRiskClass
+            )
+
+          : (
+              data.morphologicRiskClass ||
+              "CLASS_0_NORMAL"
+            ),
+
+    reactiveLymphoidPattern,
+
+    mononucleosisSuspicion,
+
+    downeyCellSuspicion:
+      Boolean(
+        data.downeyCellSuspicion ||
+        downeyLikeCells ||
+        downeyType === "II" ||
+        downeyType === "III"
+      ),
 
     summary:
       data.summary || "",
 
     riskLevel:
-      data.riskLevel || "Indefinido",
+      reactiveLymphoidPattern
+        ? "Alteração morfológica linfoide reacional"
+        : (data.riskLevel || "Indefinido"),
 
     observations:
       data.observations || "",
@@ -272,70 +405,72 @@ function normalizeMedicalResponse(
         : [],
 
     morphologies:
-      Array.isArray(
-        data.morphologies,
-      )
+      Array.isArray(data.morphologies)
         ? data.morphologies
         : [],
 
     counts:
-      typeof data.counts === "object"
+      typeof data.counts === "object" &&
+      data.counts !== null
         ? data.counts
         : {},
 
     findings: {
 
+      reactiveLymphocytes:
+        Boolean(findings.reactiveLymphocytes),
+
       largeMononuclearCells:
-        Boolean(
-          data.findings?.largeMononuclearCells
-        ),
+        Boolean(findings.largeMononuclearCells),
 
       plasmacytoidCells:
-        Boolean(
-          data.findings?.plasmacytoidCells
-        ),
+        Boolean(findings.plasmacytoidCells),
 
       plasmocytes:
-        Boolean(
-          data.findings?.plasmocytes
-        ),
+        Boolean(findings.plasmocytes),
 
       plasmablasts:
-        Boolean(
-          data.findings?.plasmablasts
-        ),
+        Boolean(findings.plasmablasts),
 
       atypicalLymphocytes:
-        Boolean(
-          data.findings?.atypicalLymphocytes
-        ),
+        Boolean(findings.atypicalLymphocytes),
+
+      atypicalLymphocyteSubtype,
+
+      downeyLikeCells,
+
+      downeyType,
+
+      monocytoidAtypicalLymphocytes,
+
+      lymphocytoidAtypicalLymphocytes,
+
+      immunoblastoidCells,
 
       monomorphicPopulation:
-        Boolean(
-          data.findings?.monomorphicPopulation
-        ),
+        Boolean(findings.monomorphicPopulation),
 
       immatureCells:
-        Boolean(
-          data.findings?.immatureCells
-        ),
+        Boolean(findings.immatureCells),
 
       blastSuspicion:
-        Boolean(
-          data.findings?.blastSuspicion
-        ),
+        Boolean(findings.blastSuspicion),
     },
 
     morphologyAnalysis: {
 
       overview:
-        data?.morphologyAnalysis?.overview || "",
+        reactiveLymphoidPattern
+          ? "Achado morfológico linfoide reacional/atípico identificado. A amostra não deve ser classificada como morfologia preservada."
+          : (data?.morphologyAnalysis?.overview || ""),
 
       erythrocyteReview:
         data?.morphologyAnalysis?.erythrocyteReview || "",
 
       leukocyteReview:
-        data?.morphologyAnalysis?.leukocyteReview || "",
+        reactiveLymphoidPattern
+          ? "Presença de padrão compatível com ativação linfoide reacional, incluindo linfócitos atípicos/reativos ou células mononucleares ativadas."
+          : (data?.morphologyAnalysis?.leukocyteReview || ""),
 
       plateletReview:
         data?.morphologyAnalysis?.plateletReview || "",
@@ -344,32 +479,34 @@ function normalizeMedicalResponse(
         data?.morphologyAnalysis?.absentFindings || "",
 
       biologicalInterpretation:
-        data?.morphologyAnalysis?.biologicalInterpretation || "",
+        reactiveLymphoidPattern
+          ? "O padrão pode estar associado a resposta imunológica reacional, incluindo síndrome mononucleósica, EBV, CMV ou outras viroses, sempre exigindo correlação clínica e laboratorial."
+          : (data?.morphologyAnalysis?.biologicalInterpretation || ""),
 
       differentialDiagnosis:
-        data?.morphologyAnalysis?.differentialDiagnosis || "",
+        reactiveLymphoidPattern
+          ? "Hipóteses educacionais: síndrome mononucleósica, mononucleose infecciosa por EBV, infecção por CMV ou resposta viral/reacional."
+          : (data?.morphologyAnalysis?.differentialDiagnosis || ""),
 
       summary:
-        data?.morphologyAnalysis?.summary || "",
+        reactiveLymphoidPattern
+          ? "Ativação linfoide reacional / população mononuclear atípica."
+          : (data?.morphologyAnalysis?.summary || ""),
     },
 
     educationalPearls:
-      Array.isArray(
-        data.educationalPearls,
-      )
+      Array.isArray(data.educationalPearls)
         ? data.educationalPearls
         : [],
 
     heatmapRegions:
-      Array.isArray(
-        data.heatmapRegions,
-      )
+      Array.isArray(data.heatmapRegions)
         ? data.heatmapRegions
         : [],
 
     imageQuality:
-      typeof data.imageQuality ===
-      "object"
+      typeof data.imageQuality === "object" &&
+      data.imageQuality !== null
         ? data.imageQuality
         : {},
 
@@ -379,7 +516,9 @@ function normalizeMedicalResponse(
         data?.patternRecognition?.erythrocytePattern || "",
 
       leukocytePattern:
-        data?.patternRecognition?.leukocytePattern || "",
+        reactiveLymphoidPattern
+          ? "Reactive lymphoid activation"
+          : (data?.patternRecognition?.leukocytePattern || ""),
 
       plateletPattern:
         data?.patternRecognition?.plateletPattern || "",
@@ -388,14 +527,20 @@ function normalizeMedicalResponse(
         data?.patternRecognition?.artifactPattern || "",
 
       overallPattern:
-        data?.patternRecognition?.overallPattern || "",
+        reactiveLymphoidPattern
+          ? "Reactive lymphoid activation / atypical mononuclear population"
+          : (data?.patternRecognition?.overallPattern || ""),
     },
 
     interpretiveSynthesis:
-      data?.interpretiveSynthesis || "",
+      reactiveLymphoidPattern
+        ? "Há achados morfológicos que impedem a classificação como normal. O padrão linfoide observado sugere ativação imunológica reacional, com hipótese educacional de síndrome mononucleósica, dependente de correlação clínica, hemograma e sorologias."
+        : (data?.interpretiveSynthesis || ""),
 
     clinicalMeaning:
-      data?.clinicalMeaning || "",
+      reactiveLymphoidPattern
+        ? "Achado educacionalmente relevante: padrão linfoide reacional/atípico."
+        : (data?.clinicalMeaning || ""),
 
     hematologicReasoning:
       data?.hematologicReasoning || "",
@@ -404,98 +549,105 @@ function normalizeMedicalResponse(
       data?.educationalImpact || "",
 
     erythrocyteFindings:
-      typeof data
-        .erythrocyteFindings ===
-      "object"
-        ? data
-            .erythrocyteFindings
+      typeof data.erythrocyteFindings === "object" &&
+      data.erythrocyteFindings !== null
+        ? data.erythrocyteFindings
         : {},
 
     leukocyteFindings:
-      typeof data
-        .leukocyteFindings ===
-      "object"
-        ? data
-            .leukocyteFindings
+      typeof data.leukocyteFindings === "object" &&
+      data.leukocyteFindings !== null
+        ? data.leukocyteFindings
         : {},
 
     plateletFindings:
-      typeof data
-        .plateletFindings ===
-      "object"
-        ? data
-            .plateletFindings
+      typeof data.plateletFindings === "object" &&
+      data.plateletFindings !== null
+        ? data.plateletFindings
         : {},
 
     blastSuspicion:
-      typeof data
-        .blastSuspicion ===
-      "object"
-        ? data
-            .blastSuspicion
+      typeof data.blastSuspicion === "object" &&
+      data.blastSuspicion !== null
+        ? data.blastSuspicion
         : {},
 
     overallAssessment:
-      typeof data
-        .overallAssessment ===
-      "object"
-        ? data
-            .overallAssessment
-        : {},
+      typeof data.overallAssessment === "object" &&
+      data.overallAssessment !== null
+        ? {
+            ...data.overallAssessment,
+            requiresHumanReview:
+              normalityBlocked ||
+              data.overallAssessment?.requiresHumanReview === true,
+
+            riskCategory:
+              reactiveLymphoidPattern
+                ? "CLASS_2_ATYPICAL_POPULATION"
+                : data.overallAssessment?.riskCategory,
+          }
+        : {
+            requiresHumanReview: normalityBlocked,
+            riskCategory:
+              normalityBlocked
+                ? "CLASS_2_ATYPICAL_POPULATION"
+                : "CLASS_0_NORMAL",
+          },
 
     structuredReport:
-      typeof data
-        .structuredReport ===
-      "object"
-        ? data
-            .structuredReport
+      typeof data.structuredReport === "object" &&
+      data.structuredReport !== null
+        ? data.structuredReport
         : {},
 
     differentialDiagnosis:
-      Array.isArray(
-        data.differentialDiagnosis,
-      )
-        ? data
-            .differentialDiagnosis
-        : [],
+      reactiveLymphoidPattern
+        ? [
+            "Síndrome mononucleósica",
+            "Mononucleose infecciosa por EBV",
+            "Infecção por CMV",
+            "Resposta imunológica reacional",
+            ...(
+              Array.isArray(data.differentialDiagnosis)
+                ? data.differentialDiagnosis
+                : []
+            ),
+          ]
+        : (
+            Array.isArray(data.differentialDiagnosis)
+              ? data.differentialDiagnosis
+              : []
+          ),
 
     criticalFlags:
-      Array.isArray(
-        data.criticalFlags,
-      )
+      Array.isArray(data.criticalFlags)
         ? data.criticalFlags
         : [],
 
     analysisSource:
-      data.analysisSource ||
-      "ai_visual",
+      data.analysisSource || "ai_visual",
 
     manualCounts:
-      typeof data.manualCounts ===
-      "object"
+      typeof data.manualCounts === "object" &&
+      data.manualCounts !== null
         ? data.manualCounts
         : {},
 
     aiDetectedCounts:
-      typeof data.aiDetectedCounts ===
-      "object"
+      typeof data.aiDetectedCounts === "object" &&
+      data.aiDetectedCounts !== null
         ? data.aiDetectedCounts
         : {},
 
     hybridValidation:
-      typeof data.hybridValidation ===
-      "object"
+      typeof data.hybridValidation === "object" &&
+      data.hybridValidation !== null
         ? data.hybridValidation
         : {},
 
-  rawResponse: data,
+    rawResponse: data,
   };
 }
-
-// ============================================================================
-// AUTH
-// ============================================================================
-
 function auth(
   req,
   res,
@@ -1275,6 +1427,71 @@ Preferir:
 Se houver população heterogênea de células mononucleares grandes sem critérios inequívocos de blasto, não sugerir leucemia aguda. Descrever como:
 "linfócitos reativos/atípicos, requerendo correlação clínica e hemograma".
 
+
+====================================================================
+CLASSIFICAÇÃO DOS LINFÓCITOS ATÍPICOS
+====================================================================
+
+Se forem observados linfócitos atípicos, classificá-los obrigatoriamente.
+
+TIPO LINFOCITOIDE
+
+Características:
+
+- núcleo relativamente regular
+- cromatina moderadamente condensada
+- discreta basofilia citoplasmática
+- aspecto próximo ao linfócito maduro
+
+Retornar:
+
+atypicalLymphocyteSubtype = "lymphocytoid"
+lymphocytoidAtypicalLymphocytes = true
+
+------------------------------------------------------------
+
+TIPO MONOCITOIDE (DOWNEY II)
+
+Características:
+
+- célula grande
+- citoplasma abundante
+- citoplasma moldando hemácias
+- basofilia intensa periférica
+- núcleo irregular ou excêntrico
+
+Retornar:
+
+atypicalLymphocyteSubtype = "monocytoid"
+monocytoidAtypicalLymphocytes = true
+downeyLikeCells = true
+downeyType = "II"
+
+mononucleosisSuspicion = true
+
+------------------------------------------------------------
+
+TIPO IMUNOBLASTOIDE (DOWNEY III)
+
+Características:
+
+- célula muito grande
+- nucléolo evidente
+- cromatina frouxa
+- citoplasma fortemente basofílico
+
+Retornar:
+
+atypicalLymphocyteSubtype = "immunoblastoid"
+immunoblastoidCells = true
+downeyType = "III"
+
+------------------------------------------------------------
+
+Se não houver evidência suficiente:
+
+atypicalLymphocyteSubtype = "none"
+
 ====================================================================
 
 ANÁLISE NUCLEAR
@@ -1610,6 +1827,18 @@ ESTRUTURA OBRIGATÓRIA:
 
     "atypicalLymphocytes": false,
 
+    "atypicalLymphocyteSubtype": "none",
+
+    "downeyLikeCells": false,
+
+    "downeyType": "none",
+
+    "monocytoidAtypicalLymphocytes": false,
+
+    "lymphocytoidAtypicalLymphocytes": false,
+
+    "immunoblastoidCells": false,
+
     "monomorphicPopulation": false,
 
     "immatureCells": false,
@@ -1879,15 +2108,28 @@ Nunca usar array vazio [] quando houver recomendação educacional aplicável.`,
       visualStart,
     );
 
-    const mergedAnalysis = normalizeMedicalResponse({
+    let mergedAnalysis = normalizeMedicalResponse({
       ...parsed,
       analysisSource,
       manualCounts,
       manualMetadata,
     });
 
+    mergedAnalysis =
+      applyFieldAdequacyRules(
+        mergedAnalysis,
+      );
+
     console.log("================================");
     console.log("NORMALIZED RESPONSE");
+    console.log("FIELD ADEQUACY");
+    console.log(
+      JSON.stringify(
+        mergedAnalysis.fieldAdequacy,
+        null,
+        2,
+      ),
+    );
     console.log(JSON.stringify(mergedAnalysis, null, 2));
     console.log("================================");
     console.log("MORPHOLOGY ANALYSIS");
