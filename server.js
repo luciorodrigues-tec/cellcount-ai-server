@@ -3653,6 +3653,19 @@ if (hasReactiveOrAtypicalSignal) {
     }
 
     const confidenceStart = performance.now();
+
+    console.log(
+      "VISUAL EVIDENCE CHECK",
+      JSON.stringify(
+        {
+          raw: mergedAnalysis?.rawResponse?.visualEvidence,
+          normalized: mergedAnalysis?.visualEvidence,
+        },
+        null,
+        2,
+      ),
+    );
+
     const confidenceAnalysis = buildConfidenceAnalysis({
       analysis: mergedAnalysis,
 
