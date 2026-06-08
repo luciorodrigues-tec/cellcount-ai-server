@@ -990,11 +990,15 @@ function buildSummary(
   noLeukocytesDetected = false,
   normalLeukocytePattern = false,
 ) {
+
   if (noLeukocytesDetected) {
     return "Ausência de elementos leucocitários suficientes para avaliação morfológica confiável.";
   }
 
-  if (normalLeukocytePattern && findings.length === 0) {
+  if (
+    normalLeukocytePattern &&
+    findings.length === 0
+  ) {
     return "Leucócitos descritos sem alterações morfológicas significativas.";
   }
 
@@ -1002,13 +1006,29 @@ function buildSummary(
     return "Sem alterações leucocitárias significativas.";
   }
 
-  return findings
-    .map(
-      item =>
-        item.type.replaceAll(
-          "_",
-          " ",
-        ),
-    )
-    .join(", ");
+  const labels = findings
+    .map((item) => {
+
+      if (typeof item === "string") {
+        return item;
+      }
+
+      return (
+        item?.type ||
+        item?.name ||
+        item?.label ||
+        ""
+      );
+    })
+    .filter(Boolean)
+    .map((label) =>
+      String(label)
+        .replaceAll("_", " ")
+    );
+
+  if (labels.length === 0) {
+    return "Alterações leucocitárias identificadas.";
+  }
+
+  return labels.join(", ");
 }
