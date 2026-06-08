@@ -4082,6 +4082,36 @@ app.post(
         );
 
       if (
+        validation.result.morphologicRiskClass ===
+          "CLASS_1_LIMITED_FIELD_ATYPICAL_CELL" ||
+        validation.result.findings?.reactiveLymphocytes === true ||
+        validation.result.findings?.atypicalLymphocytes === true
+      ) {
+        validation.result.normalityBlocked = true;
+
+        validation.result.overallAssessment =
+          validation.result.overallAssessment || {};
+
+        validation.result.overallAssessment.requiresHumanReview = true;
+
+        validation.result.overallAssessment.riskCategory =
+          validation.result.morphologicRiskClass ||
+          "CLASS_1_LIMITED_FIELD_ATYPICAL_CELL";
+
+        validation.result.blockNormalReason =
+          Array.isArray(validation.result.blockNormalReason)
+            ? validation.result.blockNormalReason
+            : [];
+
+        validation.result.blockNormalReason.push(
+          "Célula mononuclear isolada com possível padrão reacional/atípico impede classificação como morfologia preservada."
+        );
+
+        validation.result.blockNormalReason =
+          [...new Set(validation.result.blockNormalReason)];
+      }
+
+      if (
         validation.result.findings?.blastSuspicion === true
       ) {
 
