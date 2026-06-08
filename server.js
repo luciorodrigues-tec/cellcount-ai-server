@@ -8,7 +8,7 @@ import validateConsistency
 
 import {
   applyFieldAdequacyRules,
-} from "./fieldAdequacyEngine.js";
+} from "./ai/fieldAdequacyEngine.js";
 
 import express from "express";
 import cors from "cors";
