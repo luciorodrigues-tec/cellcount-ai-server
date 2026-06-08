@@ -3742,6 +3742,26 @@ if (hasReactiveOrAtypicalSignal) {
 
     let finalStructuredReport = mergedAnalysis?.structuredReport || {};
 
+    const riskClass =
+      mergedAnalysis?.morphologicRiskClass || '';
+
+    if (
+      riskClass === 'CLASS_1_LIMITED_FIELD_ATYPICAL_CELL'
+    ) {
+      finalStructuredReport = {
+        ...finalStructuredReport,
+
+        conclusion:
+          'Campo microscópico limitado com célula mononuclear isolada de possível natureza reacional. Não foram observados elementos inequívocos de blastos ou população neoplásica neste campo analisado.',
+
+        hematologicMeaning:
+          'Achado focal e isolado, insuficiente para caracterização de processo proliferativo. Recomenda-se correlação clínica e avaliação de múltiplos campos da lâmina.',
+
+        recommendation:
+          'Correlacionar com hemograma completo, quadro clínico e revisão microscópica profissional.',
+      };
+    }
+
     if (!safetyValidation?.safeDiagnosticGate) {
       finalStructuredReport = {
         ...finalStructuredReport,
