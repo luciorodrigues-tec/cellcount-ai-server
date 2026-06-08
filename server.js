@@ -3728,6 +3728,48 @@ function validateAIResult(
       "Indefinido";
   }
 
+  const atypicalFlags = [
+    result?.findings?.reactiveLymphocytes,
+    result?.findings?.atypicalLymphocytes,
+    result?.findings?.largeMononuclearCells,
+    result?.findings?.monocytoidAtypicalLymphocytes,
+    result?.findings?.downeyLikeCells,
+  ].some((v) => v === true);
+
+  if (atypicalFlags) {
+    result.normalityBlocked = true;
+
+    result.overallAssessment =
+      result.overallAssessment || {};
+
+    result.overallAssessment.requiresHumanReview = true;
+
+    if (
+      result.morphologicRiskClass === "CLASS_0_NORMAL" ||
+      !result.morphologicRiskClass
+    ) {
+      result.morphologicRiskClass =
+        "CLASS_1_LIMITED_FIELD_ATYPICAL_CELL";
+    }
+
+    result.riskLevel =
+      result.riskLevel === "Indefinido"
+        ? "Achado celular isolado / possível reatividade linfoide"
+        : result.riskLevel;
+
+    result.blockNormalReason =
+      Array.isArray(result.blockNormalReason)
+        ? result.blockNormalReason
+        : [];
+
+    result.blockNormalReason.push(
+      "Sinal de reatividade/atipia celular impede classificação como morfologia preservada."
+    );
+
+    result.blockNormalReason =
+      [...new Set(result.blockNormalReason)];
+  }
+
   return {
 
     valid: true,
