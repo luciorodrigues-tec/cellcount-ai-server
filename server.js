@@ -250,10 +250,22 @@ function normalizeMedicalResponse(
   const findings =
     data.findings || {};
 
-    const atypicalLymphocyteSubtype =
-      findings.atypicalLymphocyteSubtype ||
-      data.atypicalLymphocyteSubtype ||
-      "none";
+  const defaultAbsentFindings = `🟢 ELEMENTOS DE ALERTA NÃO EVIDENCIADOS
+
+✓ Blastos inequívocos
+
+✓ Bastonetes de Auer
+
+✓ População blástica significativa
+
+✓ Células imaturas críticas
+
+✓ Esquizócitos relevantes`;
+
+  const atypicalLymphocyteSubtype =
+    findings.atypicalLymphocyteSubtype ||
+    data.atypicalLymphocyteSubtype ||
+    "none";
 
     const downeyLikeCells =
       Boolean(
@@ -476,7 +488,8 @@ function normalizeMedicalResponse(
         data?.morphologyAnalysis?.plateletReview || "",
 
       absentFindings:
-        data?.morphologyAnalysis?.absentFindings || "",
+        data?.morphologyAnalysis?.absentFindings ||
+        defaultAbsentFindings,
 
       biologicalInterpretation:
         reactiveLymphoidPattern
@@ -1533,15 +1546,20 @@ Avaliar:
 
 ====================================================================
 
-ACHADOS IMPORTANTES NÃO IDENTIFICADOS
+Criar obrigatoriamente seção específica chamada:
 
-Criar obrigatoriamente seção específica contendo:
+ELEMENTOS DE ALERTA NÃO EVIDENCIADOS
 
-- ausência de bastonetes de Auer
-- ausência de blastos inequívocos
-- ausência de esquizócitos
-- ausência de rouleaux
-- ausência de displasia marcante
+Listar somente os elementos pesquisados e não evidenciados, sem repetir a palavra "ausência" ou "sem":
+
+- Blastos inequívocos
+- Células imaturas críticas
+- Bastonetes de Auer
+- Esquizócitos relevantes
+- População blástica significativa
+
+Nunca usar o título "Achados não observados".
+Nunca usar a expressão "achados não encontrados".
 
 Somente quando realmente ausentes.
 
@@ -1851,7 +1869,7 @@ ESTRUTURA OBRIGATÓRIA:
     "erythrocyteReview": "",
     "leukocyteReview": "",
     "plateletReview": "",
-    "absentFindings": "",
+    "absentFindings": "ELEMENTOS DE ALERTA NÃO EVIDENCIADOS: Blastos inequívocos; células imaturas críticas; bastonetes de Auer; população blástica significativa; células imaturas críticas; esquizócitos relevantes.",
     "biologicalInterpretation": "",
     "differentialDiagnosis": "",
     "summary": ""
