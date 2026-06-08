@@ -927,25 +927,24 @@ function calculateInflammatoryConfidence({
       "standard",
     );
 
-  if (
-    hasPositiveFinding(text, [
-      "linfocito reativo",
-      "linfocitos reativos",
-      "linfocito atipico",
-      "linfocitos atipicos",
-      "reactive lymphocyte",
-      "atypical lymphocyte",
-      "downey",
-      "ativacao linfoide",
-      "reactive lymphoid activation",
-      "mononucleosis"
-    ])
-  ) {
-    score += 35;
-  }
+  const reactiveMarkers = [
+    "linfocito reativo",
+    "linfocitos reativos",
+    "linfocito atipico",
+    "linfocitos atipicos",
+    "downey",
+    "ativacao linfoide",
+  ];
+
+  const reactiveCount =
+    reactiveMarkers.filter(marker =>
+      hasPositiveFinding(text, [marker])
+    ).length;
+
+  score += reactiveCount * 10;
 
   return normalize(score);
-}
+  }
 
 // ============================================================================
 // DYSPLASIA CONFIDENCE
@@ -1062,6 +1061,18 @@ function calculateDiagnosticCoherence({
     score += 12;
   }
 
+  if (
+    safetyProfile?.hasRealVisualEvidence === true
+  ) {
+    score += 18;
+  }
+
+  if (
+    safetyProfile?.normalPattern === false
+  ) {
+    score += 10;
+  }
+
   score =
     applyQualityAdjustment(
       score,
@@ -1128,6 +1139,20 @@ function calculateGlobalScore({
 
   if (safetyProfile?.falsePositiveRisk >= 55) {
     score -= 10;
+  }
+
+  if (
+    safetyProfile?.hasRealVisualEvidence === true &&
+    inflammatoryPatternConfidence >= 30
+  ) {
+    score = Math.max(score, 45);
+  }
+
+  if (
+    safetyProfile?.hasRealVisualEvidence === true &&
+    inflammatoryPatternConfidence >= 40
+  ) {
+    score = Math.max(score, 55);
   }
 
   return normalize(score);
