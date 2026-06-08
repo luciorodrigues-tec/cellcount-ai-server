@@ -3655,6 +3655,12 @@ if (hasReactiveOrAtypicalSignal) {
     const confidenceStart = performance.now();
     const confidenceAnalysis = buildConfidenceAnalysis({
       analysis: mergedAnalysis,
+
+      visualEvidence:
+        mergedAnalysis.visualEvidence ||
+        mergedAnalysis.rawResponse?.visualEvidence ||
+        {},
+
       extractedText,
       erythrocyteAnalysis,
       leukocyteAnalysis,
