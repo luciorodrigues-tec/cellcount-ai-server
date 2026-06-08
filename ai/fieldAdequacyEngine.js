@@ -50,6 +50,36 @@ export function applyFieldAdequacyRules(analysis = {}) {
   analysis.fieldAdequacy = fieldAdequacy;
 
   if (
+    fieldAdequacy.visibleLeukocytes <= 3 ||
+    fieldAdequacy.adequateForPopulationAssessment === false
+  ) {
+    analysis.mononucleosisSuspicion = false;
+    analysis.reactiveLymphoidPattern = false;
+
+    analysis.morphologicRiskClass =
+      "CLASS_1_LIMITED_FIELD_ATYPICAL_CELL";
+
+    analysis.riskLevel =
+      "Achado celular isolado";
+
+    analysis.morphologyAnalysis = {
+      ...(analysis.morphologyAnalysis || {}),
+      leukocyteReview:
+        "Observa-se célula mononuclear isolada com possível atipia/reatividade. O campo é limitado para afirmar ativação linfoide populacional.",
+      summary:
+        "Campo limitado com célula mononuclear isolada. Recomenda-se avaliação de múltiplos campos e correlação com hemograma.",
+    };
+
+    analysis.patternRecognition = {
+      ...(analysis.patternRecognition || {}),
+      leukocytePattern:
+        "Achado mononuclear isolado",
+      overallPattern:
+        "Campo limitado para caracterização populacional",
+    };
+  }
+
+  if (
     fieldAdequacy.singleCellConcern &&
     !fieldAdequacy.adequateForPopulationAssessment
   ) {

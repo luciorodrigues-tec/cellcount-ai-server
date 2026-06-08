@@ -281,36 +281,58 @@ function buildSafetyProfile({
 }) {
   const visualEvidenceScore =
     normalize(
-      safetyValidation?.visualEvidenceScore ||
-        visualEvidence?.visualEvidenceScore ||
+      safetyValidation?.visualEvidenceScore ??
+        analysis?.visualEvidence?.visualEvidenceScore ??
+        analysis?.confidenceAnalysis?.visualEvidenceScore ??
         0,
     );
 
   const diagnosticReliability =
     normalize(
-      safetyValidation?.diagnosticReliability ||
-        analysis?.visualEvidence?.diagnosticReliability ||
-        0,
+      safetyValidation?.diagnosticReliability ??
+        (
+          analysis?.visualEvidence?.imageReliability === "high"
+            ? 80
+            : analysis?.visualEvidence?.imageReliability === "moderate"
+            ? 60
+            : analysis?.visualEvidence?.imageReliability === "low"
+            ? 35
+            : 0
+        ),
     );
 
   const morphologyCoherence =
     normalize(
-      safetyValidation?.morphologyCoherence ||
-        analysis?.metadata?.morphologyCoherence ||
-        0,
+      safetyValidation?.morphologyCoherence ??
+        analysis?.confidenceAnalysis?.safetySignals?.morphologyCoherence ??
+        (
+          analysis?.consensusAnalysis?.morphologicalCoherence === "validated"
+            ? 85
+            : analysis?.consensusAnalysis?.morphologyCoherence === "validated"
+            ? 85
+            : 0
+        ),
     );
 
   const artifactProbability =
     normalize(
-      safetyValidation?.artifactProbability ||
-        analysis?.metadata?.artifactProbability ||
-        0,
+      safetyValidation?.artifactProbability ??
+        analysis?.confidenceAnalysis?.safetySignals?.artifactProbability ??
+        (
+          analysis?.visualEvidence?.artifactInterference === "low"
+            ? 10
+            : analysis?.visualEvidence?.artifactInterference === "moderate"
+            ? 40
+            : analysis?.visualEvidence?.artifactInterference === "high"
+            ? 75
+            : 0
+        ),
     );
 
   const falsePositiveRisk =
     normalize(
-      safetyValidation?.falsePositiveRisk ||
-        analysis?.metadata?.falsePositiveRisk ||
+      safetyValidation?.falsePositiveRisk ??
+        analysis?.confidenceAnalysis?.safetySignals?.falsePositiveRisk ??
         0,
     );
 
@@ -319,6 +341,7 @@ function buildSafetyProfile({
 
   const safeDiagnosticGate =
     safetyValidation?.safeDiagnosticGate === true ||
+    analysis?.confidenceAnalysis?.safetySignals?.safeDiagnosticGate === true ||
     analysis?.metadata?.safeDiagnosticGate === true;
 
   const yoloAvailable =
