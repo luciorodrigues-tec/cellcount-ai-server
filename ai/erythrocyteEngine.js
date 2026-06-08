@@ -479,7 +479,10 @@ export function analyzeErythrocytes(
       );
   }
 
-  if (normalRbcPattern) {
+  if (
+    normalRbcPattern &&
+    findings.length === 0
+  ) {
     suppressFalsePositiveRbcPattern({
       scores,
       findings,
@@ -548,23 +551,22 @@ function suppressFalsePositiveRbcPattern({
   reasoning,
   contradictionFlags,
 }) {
-  const hadPositive =
-    Object.values(scores)
-      .some((value) => value > 0);
+
+  const trulyNormal =
+    findings.length === 0;
+
+  if (!trulyNormal) {
+    return;
+  }
 
   for (const key of Object.keys(scores)) {
     scores[key] = 0;
   }
 
-  findings.length = 0;
-  alerts.length = 0;
-  correlations.length = 0;
-
-  if (hadPositive) {
-    contradictionFlags.push(
-      "Achados eritrocitários positivos suprimidos por contexto explícito de normalidade/ausência.",
-    );
-  }
+  reasoning.push(
+    "Padrão eritrocitário descrito como normal."
+  );
+}
 
   reasoning.push(
     "Padrão eritrocitário descrito como normal; achados morfológicos específicos foram suprimidos.",

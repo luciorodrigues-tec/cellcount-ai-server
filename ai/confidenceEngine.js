@@ -315,14 +315,57 @@ function buildSafetyProfile({
 
   const normalPattern =
     containsAny(text, [
-      "sem alteracoes",
-      "sem alterações",
       "morfologia normal",
-      "baixo risco",
-      "low risk",
+      "normal morphology",
       "normal pattern",
-      "no significant",
-      "not observed",
+      "campo normal",
+      "baixo risco"
+    ]);
+
+  const hasAbnormalMorphology =
+    containsAny(text, [
+
+      "anisocitose",
+      "poiquilocitose",
+      "anisopoiquilocitose",
+
+      "microcitose",
+      "macrocitose",
+      "hipocromia",
+
+      "equinocito",
+      "equinocitos",
+
+      "acantocito",
+      "acantocitos",
+
+      "codocito",
+      "codocitos",
+
+      "esquizocito",
+      "esquizocitos",
+
+      "linfocito atipico",
+      "linfocitos atipicos",
+
+      "plasmocito",
+      "plasmocitos",
+
+      "plasmocitoide",
+      "plasmocitoides",
+
+      "blasto",
+      "blastos"
+    ]);
+
+  const normalPattern =
+    !hasAbnormalMorphology &&
+    containsAny(text, [
+      "morfologia normal",
+      "normal morphology",
+      "normal pattern",
+      "campo normal",
+      "baixo risco"
     ]);
 
   return {
