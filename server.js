@@ -243,6 +243,34 @@ function safeJsonParse(
 // NORMALIZE RESPONSE
 // ============================================================================
 
+function normalizeBoolean(value) {
+  if (typeof value === "boolean") return value;
+
+  if (value === null || value === undefined) return false;
+
+  const text = String(value).toLowerCase().trim();
+
+  if (
+    [
+      "true",
+      "yes",
+      "sim",
+      "present",
+      "presente",
+      "detected",
+      "detectado",
+      "suspected",
+      "suspeito",
+      "positive",
+      "positivo",
+    ].includes(text)
+  ) {
+    return true;
+  }
+
+  return false;
+}
+
 function normalizeMedicalResponse(
   data = {},
 ) {
@@ -466,7 +494,7 @@ function normalizeMedicalResponse(
         Boolean(findings.immatureCells),
 
       blastSuspicion:
-        Boolean(findings.blastSuspicion),
+        normalizeBoolean(findings.blastSuspicion),
     },
 
     morphologyAnalysis: {
@@ -3999,7 +4027,7 @@ app.post(
         );
 
       if (
-        validation.result.findings?.blastSuspicion
+        validation.result.findings?.blastSuspicion === true
       ) {
 
         validation.result.morphologicRiskClass =
