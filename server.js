@@ -971,6 +971,8 @@ function buildSemanticText(
 
     parsed.heatmapRegions,
 
+    parsed.rawResponseText,
+
     parsed.analise,
   ];
 
@@ -3454,7 +3456,17 @@ educationalImpact, interpretiveSynthesis e hematologicReasoning.
     mergedAnalysis.hematologicReasoning =
       mergedAnalysis.hematologicReasoning ||
       "A avaliação hematológica considera inicialmente a linhagem celular predominante, características nucleares, padrão de cromatina, relação núcleo/citoplasma, alterações citoplasmáticas e maturação celular. Esses elementos auxiliam na diferenciação entre padrões reacionais, fisiológicos ou alterações que necessitam investigação complementar. A análise digital deve sempre ser correlacionada com hemograma completo, histórico clínico e revisão microscópica profissional.";
-    const extractedText = buildSemanticText(mergedAnalysis);
+    const extractedText =
+      buildSemanticText({
+        ...mergedAnalysis,
+        rawResponse:
+          mergedAnalysis.rawResponse || {},
+
+        rawResponseText:
+          JSON.stringify(
+            mergedAnalysis.rawResponse || {},
+          ),
+      });
 
   function semanticAtypiaEngine(text = "") {
     const t = text.toLowerCase();
