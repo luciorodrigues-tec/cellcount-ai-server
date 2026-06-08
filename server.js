@@ -3212,12 +3212,50 @@ educationalImpact, interpretiveSynthesis e hematologicReasoning.
 
     const visualStart = performance.now();
 
+    const compactHospitalPrompt = `
+    Você é uma IA hematológica educacional especializada em morfologia de sangue periférico.
+
+    Responda SOMENTE JSON válido.
+
+    Nunca emitir diagnóstico definitivo.
+    Nunca confirmar leucemia, linfoma, neoplasia ou malignidade.
+    Usar linguagem segura: possível, sugestivo, pode estar associado, requer correlação.
+
+    Nunca chamar de normal se houver:
+    linfócito reativo, célula mononuclear grande, célula atípica, célula imatura, plasmocitoide, plasmócito, plasmoblasto, monomorfismo ou suspeita blástica.
+
+    Se houver sinal reacional/atípico:
+    normalityBlocked=true.
+
+    Se houver célula mononuclear isolada:
+    morphologicRiskClass="CLASS_1_LIMITED_FIELD_ATYPICAL_CELL".
+
+    Se houver população linfoide reacional sustentada:
+    morphologicRiskClass="CLASS_2_ATYPICAL_POPULATION".
+
+    Se houver suspeita blástica:
+    morphologicRiskClass="CLASS_4_BLAST_SUSPICION".
+
+    Avaliar:
+    1. Qualidade da imagem.
+    2. Eritrócitos: tamanho, cor, anisocitose, poiquilocitose, esquizócitos.
+    3. Leucócitos: neutrófilos, linfócitos, monócitos, células reativas, atípicas ou imaturas.
+    4. Plaquetas: quantidade, agregados, gigantismo.
+    5. Elementos de alerta não evidenciados.
+
+    ELEMENTOS DE ALERTA NÃO EVIDENCIADOS:
+    Blastos inequívocos; bastonetes de Auer; população blástica significativa; células imaturas críticas; esquizócitos relevantes.
+
+    Retorne obrigatoriamente JSON com:
+    imageQuality, visualExtraction, normalityBlocked, blockNormalReason, morphologicRiskClass, findings, morphologyAnalysis, patternRecognition, interpretiveSynthesis, clinicalMeaning, hematologicReasoning, educationalImpact, visualEvidence, overallAssessment, structuredReport.
+    `;
+
     console.log("================================");
     console.log("PROMPT SIZE");
     console.log(
       JSON.stringify({
         contextualPromptLength: contextualPrompt.length,
-        hospitalPromptLength: hospitalPrompt.length,
+        compactHospitalPromptLength: compactHospitalPrompt.length,
         imagesPayloadLength: imagesPayload.length,
       }, null, 2)
     );
@@ -3231,24 +3269,9 @@ educationalImpact, interpretiveSynthesis e hematologicReasoning.
       messages: [
         {
           role: "system",
-          content: `${hospitalPrompt}
-
-MODO TURBO ENTERPRISE:
-Gerar a estrutura completa obrigatória em uma única chamada, com escrita acadêmica, segura e não diagnóstica.
-
-Nunca retornar campos vazios.
-Nunca retornar morphologyAnalysis vazio.
-Nunca retornar patternRecognition vazio.
-Todos os campos obrigatórios devem ser preenchidos.
-Quando um achado não estiver presente, descrever explicitamente a ausência.
-Quando a imagem não permitir avaliação segura, informar a limitação no próprio campo.
-Nunca usar null.
-Nunca usar undefined.
-Nunca usar objeto vazio {} em campos obrigatórios.
-Nunca usar array vazio [] quando houver recomendação educacional aplicável.`,
+          content: compactHospitalPrompt,
         },
         {
-
           role: "user",
           content: [
             { type: "text", text: contextualPrompt },
