@@ -568,11 +568,6 @@ function suppressFalsePositiveRbcPattern({
   );
 }
 
-  reasoning.push(
-    "Padrão eritrocitário descrito como normal; achados morfológicos específicos foram suprimidos.",
-  );
-}
-
 // ============================================================================
 // DOMINANT MORPHOLOGY
 // ============================================================================
