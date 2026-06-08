@@ -313,15 +313,6 @@ function buildSafetyProfile({
       "leukocyte",
     ]);
 
-  const normalPattern =
-    containsAny(text, [
-      "morfologia normal",
-      "normal morphology",
-      "normal pattern",
-      "campo normal",
-      "baixo risco"
-    ]);
-
   const hasAbnormalMorphology =
     containsAny(text, [
 
