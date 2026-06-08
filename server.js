@@ -3469,46 +3469,65 @@ educationalImpact, interpretiveSynthesis e hematologicReasoning.
       });
 
   function semanticAtypiaEngine(text = "") {
+
     const t = text.toLowerCase();
 
     return {
 
       largeMononuclearCells:
         t.includes("celulas mononucleares grandes") ||
-        t.includes("celulas grandes"),
+        t.includes("celula mononuclear grande") ||
+        t.includes("large mononuclear cells") ||
+        t.includes("large mononuclear cell") ||
+        t.includes("large mononuclear"),
 
       reactiveLymphocytes:
         t.includes("linfocitos reativos") ||
         t.includes("linfocito reativo") ||
-        t.includes("linfocitos atipicos") ||
-        t.includes("linfocito atipico") ||
+        t.includes("reactive lymphocyte") ||
+        t.includes("reactive lymphocytes") ||
+        t.includes("reactive process") ||
+        t.includes("reactive lymphocytosis") ||
         t.includes("virocito") ||
         t.includes("virocitos"),
 
       atypicalLymphocytes:
         t.includes("linfocitos atipicos") ||
-        t.includes("linfocito atipico"),
+        t.includes("linfocito atipico") ||
+        t.includes("atypical lymphocyte") ||
+        t.includes("atypical lymphocytes") ||
+        t.includes("atypical cell") ||
+        t.includes("atypical cells"),
 
       plasmacytoidCells:
         t.includes("plasmocitoide") ||
-        t.includes("plasmocitoides"),
+        t.includes("plasmocitoides") ||
+        t.includes("plasmacytoid"),
 
       plasmocytes:
         t.includes("plasmocito") ||
-        t.includes("plasmocitos"),
+        t.includes("plasmocitos") ||
+        t.includes("plasma cell") ||
+        t.includes("plasma cells"),
 
       plasmablasts:
         t.includes("plasmoblasto") ||
         t.includes("plasmoblastos") ||
-        t.includes("plasmoblastico"),
+        t.includes("plasmoblastico") ||
+        t.includes("plasmablast") ||
+        t.includes("plasmablasts"),
 
       monomorphicPopulation:
         t.includes("monomorfica") ||
-        t.includes("monomorfismo"),
+        t.includes("monomorfismo") ||
+        t.includes("monomorphic population") ||
+        t.includes("monomorphic"),
 
       blastSuspicion:
         t.includes("blasto suspeito") ||
-        t.includes("suspeita blastica"),
+        t.includes("suspeita blastica") ||
+        t.includes("blast suspicion") ||
+        t.includes("suspicious blast"),
     };
   }
 
@@ -3516,6 +3535,15 @@ educationalImpact, interpretiveSynthesis e hematologicReasoning.
       semanticAtypiaEngine(
         extractedText,
       );
+
+    console.log(
+      'SEMANTIC FINDINGS',
+      JSON.stringify(
+        semanticFindings,
+        null,
+        2,
+      ),
+    );
 
     mergedAnalysis.findings = {
       ...mergedAnalysis.findings,
