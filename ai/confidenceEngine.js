@@ -15,25 +15,10 @@ export function buildConfidenceAnalysis({
   plateletAnalysis = null,
   diagnosticCorrelation = null,
 }) {
+
   if (!analysis) {
-
-  console.log(
-    "CONFIDENCE DEBUG",
-    JSON.stringify({
-      visualEvidenceScore: safetyProfile.visualEvidenceScore,
-      diagnosticReliability: safetyProfile.diagnosticReliability,
-      morphologyCoherence: safetyProfile.morphologyCoherence,
-      artifactProbability: safetyProfile.artifactProbability,
-      falsePositiveRisk: safetyProfile.falsePositiveRisk,
-      safeDiagnosticGate: safetyProfile.safeDiagnosticGate,
-      globalConfidenceScore,
-      hematologicRisk,
-    }, null, 2)
-  );
-
     return buildEmptyConfidence();
   }
-
   const text = normalizeText(
     [
       extractedText,
@@ -176,6 +161,37 @@ export function buildConfidenceAnalysis({
       diagnosticCorrelation,
       safetyProfile,
     });
+
+  console.log(
+    "CONFIDENCE DEBUG",
+    JSON.stringify(
+      {
+        visualEvidenceScore:
+          safetyProfile.visualEvidenceScore,
+
+        diagnosticReliability:
+          safetyProfile.diagnosticReliability,
+
+        morphologyCoherence:
+          safetyProfile.morphologyCoherence,
+
+        artifactProbability:
+          safetyProfile.artifactProbability,
+
+        falsePositiveRisk:
+          safetyProfile.falsePositiveRisk,
+
+        safeDiagnosticGate:
+          safetyProfile.safeDiagnosticGate,
+
+        globalConfidenceScore,
+
+        hematologicRisk,
+      },
+      null,
+      2,
+    ),
+  );
 
   return {
     globalConfidenceScore,
@@ -353,6 +369,24 @@ function buildSafetyProfile({
 
       "linfocito atipico",
       "linfocitos atipicos",
+
+      "linfocito reativo",
+      "linfocitos reativos",
+
+      "ativacao linfoide",
+      "ativacao linfoide reativa",
+
+      "reactive lymphocyte",
+      "reactive lymphocytes",
+
+      "large mononuclear cell",
+      "large mononuclear cells",
+
+      "celula mononuclear grande",
+      "celulas mononucleares grandes",
+
+      "atypical lymphocyte",
+      "atypical lymphocytes",
 
       "plasmocito",
       "plasmocitos",
