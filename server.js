@@ -3623,8 +3623,11 @@ if (hasReactiveOrAtypicalSignal) {
 
   mergedAnalysis.overallAssessment.requiresHumanReview = true;
 
+  mergedAnalysis.overallAssessment.riskCategory =
+    mergedAnalysis.morphologicRiskClass;
+
   mergedAnalysis.overallAssessment.mainImpression =
-    "Campo limitado com célula mononuclear isolada de possível natureza reacional/atípica. Não há elementos suficientes para suspeita blástica, porém a presença dessa célula impede classificar a lâmina como morfologia preservada. Recomenda-se avaliação de múltiplos campos, correlação com hemograma e revisão microscópica profissional quando indicada.";
+    "Campo limitado para caracterização leucocitária conclusiva. Há célula mononuclear isolada com possível aspecto reacional/atípico, sem critérios para blastos inequívocos ou população monomórfica neste campo.";
 
   mergedAnalysis.interpretiveSynthesis =
     "A imagem demonstra campo limitado com célula mononuclear isolada de possível reatividade/atipia. Esse padrão não permite afirmar ativação linfoide populacional, mas também não deve ser classificado como morfologia preservada. A interpretação deve permanecer conservadora, sem inferir processo neoplásico, e requer correlação com hemograma completo e avaliação de múltiplos campos.";
