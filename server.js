@@ -3384,6 +3384,10 @@ educationalImpact, interpretiveSynthesis e hematologicReasoning.
     );
     console.log("================================");
 
+
+
+    const visualStart = performance.now();
+
     const completion = await openai.chat.completions.create({
       model: OPENAI_MODEL,
       temperature: 0.12,
@@ -3403,6 +3407,12 @@ educationalImpact, interpretiveSynthesis e hematologicReasoning.
         },
       ],
     });
+
+    const visualTiming = logStep(
+      requestId,
+      "OPENAI TURBO ANALYSIS",
+      visualStart,
+    );
 
     const parsed = safeJsonParse(
       completion?.choices?.[0]?.message?.content || "{}",
@@ -3438,6 +3448,8 @@ educationalImpact, interpretiveSynthesis e hematologicReasoning.
               !Array.isArray(region),
           )
         : [];
+
+    const visualStart = performance.now();
 
     console.log("================================");
     console.log("RAW GPT RESPONSE");
