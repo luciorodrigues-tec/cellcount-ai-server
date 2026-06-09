@@ -50,6 +50,10 @@ import {
 } from "./ai/confidenceEngine.js";
 
 import {
+  calculateReactiveLymphocyteScore,
+} from "./ai/reactiveLymphocyteEngine.js";
+
+import {
   validateHematologyAnalysis,
 } from "./ai/hematologySafetyEngine.js";
 
@@ -3785,6 +3789,15 @@ if (hasReactiveOrAtypicalSignal) {
         };
       }
     }
+
+    const reactiveLymphocyteAnalysis =
+      calculateReactiveLymphocyteScore({
+        findings: mergedAnalysis.findings || {},
+        visualEvidence: mergedAnalysis.visualEvidence || {},
+      });
+
+    mergedAnalysis.reactiveLymphocyteAnalysis =
+      reactiveLymphocyteAnalysis;
 
     const confidenceStart = performance.now();
 
