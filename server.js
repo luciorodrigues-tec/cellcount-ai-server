@@ -58,6 +58,10 @@ import {
 } from "./ai/blastMimicEngine.js";
 
 import {
+  classifyLymphoidPattern,
+} from './ai/lymphoidPatternEngine.js';
+
+import {
   applyAntiOvercallingRules,
 } from "./ai/antiOvercallingEngine.js";
 
@@ -3832,6 +3836,43 @@ if (hasReactiveOrAtypicalSignal) {
     mergedAnalysis.antiOvercallingAnalysis =
       antiOvercallingAnalysis;
 
+    const lymphoidPatternAnalysis =
+      classifyLymphoidPattern({
+        findings: mergedAnalysis.findings || {},
+        visualEvidence: mergedAnalysis.visualEvidence || {},
+        fieldAdequacy: mergedAnalysis.fieldAdequacy || {},
+      });
+
+    mergedAnalysis.lymphoidPatternAnalysis =
+      lymphoidPatternAnalysis;
+
+    if (
+      lymphoidPatternAnalysis.forceDowngrade === true
+    ) {
+      mergedAnalysis.findings.monomorphicPopulation = false;
+
+      if (
+        mergedAnalysis.morphologicRiskClass ===
+          "CLASS_5_HIGH_NEOPLASTIC_SUSPICION" ||
+        mergedAnalysis.morphologicRiskClass ===
+          "CLASS_3_POSSIBLE_CLONALITY"
+      ) {
+        mergedAnalysis.morphologicRiskClass =
+          lymphoidPatternAnalysis.riskCeiling;
+      }
+
+      mergedAnalysis.riskLevel =
+        "Padrão linfoide atípico/indeterminado com necessidade de correlação";
+
+      mergedAnalysis.overallAssessment =
+        mergedAnalysis.overallAssessment || {};
+
+      mergedAnalysis.overallAssessment.requiresHumanReview = true;
+
+      mergedAnalysis.overallAssessment.riskCategory =
+        mergedAnalysis.morphologicRiskClass;
+    }
+
     const confidenceStart = performance.now();
 
     console.log(
@@ -3919,6 +3960,7 @@ if (hasReactiveOrAtypicalSignal) {
       reactiveLymphocyteAnalysis,
       blastMimicAnalysis,
       antiOvercallingAnalysis,
+      lymphoidPatternAnalysis,
       consensusAnalysis,
       safetyValidation,
       pipeline: {
@@ -4289,66 +4331,59 @@ app.post(
           [...new Set(validation.result.blockNormalReason)];
       }
 
-      if (
-        validation.result.findings?.blastSuspicion === true
-      ) {
+      const finalFindings =
+        validation.result.findings || {};
 
+      const finalLymphoidPattern =
+        validation.result.lymphoidPatternAnalysis ||
+        classifyLymphoidPattern({
+          findings: finalFindings,
+          visualEvidence: validation.result.visualEvidence || {},
+          fieldAdequacy: validation.result.fieldAdequacy || {},
+        });
+
+      validation.result.lymphoidPatternAnalysis =
+        finalLymphoidPattern;
+
+      if (
+        finalFindings.blastSuspicion === true
+      ) {
         validation.result.morphologicRiskClass =
           "CLASS_4_BLAST_SUSPICION";
       }
 
-      if (
-        validation.result.findings?.plasmablasts &&
-        validation.result.findings?.monomorphicPopulation
+      else if (
+        finalLymphoidPattern.lymphoidPattern ===
+          "LYMPHOID_MONOMORPHIC" &&
+        finalFindings.plasmablasts === true &&
+        finalFindings.monomorphicPopulation === true
       ) {
-
         validation.result.morphologicRiskClass =
           "CLASS_5_HIGH_NEOPLASTIC_SUSPICION";
       }
 
-      const reportText =
-        JSON.stringify(
-          validation.result,
-        ).toLowerCase();
-
-      if (
-
-        validation.result
-          .normalityBlocked &&
-
-        (
-          reportText.includes("padrão hematológico normal") ||
-          reportText.includes("padrao hematologico normal") ||
-          reportText.includes("sem alterações patológicas") ||
-          reportText.includes("sem alteracoes patologicas") ||
-          reportText.includes("morfologia normal") ||
-          reportText.includes("estado hematológico normal") ||
-          reportText.includes("estado hematologico normal")
-        )
-
+      else if (
+        finalLymphoidPattern.forceDowngrade === true
       ) {
+        validation.result.findings.monomorphicPopulation = false;
 
-        validation.result.criticalFlags =
-          Array.isArray(validation.result.criticalFlags)
-            ? validation.result.criticalFlags
-            : [];
+        validation.result.morphologicRiskClass =
+          finalLymphoidPattern.riskCeiling ||
+          "CLASS_2_ATYPICAL_REACTIVE_PATTERN";
 
-        validation.result.criticalFlags.push(
-          "Contradição interna detectada"
-        );
+        validation.result.riskLevel =
+          "Padrão linfoide atípico/indeterminado com necessidade de correlação";
 
         validation.result.overallAssessment =
           validation.result.overallAssessment || {};
 
-        validation.result.overallAssessment.requiresHumanReview =
-          true;
+        validation.result.overallAssessment.requiresHumanReview = true;
+
+        validation.result.overallAssessment.riskCategory =
+          validation.result.morphologicRiskClass;
       }
 
       data.totalUses++;
-
-      // ====================================================================
-      // RESPONSE
-      // ====================================================================
 
       console.log("================================");
       console.log("FINAL VALIDATED RESULT");
