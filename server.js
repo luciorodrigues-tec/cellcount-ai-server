@@ -3253,31 +3253,57 @@ associatedEducationalHypotheses, clinicalCorrelationNeeds, clinicalMeaning,
 educationalImpact, interpretiveSynthesis e hematologicReasoning.
 `;
 
-    const visualStart = performance.now();
-
     const compactHospitalPrompt = `
     Você é uma IA hematológica educacional especializada em morfologia de sangue periférico.
 
-    Responda SOMENTE JSON válido.
+    Responda SOMENTE JSON válido em português do Brasil.
 
     Nunca emitir diagnóstico definitivo.
     Nunca confirmar leucemia, linfoma, neoplasia ou malignidade.
     Usar linguagem segura: possível, sugestivo, pode estar associado, requer correlação.
 
     Nunca chamar de normal se houver:
-    linfócito reativo, célula mononuclear grande, célula atípica, célula imatura, plasmocitoide, plasmócito, plasmoblasto, monomorfismo ou suspeita blástica.
+    linfócito reativo, linfócito atípico, célula mononuclear grande, célula imatura, plasmocitoide, plasmócito, plasmoblasto, monomorfismo ou suspeita blástica.
 
     Se houver sinal reacional/atípico:
     normalityBlocked=true.
 
-    Se houver célula mononuclear isolada:
+    Se houver apenas célula mononuclear/linfócito atípico isolado:
     morphologicRiskClass="CLASS_1_LIMITED_FIELD_ATYPICAL_CELL".
+    reactiveLymphocytePattern="isolated_cell".
+    Não usar termos populacionais como linfocitose, ativação linfoide populacional ou padrão mononucleósico.
 
     Se houver população linfoide reacional sustentada:
     morphologicRiskClass="CLASS_2_ATYPICAL_POPULATION".
+    reactiveLymphocytePattern="population_pattern".
 
     Se houver suspeita blástica:
     morphologicRiskClass="CLASS_4_BLAST_SUSPICION".
+
+    CLASSIFICAÇÃO DE LINFÓCITOS REATIVOS / ATÍPICOS:
+
+    1. REACTIVE_LYMPHOCYTE_TYPICAL:
+    citoplasma amplo, basofilia periférica, bordas irregulares, moldagem às hemácias, núcleo maduro, sem nucléolo evidente.
+
+    2. DOWNEY_TYPE_I:
+    linfócito pequeno a médio, citoplasma discretamente basofílico, núcleo relativamente maduro, reatividade discreta.
+
+    3. DOWNEY_TYPE_II:
+    célula grande, citoplasma abundante, basofilia intensa, contorno citoplasmático irregular, moldagem às hemácias, núcleo oval ou irregular.
+
+    4. DOWNEY_TYPE_III_IMMUNOBLASTOID:
+    célula grande, citoplasma basofílico, núcleo grande, cromatina mais frouxa, nucléolo possível. Pode simular blasto, mas não confirmar blasto sem critérios inequívocos.
+
+    5. PLASMACYTOID_LYMPHOCYTE:
+    citoplasma intensamente basofílico, núcleo excêntrico, halo perinuclear possível, aspecto intermediário entre linfócito e plasmócito.
+
+    6. ATYPICAL_LYMPHOCYTE_UNCLASSIFIED:
+    célula mononuclear atípica sem elementos suficientes para subtipo seguro, especialmente em campo limitado.
+
+    DIFERENCIAÇÃO CONTRA BLASTO:
+    Só marcar blastSuspicion=true se houver conjunto convincente:
+    alta relação núcleo/citoplasma, cromatina frouxa, nucléolos evidentes, contorno nuclear imaturo e ausência de maturação.
+    Na dúvida, marcar blastSuspicion=false e usar ATYPICAL_LYMPHOCYTE_UNCLASSIFIED.
 
     Avaliar:
     1. Qualidade da imagem.
@@ -3290,7 +3316,15 @@ educationalImpact, interpretiveSynthesis e hematologicReasoning.
     Blastos inequívocos; bastonetes de Auer; população blástica significativa; células imaturas críticas; esquizócitos relevantes.
 
     Retorne obrigatoriamente JSON com:
-    imageQuality, visualExtraction, normalityBlocked, blockNormalReason, morphologicRiskClass, findings, morphologyAnalysis, patternRecognition, interpretiveSynthesis, clinicalMeaning, hematologicReasoning, educationalImpact, visualEvidence, overallAssessment, structuredReport.
+    imageQuality, visualExtraction, normalityBlocked, blockNormalReason, morphologicRiskClass, reactiveLymphocytePattern, findings, morphologyAnalysis, patternRecognition, interpretiveSynthesis, clinicalMeaning, hematologicReasoning, educationalImpact, visualEvidence, overallAssessment, structuredReport.
+
+    Dentro de findings incluir obrigatoriamente:
+    reactiveLymphocytes, atypicalLymphocytes, largeMononuclearCells, atypicalLymphocyteSubtype, downeyLikeCells, downeyType, plasmacytoidCells, plasmocytes, plasmablasts, monomorphicPopulation, immatureCells, blastSuspicion.
+
+    Valores aceitos para atypicalLymphocyteSubtype:
+    none, REACTIVE_LYMPHOCYTE_TYPICAL, DOWNEY_TYPE_I, DOWNEY_TYPE_II, DOWNEY_TYPE_III_IMMUNOBLASTOID, PLASMACYTOID_LYMPHOCYTE, ATYPICAL_LYMPHOCYTE_UNCLASSIFIED.
+
+    Sempre escrever interpretiveSynthesis, clinicalMeaning, hematologicReasoning e educationalImpact em português do Brasil.
     `;
 
     console.log("================================");
