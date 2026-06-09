@@ -3449,18 +3449,10 @@ educationalImpact, interpretiveSynthesis e hematologicReasoning.
           )
         : [];
 
-    const visualStart = performance.now();
-
     console.log("================================");
     console.log("RAW GPT RESPONSE");
     console.log(JSON.stringify(parsed, null, 2));
     console.log("================================");
-
-    const visualTiming = logStep(
-      requestId,
-      "OPENAI TURBO ANALYSIS",
-      visualStart,
-    );
 
     let mergedAnalysis = normalizeMedicalResponse({
       ...parsed,
