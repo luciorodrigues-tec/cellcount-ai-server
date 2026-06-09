@@ -3384,8 +3384,6 @@ educationalImpact, interpretiveSynthesis e hematologicReasoning.
     );
     console.log("================================");
 
-
-
     const visualStart = performance.now();
 
     const completion = await openai.chat.completions.create({
