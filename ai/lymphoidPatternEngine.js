@@ -3,7 +3,7 @@
 // CELLCOUNT ENTERPRISE — REACTIVE vs INDETERMINATE vs MONOMORPHIC
 // ============================================================================
 
-export function classifyLymphoidPattern({
+function classifyLymphoidPattern({
   findings = {},
   visualEvidence = {},
   fieldAdequacy = {},
@@ -20,10 +20,11 @@ export function classifyLymphoidPattern({
     visualEvidence.irregularCellBorders === true ||
     visualEvidence.abundantBasophilicCytoplasm === true;
 
-  const hasPlasmablasticSignal =
+  const hasPlasmacytoidSignal =
     findings.plasmablasts === true ||
     findings.plasmocytes === true ||
-    findings.plasmacytoidCells === true;
+    findings.plasmacytoidCells === true ||
+    findings.monomorphicPopulation === true;
 
   const hasBlastSignal =
     findings.blastSuspicion === true ||
@@ -32,11 +33,6 @@ export function classifyLymphoidPattern({
   const populationAdequate =
     fieldAdequacy.adequateForPopulationAssessment === true;
 
-  const monomorphicConfirmed =
-    populationAdequate &&
-    findings.monomorphicPopulation === true &&
-    (hasPlasmablasticSignal || hasBlastSignal);
-
   if (!populationAdequate) {
     reasoning.push(
       "Campo limitado: não permite concluir população linfoide monomórfica sustentada."
@@ -44,42 +40,58 @@ export function classifyLymphoidPattern({
   }
 
   if (hasReactiveSignal) {
-    reasoning.push(
-      "Há sinal morfológico reacional/linfoide atípico."
-    );
+    reasoning.push("Há sinal morfológico reacional/linfoide atípico.");
   }
 
-  if (hasPlasmablasticSignal) {
+  if (hasPlasmacytoidSignal) {
     reasoning.push(
-      "Há sinal plasmocitoide/plasmoblástico informado, exigindo validação por múltiplos campos."
+      "Há sinal monomórfico/plasmocitoide/plasmoblástico que impede classificação como morfologia preservada."
     );
   }
 
   if (hasBlastSignal) {
-    reasoning.push(
-      "Há sinal de imaturidade/blasto informado."
-    );
+    reasoning.push("Há sinal de imaturidade/blasto informado.");
   }
 
-  if (monomorphicConfirmed) {
+  if (
+    populationAdequate &&
+    findings.monomorphicPopulation === true &&
+    (
+      findings.plasmablasts === true ||
+      findings.plasmocytes === true ||
+      findings.plasmacytoidCells === true ||
+      hasBlastSignal
+    )
+  ) {
     return {
       lymphoidPattern: "LYMPHOID_MONOMORPHIC",
       riskCeiling: "CLASS_5_HIGH_NEOPLASTIC_SUSPICION",
       allowHighSuspicion: true,
       forceDowngrade: false,
       reasoning,
-      ruleVersion: "LYMPHOID_PATTERN_ENGINE_V1",
+      ruleVersion: "LYMPHOID_PATTERN_ENGINE_V2",
     };
   }
 
-  if (hasReactiveSignal || hasPlasmablasticSignal || hasBlastSignal) {
+  if (hasPlasmacytoidSignal) {
+    return {
+      lymphoidPattern: "ATYPICAL_MONOMORPHIC_OR_PLASMACYTOID_POPULATION",
+      riskCeiling: "CLASS_2_ATYPICAL_POPULATION",
+      allowHighSuspicion: false,
+      forceDowngrade: false,
+      reasoning,
+      ruleVersion: "LYMPHOID_PATTERN_ENGINE_V2",
+    };
+  }
+
+  if (hasReactiveSignal || hasBlastSignal) {
     return {
       lymphoidPattern: "LYMPHOID_INDETERMINATE",
       riskCeiling: "CLASS_2_ATYPICAL_REACTIVE_PATTERN",
       allowHighSuspicion: false,
       forceDowngrade: true,
       reasoning,
-      ruleVersion: "LYMPHOID_PATTERN_ENGINE_V1",
+      ruleVersion: "LYMPHOID_PATTERN_ENGINE_V2",
     };
   }
 
@@ -89,8 +101,12 @@ export function classifyLymphoidPattern({
     allowHighSuspicion: false,
     forceDowngrade: false,
     reasoning,
-    ruleVersion: "LYMPHOID_PATTERN_ENGINE_V1",
+    ruleVersion: "LYMPHOID_PATTERN_ENGINE_V2",
   };
 }
+
+export {
+  classifyLymphoidPattern,
+};
 
 export default classifyLymphoidPattern;
