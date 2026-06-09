@@ -3316,7 +3316,41 @@ educationalImpact, interpretiveSynthesis e hematologicReasoning.
     Blastos inequívocos; bastonetes de Auer; população blástica significativa; células imaturas críticas; esquizócitos relevantes.
 
     Retorne obrigatoriamente JSON com:
-    imageQuality, visualExtraction, normalityBlocked, blockNormalReason, morphologicRiskClass, reactiveLymphocytePattern, findings, morphologyAnalysis, patternRecognition, interpretiveSynthesis, clinicalMeaning, hematologicReasoning, educationalImpact, visualEvidence, overallAssessment, structuredReport.
+
+    imageQuality,
+    visualExtraction,
+    normalityBlocked,
+    blockNormalReason,
+    morphologicRiskClass,
+    reactiveLymphocytePattern,
+    findings,
+
+    visualEvidence,
+
+    morphologyAnalysis,
+    patternRecognition,
+    interpretiveSynthesis,
+    clinicalMeaning,
+    hematologicReasoning,
+    educationalImpact,
+    overallAssessment,
+    structuredReport.
+
+    Quando houver linfócito reativo, linfócito atípico,
+    célula mononuclear grande, célula plasmocitoide
+    ou imunoblastoide, preencher visualEvidence com:
+
+    {
+      "cellSizeIncrease": false,
+      "abundantBasophilicCytoplasm": false,
+      "erythrocyteMolding": false,
+      "irregularCellBorders": false,
+      "eccentricNucleus": false,
+      "prominentNucleolus": false
+    }
+
+    Marcar true apenas quando houver evidência visual observável.
+    Nunca inferir características não visualizadas.
 
     Dentro de findings incluir obrigatoriamente:
     reactiveLymphocytes, atypicalLymphocytes, largeMononuclearCells, atypicalLymphocyteSubtype, downeyLikeCells, downeyType, plasmacytoidCells, plasmocytes, plasmablasts, monomorphicPopulation, immatureCells, blastSuspicion.
@@ -3361,6 +3395,16 @@ educationalImpact, interpretiveSynthesis e hematologicReasoning.
     const parsed = safeJsonParse(
       completion?.choices?.[0]?.message?.content || "{}",
     );
+
+    parsed.visualEvidence =
+      parsed.visualEvidence || {};
+
+    parsed.visualEvidence.cellSizeIncrease ??= false;
+    parsed.visualEvidence.abundantBasophilicCytoplasm ??= false;
+    parsed.visualEvidence.erythrocyteMolding ??= false;
+    parsed.visualEvidence.irregularCellBorders ??= false;
+    parsed.visualEvidence.eccentricNucleus ??= false;
+    parsed.visualEvidence.prominentNucleolus ??= false;
 
     if (
       typeof parsed.visualEvidence === "string"
