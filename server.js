@@ -2769,6 +2769,7 @@ Listar somente os elementos pesquisados e não evidenciados, sem repetir a palav
 Nunca usar o título "Achados não observados".
 Nunca usar a expressão "achados não encontrados".
 
+
 Somente quando realmente ausentes.
 
 ====================================================================
