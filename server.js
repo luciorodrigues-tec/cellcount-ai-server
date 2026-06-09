@@ -54,6 +54,10 @@ import {
 } from "./ai/reactiveLymphocyteEngine.js";
 
 import {
+  calculateBlastMimicRisk,
+} from "./ai/blastMimicEngine.js";
+
+import {
   validateHematologyAnalysis,
 } from "./ai/hematologySafetyEngine.js";
 
@@ -3799,6 +3803,15 @@ if (hasReactiveOrAtypicalSignal) {
     mergedAnalysis.reactiveLymphocyteAnalysis =
       reactiveLymphocyteAnalysis;
 
+    const blastMimicAnalysis =
+      calculateBlastMimicRisk({
+        findings: mergedAnalysis.findings || {},
+        visualEvidence: mergedAnalysis.visualEvidence || {},
+      });
+
+    mergedAnalysis.blastMimicAnalysis =
+      blastMimicAnalysis;
+
     const confidenceStart = performance.now();
 
     console.log(
@@ -3884,6 +3897,7 @@ if (hasReactiveOrAtypicalSignal) {
       diagnosticCorrelation,
       confidenceAnalysis,
       reactiveLymphocyteAnalysis,
+      blastMimicAnalysis,
       consensusAnalysis,
       safetyValidation,
       pipeline: {
