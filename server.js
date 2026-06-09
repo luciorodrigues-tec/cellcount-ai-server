@@ -62,6 +62,10 @@ import {
 } from './ai/lymphoidPatternEngine.js';
 
 import {
+  sanitizeHematologyLanguage,
+} from "./ai/hematologySemanticGuard.js";
+
+import {
   applyAntiOvercallingRules,
 } from "./ai/antiOvercallingEngine.js";
 
@@ -4384,6 +4388,11 @@ app.post(
       }
 
       data.totalUses++;
+
+      validation.result =
+        sanitizeHematologyLanguage(
+          validation.result,
+        );
 
       console.log("================================");
       console.log("FINAL VALIDATED RESULT");
