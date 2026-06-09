@@ -58,6 +58,10 @@ import {
 } from "./ai/blastMimicEngine.js";
 
 import {
+  applyAntiOvercallingRules,
+} from "./ai/antiOvercallingEngine.js";
+
+import {
   validateHematologyAnalysis,
 } from "./ai/hematologySafetyEngine.js";
 
@@ -3812,6 +3816,20 @@ if (hasReactiveOrAtypicalSignal) {
     mergedAnalysis.blastMimicAnalysis =
       blastMimicAnalysis;
 
+    const antiOvercallingAnalysis =
+      applyAntiOvercallingRules({
+        findings: mergedAnalysis.findings || {},
+        reactiveLymphocyteAnalysis,
+        blastMimicAnalysis,
+        visualEvidence: mergedAnalysis.visualEvidence || {},
+      });
+
+    mergedAnalysis.findings =
+      antiOvercallingAnalysis.adjustedFindings;
+
+    mergedAnalysis.antiOvercallingAnalysis =
+      antiOvercallingAnalysis;
+
     const confidenceStart = performance.now();
 
     console.log(
@@ -3898,6 +3916,7 @@ if (hasReactiveOrAtypicalSignal) {
       confidenceAnalysis,
       reactiveLymphocyteAnalysis,
       blastMimicAnalysis,
+      antiOvercallingAnalysis,
       consensusAnalysis,
       safetyValidation,
       pipeline: {
