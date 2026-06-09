@@ -3883,6 +3883,7 @@ if (hasReactiveOrAtypicalSignal) {
       plateletAnalysis,
       diagnosticCorrelation,
       confidenceAnalysis,
+      reactiveLymphocyteAnalysis,
       consensusAnalysis,
       safetyValidation,
       pipeline: {
