@@ -50,8 +50,7 @@ export function applyFieldAdequacyRules(analysis = {}) {
   analysis.fieldAdequacy = fieldAdequacy;
 
   if (
-    fieldAdequacy.visibleLeukocytes <= 3 ||
-    fieldAdequacy.adequateForPopulationAssessment === false
+    fieldAdequacy.visibleLeukocytes <= 3
   ) {
     analysis.mononucleosisSuspicion = false;
     analysis.reactiveLymphoidPattern = false;
