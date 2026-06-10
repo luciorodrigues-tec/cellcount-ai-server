@@ -61,6 +61,9 @@ import {
   classifyLymphoidPattern,
 } from './ai/lymphoidPatternEngine.js';
 
+import analyzeGlobalPattern
+from './ai/globalPatternEngine.js';
+
 import {
   sanitizeHematologyLanguage,
 } from "./ai/hematologySemanticGuard.js";
@@ -3472,6 +3475,19 @@ educationalImpact, interpretiveSynthesis e hematologicReasoning.
       applyFieldAdequacyRules(
         mergedAnalysis,
       );
+
+    const globalPattern =
+      analyzeGlobalPattern(
+        mergedAnalysis,
+      );
+
+    mergedAnalysis.globalPattern =
+      globalPattern;
+
+    console.log("================================");
+    console.log("GLOBAL PATTERN");
+    console.log(JSON.stringify(globalPattern, null, 2));
+    console.log("================================");
 
     console.log("================================");
     console.log("NORMALIZED RESPONSE");
