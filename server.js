@@ -533,6 +533,20 @@ function normalizeMedicalResponse(
 
     morphologyAnalysis: {
 
+      visualMorphologyDescription:
+        data?.morphologyAnalysis?.visualMorphologyDescription || {},
+
+      cellMorphology:
+        data?.morphologyAnalysis?.cellMorphology || {},
+
+      populationPatternAnalysis:
+        data?.morphologyAnalysis?.populationPatternAnalysis || {},
+
+      negativeFindings:
+        Array.isArray(data?.morphologyAnalysis?.negativeFindings)
+          ? data.morphologyAnalysis.negativeFindings
+          : [],
+
       overview:
         reactiveLymphoidPattern
           ? "Achado morfológico linfoide reacional/atípico identificado. A amostra não deve ser classificada como morfologia preservada."
@@ -3077,13 +3091,53 @@ ESTRUTURA OBRIGATÓRIA:
   },
 
   "morphologyAnalysis": {
+
+    "visualMorphologyDescription": {
+      "globalView": "",
+      "dominantPopulation": "",
+      "cellularity": "",
+      "architecturalPattern": "",
+      "overallImpression": ""
+    },
+
+    "cellMorphology": {
+      "cellSize": "",
+      "nucleusShape": "",
+      "chromatinPattern": "",
+      "nucleoli": "",
+      "cytoplasm": "",
+      "uniformity": ""
+    },
+
+    "populationPatternAnalysis": {
+      "populationPattern": "",
+      "uniformityLevel": "",
+      "suspectedLineage": "",
+      "confidence": ""
+    },
+
     "overview": "",
+
     "erythrocyteReview": "",
+
     "leukocyteReview": "",
+
     "plateletReview": "",
-    "absentFindings": "ELEMENTOS DE ALERTA NÃO EVIDENCIADOS: Blastos inequívocos; células imaturas críticas; bastonetes de Auer; população blástica significativa; células imaturas críticas; esquizócitos relevantes.",
+
+    "negativeFindings": [
+      "Blastos inequívocos não identificados",
+      "Bastonetes de Auer não observados",
+      "Esquizócitos relevantes não observados",
+      "Drepanócitos não observados",
+      "Granulações tóxicas não observadas",
+      "Hipersegmentação não observada",
+      "Agregados plaquetários não observados"
+    ],
+
     "biologicalInterpretation": "",
+
     "differentialDiagnosis": "",
+
     "summary": ""
   },
 
@@ -3101,9 +3155,12 @@ ESTRUTURA OBRIGATÓRIA:
   "clinicalMeaning":
   "Texto obrigatório com no mínimo 500 caracteres. Explicar o significado dos achados encontrados, possíveis mecanismos fisiológicos associados e correlação clínico-laboratorial necessária. Nunca afirmar diagnóstico.",
 
-  "hematologicReasoning":
-  "Texto obrigatório com no mínimo 500 caracteres. Explicar raciocínio hematológico especialista considerando morfologia celular, maturação, alterações reacionais, sinais de alerta e limitações da imagem.",
-
+  "hematologicReasoning": {
+    "whatISee": "Descrever primeiro o que está visualmente presente no campo: população celular, padrão global, distribuição, células predominantes e limitações.",
+    "whatItResembles": "Explicar a qual padrão morfológico educacional os achados se assemelham: reacional, plasmocitoide, blastoide, monomórfico, misto ou inespecífico.",
+    "whatICannotConfirm": "Declarar claramente o que não pode ser confirmado apenas pela imagem: clonalidade, malignidade, leucemia, linfoma, mieloma ou diagnóstico definitivo.",
+    "finalInterpretation": "Síntese hematológica final em linguagem segura, com necessidade de correlação com hemograma, contexto clínico e revisão microscópica profissional."
+  },
   "educationalImpact":
   "Texto obrigatório explicando valor educacional, limitações e quais exames ou dados complementares poderiam auxiliar.",
 
@@ -3274,13 +3331,15 @@ imageQuality, visualExtraction, morphologyAnalysis, visualEvidence,
 erythrocyteFindings, leukocyteFindings, plateletFindings, blastSuspicion,
 overallAssessment, structuredReport, possibleClinicalCorrelations,
 associatedEducationalHypotheses, clinicalCorrelationNeeds, clinicalMeaning,
-educationalImpact, interpretiveSynthesis e hematologicReasoning.
+educationalImpact, interpretiveSynthesis, hematologicReasoning,
+visualMorphologyDescription, cellMorphology, populationPatternAnalysis,
+negativeFindings.
 `;
 
-    const compactHospitalPrompt = `
-    Você é uma IA hematológica educacional especializada em morfologia de sangue periférico.
+const compactHospitalPrompt = `
+Você é uma IA hematológica educacional especializada em morfologia de sangue periférico.
 
-    Responda SOMENTE JSON válido em português do Brasil.
+Responda SOMENTE JSON válido em português do Brasil.
 
     Nunca emitir diagnóstico definitivo.
     Nunca confirmar leucemia, linfoma, neoplasia ou malignidade.
@@ -3348,14 +3407,31 @@ educationalImpact, interpretiveSynthesis e hematologicReasoning.
     morphologicRiskClass,
     reactiveLymphocytePattern,
     findings,
-
     visualEvidence,
 
-    morphologyAnalysis,
+    morphologyAnalysis contendo obrigatoriamente:
+    - visualMorphologyDescription
+    - cellMorphology
+    - populationPatternAnalysis
+    - negativeFindings
+    - overview
+    - erythrocyteReview
+    - leukocyteReview
+    - plateletReview
+    - biologicalInterpretation
+    - differentialDiagnosis
+    - summary
+
     patternRecognition,
     interpretiveSynthesis,
     clinicalMeaning,
-    hematologicReasoning,
+
+    hematologicReasoning em 4 camadas:
+    - whatISee
+    - whatItResembles
+    - whatICannotConfirm
+    - finalInterpretation
+
     educationalImpact,
     overallAssessment,
     structuredReport.
@@ -4403,6 +4479,57 @@ app.post(
         validation.result.overallAssessment.riskCategory =
           validation.result.morphologicRiskClass;
       }
+
+// ====================================================================
+// CLASS_3 — POPULAÇÃO MONONUCLEAR ATÍPICA SUSTENTADA
+// ====================================================================
+
+const visibleLeukocytes =
+  validation.result.fieldAdequacy?.visibleLeukocytes || 0;
+
+const hasAtypicalPopulationSignal =
+  finalFindings.largeMononuclearCells === true ||
+  finalFindings.atypicalLymphocytes === true ||
+  finalFindings.plasmacytoidCells === true ||
+  finalFindings.plasmocytes === true ||
+  finalFindings.plasmablasts === true ||
+  finalFindings.monomorphicPopulation === true;
+
+if (
+  hasAtypicalPopulationSignal === true &&
+  visibleLeukocytes >= 8 &&
+  validation.result.morphologicRiskClass !== "CLASS_4_BLAST_SUSPICION" &&
+  validation.result.morphologicRiskClass !== "CLASS_5_HIGH_NEOPLASTIC_SUSPICION"
+) {
+  validation.result.normalityBlocked = true;
+
+  validation.result.morphologicRiskClass =
+    "CLASS_3_SUSPICIOUS_ATYPICAL_POPULATION";
+
+  validation.result.riskLevel =
+    "População mononuclear atípica sustentada";
+
+  validation.result.overallAssessment =
+    validation.result.overallAssessment || {};
+
+  validation.result.overallAssessment.requiresHumanReview = true;
+
+  validation.result.overallAssessment.riskCategory =
+    "CLASS_3_SUSPICIOUS_ATYPICAL_POPULATION";
+
+  validation.result.blockNormalReason =
+    Array.isArray(validation.result.blockNormalReason)
+      ? validation.result.blockNormalReason
+      : [];
+
+  validation.result.blockNormalReason.push(
+    "Múltiplas células mononucleares atípicas sustentadas no campo impedem classificação como achado isolado."
+  );
+
+  validation.result.blockNormalReason =
+    [...new Set(validation.result.blockNormalReason)];
+}
+
 
       data.totalUses++;
 
