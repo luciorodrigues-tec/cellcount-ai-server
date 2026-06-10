@@ -3560,6 +3560,24 @@ Responda SOMENTE JSON válido em português do Brasil.
     mergedAnalysis.globalPattern =
       globalPattern;
 
+    mergedAnalysis.morphologyAnalysis =
+      mergedAnalysis.morphologyAnalysis || {};
+
+    mergedAnalysis.morphologyAnalysis.visualMorphologyDescription =
+      mergedAnalysis.morphologyAnalysis.visualMorphologyDescription || {
+        globalView:
+          "Campo microscópico avaliado com descrição global limitada pela resposta visual disponível.",
+        dominantPopulation:
+          mergedAnalysis.globalPattern?.dominantPattern || "Não definida",
+        cellularity:
+          "Celularidade estimada a partir do campo analisado.",
+        architecturalPattern:
+          mergedAnalysis.globalPattern?.populationDistribution || "Não definido",
+        overallImpression:
+          mergedAnalysis.globalPattern?.globalSummary ||
+          "Requer correlação com múltiplos campos.",
+      };
+
     console.log("================================");
     console.log("GLOBAL PATTERN");
     console.log(JSON.stringify(globalPattern, null, 2));
@@ -3610,11 +3628,11 @@ Responda SOMENTE JSON válido em português do Brasil.
       mergedAnalysis.possibleClinicalCorrelations.length > 0
         ? mergedAnalysis.possibleClinicalCorrelations
         : [
-            "Resposta inflamatória ou infecciosa, conforme correlação com leucograma e clínica.",
-            "Padrão reacional fisiológico, dependendo do contexto do paciente.",
-            "Alterações hematológicas secundárias que exigem correlação com hemograma completo.",
-            "Necessidade de revisão microscópica profissional para confirmação ou retificação dos achados.",
-          ];
+            "Correlação com hemograma completo e revisão microscópica profissional.",
+            "Padrão morfológico indeterminado quando o campo for limitado.",
+            "Necessidade de avaliar múltiplos campos antes de inferir padrão reacional ou clonal.",
+            "Achados devem ser interpretados conforme distribuição, repetição celular e contexto clínico.",
+          ]
 
 
     mergedAnalysis.associatedEducationalHypotheses =
@@ -3622,10 +3640,11 @@ Responda SOMENTE JSON válido em português do Brasil.
       mergedAnalysis.associatedEducationalHypotheses.length > 0
         ? mergedAnalysis.associatedEducationalHypotheses
         : [
-            "Padrão morfológico reacional relacionado a estímulos fisiológicos ou imunológicos.",
-            "Alterações secundárias que devem ser avaliadas em conjunto com parâmetros hematimétricos.",
+            "Hipótese morfológica indeterminada dependente de correlação com hemograma.",
+            "Possível alteração reacional ou atípica, conforme repetição em múltiplos campos.",
+            "Necessidade de distinguir achado isolado de população celular sustentada.",
             "Possíveis respostas adaptativas da medula óssea conforme contexto clínico-laboratorial.",
-            "Necessidade de excluir artefatos de lâmina, coloração ou preparação antes de qualquer conclusão.",
+            "Limitação por imagem isolada, artefatos ou representatividade do campo.",
           ];
 
 
@@ -4530,6 +4549,77 @@ if (
     [...new Set(validation.result.blockNormalReason)];
 }
 
+// ====================================================================
+// RISK COHERENCE OVERRIDE
+// ====================================================================
+
+const currentRiskClass =
+  validation.result.morphologicRiskClass || "";
+
+const hasAtypicalPopulation =
+  currentRiskClass === "CLASS_2_ATYPICAL_POPULATION" ||
+  currentRiskClass === "CLASS_2_ATYPICAL_REACTIVE_PATTERN" ||
+  currentRiskClass === "CLASS_3_SUSPICIOUS_ATYPICAL_POPULATION" ||
+  validation.result.findings?.monomorphicPopulation === true ||
+  validation.result.findings?.plasmacytoidCells === true ||
+  validation.result.findings?.plasmablasts === true ||
+  validation.result.findings?.plasmocytes === true ||
+  validation.result.findings?.largeMononuclearCells === true;
+
+if (hasAtypicalPopulation) {
+  validation.result.normalityBlocked = true;
+
+  validation.result.riskLevel =
+    "RISCO INTERMEDIÁRIO";
+
+  validation.result.overallAssessment =
+    validation.result.overallAssessment || {};
+
+  validation.result.overallAssessment.requiresHumanReview = true;
+
+  validation.result.overallAssessment.riskCategory =
+    "RISCO INTERMEDIÁRIO — REVISÃO ESPECIALIZADA RECOMENDADA";
+
+  validation.result.confidenceAnalysis =
+    validation.result.confidenceAnalysis || {};
+
+  validation.result.confidenceAnalysis.hematologicRisk =
+    validation.result.confidenceAnalysis.hematologicRisk || {};
+
+  validation.result.confidenceAnalysis.hematologicRisk.level =
+    "intermediate";
+
+  validation.result.confidenceAnalysis.hematologicRisk.label =
+    "RISCO INTERMEDIÁRIO";
+
+  validation.result.confidenceAnalysis.hematologicRisk.score =
+    Math.max(
+      Number(
+        validation.result.confidenceAnalysis.hematologicRisk.score || 0,
+      ),
+      45,
+    );
+
+  validation.result.confidenceAnalysis.globalConfidenceScore =
+    Math.max(
+      Number(
+        validation.result.confidenceAnalysis.globalConfidenceScore || 55,
+      ),
+      68,
+    );
+
+  validation.result.blockNormalReason =
+    Array.isArray(validation.result.blockNormalReason)
+      ? validation.result.blockNormalReason
+      : [];
+
+  validation.result.blockNormalReason.push(
+    "População celular atípica impede classificação como baixo risco morfológico."
+  );
+
+  validation.result.blockNormalReason =
+    [...new Set(validation.result.blockNormalReason)];
+}
 
       data.totalUses++;
 
