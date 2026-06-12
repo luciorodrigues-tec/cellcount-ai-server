@@ -95,6 +95,27 @@ function classifyLymphoidPattern({
     };
   }
 
+  const hasMonomorphicOrPlasmacytoidSignal =
+    findings?.monomorphicPopulation === true ||
+    findings?.plasmacytoidCells === true ||
+    findings?.plasmocytes === true ||
+    findings?.plasmablasts === true;
+
+  if (hasMonomorphicOrPlasmacytoidSignal) {
+    reasoning.push(
+      "Sinal monomórfico/plasmocitoide detectado; não deve ser classificado como padrão reacional simples."
+    );
+
+    return {
+      lymphoidPattern: "ATYPICAL_MONOMORPHIC_OR_PLASMACYTOID_POPULATION",
+      riskCeiling: "CLASS_2_ATYPICAL_POPULATION",
+      allowHighSuspicion: false,
+      forceDowngrade: false,
+      reasoning,
+      ruleVersion: "LYMPHOID_PATTERN_ENGINE_V2",
+    };
+  }
+
   return {
     lymphoidPattern: "LYMPHOID_REACTIVE_OR_UNREMARKABLE",
     riskCeiling: "CLASS_1_LIMITED_FIELD_ATYPICAL_CELL",
@@ -103,10 +124,10 @@ function classifyLymphoidPattern({
     reasoning,
     ruleVersion: "LYMPHOID_PATTERN_ENGINE_V2",
   };
-}
+  }
 
-export {
-  classifyLymphoidPattern,
-};
+  export {
+    classifyLymphoidPattern,
+  };
 
-export default classifyLymphoidPattern;
+  export default classifyLymphoidPattern;

@@ -294,6 +294,153 @@ function normalizeBoolean(value) {
   return false;
 }
 
+// ============================================================================
+// SANITIZE NARRATIVE REPETITION
+// ============================================================================
+
+function cleanRepeatedSentences(text = "") {
+  if (typeof text !== "string") return text;
+
+  const sentences =
+    text
+      .split(/(?<=[.!?])\s+/)
+      .map((s) => s.trim())
+      .filter(Boolean);
+
+  const seen = new Set();
+
+  const cleaned = sentences.filter((sentence) => {
+    const key =
+      sentence
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/[^a-z0-9\s]/g, "")
+        .replace(/\s+/g, " ")
+        .trim();
+
+    if (seen.has(key)) return false;
+
+    seen.add(key);
+    return true;
+  });
+
+  return cleaned.join(" ");
+}
+
+function softenRepetitiveTerms(text = "") {
+  if (typeof text !== "string") return text;
+
+  return text
+    .replaceAll(
+      "população celular atípica população celular atípica",
+      "população celular atípica",
+    )
+    .replaceAll(
+      "População celular atípica. População celular atípica.",
+      "População celular atípica.",
+    )
+    .replaceAll(
+      "população mononuclear atípica população mononuclear atípica",
+      "população mononuclear atípica",
+    )
+    .replaceAll(
+      "requer correlação. Requer correlação.",
+      "requer correlação.",
+    );
+}
+
+function sanitizeNarrativeText(text = "") {
+  if (typeof text !== "string") return text;
+
+  let cleaned = text.trim();
+
+  cleaned = softenRepetitiveTerms(cleaned);
+  cleaned = cleanRepeatedSentences(cleaned);
+
+  return cleaned;
+}
+
+function sanitizeNarrativeRepetition(result = {}) {
+  if (!result || typeof result !== "object") return result;
+
+  const cloned = {
+    ...result,
+    morphologyAnalysis: {
+      ...(result.morphologyAnalysis || {}),
+    },
+    structuredReport: {
+      ...(result.structuredReport || {}),
+    },
+    overallAssessment: {
+      ...(result.overallAssessment || {}),
+    },
+  };
+
+  cloned.clinicalMeaning =
+    sanitizeNarrativeText(cloned.clinicalMeaning);
+
+  cloned.interpretiveSynthesis =
+    sanitizeNarrativeText(cloned.interpretiveSynthesis);
+
+  if (typeof cloned.hematologicReasoning === "string") {
+    cloned.hematologicReasoning =
+      sanitizeNarrativeText(cloned.hematologicReasoning);
+  }
+
+  if (
+    cloned.hematologicReasoning &&
+    typeof cloned.hematologicReasoning === "object"
+  ) {
+    cloned.hematologicReasoning = {
+      ...cloned.hematologicReasoning,
+      whatISee:
+        sanitizeNarrativeText(cloned.hematologicReasoning.whatISee),
+      whatItResembles:
+        sanitizeNarrativeText(cloned.hematologicReasoning.whatItResembles),
+      whatICannotConfirm:
+        sanitizeNarrativeText(cloned.hematologicReasoning.whatICannotConfirm),
+      finalInterpretation:
+        sanitizeNarrativeText(cloned.hematologicReasoning.finalInterpretation),
+    };
+  }
+
+  cloned.morphologyAnalysis.overview =
+    sanitizeNarrativeText(cloned.morphologyAnalysis.overview);
+
+  cloned.morphologyAnalysis.erythrocyteReview =
+    sanitizeNarrativeText(cloned.morphologyAnalysis.erythrocyteReview);
+
+  cloned.morphologyAnalysis.leukocyteReview =
+    sanitizeNarrativeText(cloned.morphologyAnalysis.leukocyteReview);
+
+  cloned.morphologyAnalysis.plateletReview =
+    sanitizeNarrativeText(cloned.morphologyAnalysis.plateletReview);
+
+  cloned.morphologyAnalysis.biologicalInterpretation =
+    sanitizeNarrativeText(cloned.morphologyAnalysis.biologicalInterpretation);
+
+  cloned.morphologyAnalysis.differentialDiagnosis =
+    sanitizeNarrativeText(cloned.morphologyAnalysis.differentialDiagnosis);
+
+  cloned.morphologyAnalysis.summary =
+    sanitizeNarrativeText(cloned.morphologyAnalysis.summary);
+
+  cloned.structuredReport.conclusion =
+    sanitizeNarrativeText(cloned.structuredReport.conclusion);
+
+  cloned.structuredReport.hematologicMeaning =
+    sanitizeNarrativeText(cloned.structuredReport.hematologicMeaning);
+
+  cloned.structuredReport.recommendation =
+    sanitizeNarrativeText(cloned.structuredReport.recommendation);
+
+  cloned.overallAssessment.mainImpression =
+    sanitizeNarrativeText(cloned.overallAssessment.mainImpression);
+
+  return cloned;
+}
+
 function normalizeMedicalResponse(
   data = {},
 ) {
@@ -420,6 +567,140 @@ function normalizeMedicalResponse(
             ? data.rawResponse.visualEvidence
             : {}
         );
+
+  const positiveFindings =
+    Array.isArray(data.positiveFindings)
+      ? [...data.positiveFindings]
+      : [];
+
+  const negativeFindingsStructured =
+    Array.isArray(data.negativeFindingsStructured)
+      ? [...data.negativeFindingsStructured]
+      : [];
+
+  if (
+    findings?.reactiveLymphocytes === true
+  ) {
+    positiveFindings.push(
+      "Linfócitos reativos observados"
+    );
+  }
+
+  if (
+    findings?.atypicalLymphocytes === true
+  ) {
+    positiveFindings.push(
+      "Linfócitos atípicos observados"
+    );
+  }
+
+  if (
+    findings?.largeMononuclearCells === true
+  ) {
+    positiveFindings.push(
+      "Células mononucleares aumentadas"
+    );
+  }
+
+  if (
+    findings?.plasmacytoidCells === true
+  ) {
+    positiveFindings.push(
+      "Células plasmocitoides observadas"
+    );
+  }
+
+  if (
+    findings?.plasmocytes === true
+  ) {
+    positiveFindings.push(
+      "Plasmócitos observados"
+    );
+  }
+
+  if (
+    findings?.plasmablasts === true
+  ) {
+    positiveFindings.push(
+      "Plasmoblastos observados"
+    );
+  }
+
+  if (
+    findings?.monomorphicPopulation === true
+  ) {
+    positiveFindings.push(
+      "População monomórfica observada"
+    );
+  }
+
+  if (
+    findings?.blastSuspicion !== true
+  ) {
+    negativeFindingsStructured.push(
+      "Blastos inequívocos não evidenciados"
+    );
+  }
+
+  if (
+    findings?.immatureCells !== true
+  ) {
+    negativeFindingsStructured.push(
+      "Células imaturas críticas não evidenciadas"
+    );
+  }
+
+  negativeFindingsStructured.push(
+    "Bastonetes de Auer não evidenciados"
+  );
+
+  negativeFindingsStructured.push(
+    "Agregados plaquetários não evidenciados"
+  );
+
+  const uniquePositiveFindings =
+    [...new Set(positiveFindings)]
+      .filter((item) => String(item || "").trim().isNotEmpty);
+
+  const executiveSummary =
+    typeof data.executiveSummary === "object" &&
+    data.executiveSummary !== null
+      ? { ...data.executiveSummary }
+      : {};
+
+  executiveSummary.mainFinding =
+    executiveSummary.mainFinding ||
+    data?.morphologyAnalysis?.summary ||
+    data?.overallAssessment?.mainImpression ||
+    "Achado principal não definido.";
+
+  executiveSummary.riskLevel =
+    executiveSummary.riskLevel ||
+    data?.riskLevel ||
+    data?.morphologicRiskClass ||
+    "Risco não definido.";
+
+  executiveSummary.confidence =
+    executiveSummary.confidence ||
+    `${data?.confidenceAnalysis?.globalConfidenceScore || 0}%`;
+
+  executiveSummary.pattern =
+    executiveSummary.pattern ||
+    data?.patternRecognition?.overallPattern ||
+    "Padrão morfológico não definido.";
+
+  executiveSummary.humanReview =
+    executiveSummary.humanReview ||
+    (
+      data?.overallAssessment?.requiresHumanReview === true ||
+      data?.normalityBlocked === true
+        ? "Revisão humana recomendada"
+        : "Revisão humana conforme contexto clínico"
+    );
+
+  const uniqueNegativeFindings =
+    [...new Set(negativeFindingsStructured)]
+      .filter((item) => String(item || "").trim().isNotEmpty);
 
   return {
 
@@ -600,6 +881,68 @@ function normalizeMedicalResponse(
         : {},
 
     visualEvidence,
+
+    whatAISees:
+      typeof data.whatAISees === "object" &&
+      data.whatAISees !== null
+        ? data.whatAISees
+        : {},
+
+    positiveFindings:
+      uniquePositiveFindings,
+
+    negativeFindingsStructured:
+      uniqueNegativeFindings,
+
+    executiveSummary,
+
+    whatAISees: {
+
+      globalField:
+        normalizedResponse?.morphologyAnalysis?.overview ||
+        '',
+
+      cellularity:
+        'Campo limitado para avaliação quantitativa.',
+
+      erythrocytes:
+        normalizedResponse?.morphologyAnalysis?.erythrocyteReview ||
+        '',
+
+      leukocytes:
+        normalizedResponse?.morphologyAnalysis?.leukocyteReview ||
+        '',
+
+      platelets:
+        normalizedResponse?.morphologyAnalysis?.plateletReview ||
+        '',
+
+      dominantFinding:
+        normalizedResponse?.globalPattern?.dominantPattern ||
+        '',
+
+      unusualStructures:
+        '',
+
+      negativeFindings:
+        normalizedResponse?.morphologyAnalysis?.absentFindings ||
+        '',
+
+      imageLimitations:
+        normalizedResponse?.fieldAdequacy?.adequateForPopulationAssessment === false
+          ? 'Campo limitado para avaliação populacional.'
+          : '',
+
+      freeNarrative:
+        normalizedResponse?.morphologyAnalysis?.summary ||
+        '',
+
+      positiveFindings:
+        uniquePositiveFindings || [],
+
+      negativeFindingsStructured:
+        uniqueNegativeFindings || [],
+    },
 
     patternRecognition: {
 
@@ -3049,6 +3392,30 @@ ESTRUTURA OBRIGATÓRIA:
   "imageQuality": {},
   "visualExtraction": {},
 
+  "whatAISees": {
+    "globalField": "",
+    "cellularity": "",
+    "erythrocytes": "",
+    "leukocytes": "",
+    "platelets": "",
+    "dominantFinding": "",
+    "unusualStructures": "",
+    "negativeFindings": "",
+    "imageLimitations": "",
+    "freeNarrative": ""
+  },
+
+  "positiveFindings": [],
+  "negativeFindingsStructured": [],
+
+  "executiveSummary": {
+    "mainFinding": "",
+    "riskLevel": "",
+    "confidence": "",
+    "pattern": "",
+    "humanReview": ""
+  },
+
   "normalityBlocked": false,
 
   "blockNormalReason": [],
@@ -3087,12 +3454,16 @@ ESTRUTURA OBRIGATÓRIA:
   },
 
   "morphologyAnalysis": {
-
     "visualMorphologyDescription": {
       "globalView": "",
       "dominantPopulation": "",
       "cellularity": "",
-      "architecturalPattern": "",
+      "nuclearFeatures": "",
+      "cytoplasmicFeatures": "",
+      "populationHeterogeneity": "",
+      "erythrocyteBackground": "",
+      "plateletBackground": "",
+      "criticalNegativeFindings": "",
       "overallImpression": ""
     },
 
@@ -3113,11 +3484,8 @@ ESTRUTURA OBRIGATÓRIA:
     },
 
     "overview": "",
-
     "erythrocyteReview": "",
-
     "leukocyteReview": "",
-
     "plateletReview": "",
 
     "negativeFindings": [
@@ -3131,9 +3499,7 @@ ESTRUTURA OBRIGATÓRIA:
     ],
 
     "biologicalInterpretation": "",
-
     "differentialDiagnosis": "",
-
     "summary": ""
   },
 
@@ -3157,6 +3523,18 @@ ESTRUTURA OBRIGATÓRIA:
     "whatICannotConfirm": "Declarar claramente o que não pode ser confirmado apenas pela imagem: clonalidade, malignidade, leucemia, linfoma, mieloma ou diagnóstico definitivo.",
     "finalInterpretation": "Síntese hematológica final em linguagem segura, com necessidade de correlação com hemograma, contexto clínico e revisão microscópica profissional."
   },
+
+  "morphologicDecisionTree": {
+
+    "step1_visualDetection": "",
+    "step2_cellClassification": "",
+    "step3_patternRecognition": "",
+    "step4_riskAssessment": "",
+    "step5_conflictResolution": "",
+    "step6_finalConclusion": ""
+
+  },
+
   "educationalImpact":
   "Texto obrigatório explicando valor educacional, limitações e quais exames ou dados complementares poderiam auxiliar.",
 
@@ -3164,7 +3542,20 @@ ESTRUTURA OBRIGATÓRIA:
   "confidenceAnalysis": {},
   "safetyValidation": {},
   "consensusAnalysis": {},
-  "clinicalCorrelation": {},
+  "clinicalCorrelation": {
+
+    "possibleReactiveContexts": [],
+
+    "possibleNeoplasticContexts": [],
+
+    "recommendedLaboratoryCorrelation": [],
+
+    "recommendedClinicalCorrelation": [],
+
+    "recommendedComplementaryTests": []
+
+  },
+
   "erythrocyteFindings": {},
   "leukocyteFindings": {},
   "plateletFindings": {},
@@ -3177,6 +3568,235 @@ ESTRUTURA OBRIGATÓRIA:
   "recommendedCorrelation": [],
   "heatmapRegions": []
 }
+
+====================================================================
+VISUAL MORPHOLOGY DESCRIPTION OBRIGATÓRIO
+====================================================================
+
+visualMorphologyDescription deve ser um objeto JSON.
+Nunca retornar texto simples.
+
+Preencher obrigatoriamente:
+globalView
+cellularity
+dominantPopulation
+nuclearFeatures
+cytoplasmicFeatures
+populationHeterogeneity
+erythrocyteBackground
+plateletBackground
+criticalNegativeFindings
+
+Descrever apenas estruturas efetivamente observadas.
+Não inferir malignidade.
+Não inferir blastos sem evidência morfológica inequívoca.
+Não deixar campos vazios.
+
+====================================================================
+BLOCO O QUE A IA ESTÁ VENDO
+====================================================================
+
+Antes de interpretar, classificar ou sugerir hipóteses, descreva literalmente tudo que é visível no campo.
+
+Preencher obrigatoriamente whatAISees.
+
+Não usar linguagem diagnóstica neste bloco.
+
+Descrever:
+- aspecto global do campo
+- celularidade
+- hemácias
+- leucócitos visíveis
+- plaquetas
+- população predominante
+- estruturas incomuns
+- achados críticos ausentes
+- limitações da imagem
+
+O campo freeNarrative deve ser um texto fluido, como um hematologista descrevendo a imagem ao microscópio.
+
+Exemplo de estilo:
+
+"Observa-se campo microscópico com predomínio de hemácias preservadas ao fundo, presença de leucócitos maduros dispersos e pequena quantidade de plaquetas. No centro do campo há estrutura alongada/curvilínea incomum, que se destaca do fundo eritrocitário. Não são observados blastos inequívocos, bastonetes de Auer ou agregados plaquetários evidentes. A interpretação é limitada por campo único e requer correlação com outros campos da lâmina."
+
+====================================================================
+ACHADOS POSITIVOS E NEGATIVOS ESTRUTURADOS
+====================================================================
+
+Preencher obrigatoriamente:
+
+positiveFindings
+negativeFindingsStructured
+
+positiveFindings deve conter apenas achados realmente observados na imagem.
+
+Exemplos:
+- Hemácias predominantemente normocíticas e normocrômicas
+- Neutrófilos maduros observados
+- Linfócitos maduros observados
+- Plaquetas presentes e distribuídas
+- Célula mononuclear isolada com possível reatividade
+- Estrutura incomum observada no campo
+
+negativeFindingsStructured deve conter apenas achados ativamente pesquisados e não evidenciados.
+
+Exemplos:
+- Blastos inequívocos não evidenciados
+- Bastonetes de Auer não evidenciados
+- Esquizócitos relevantes não evidenciados
+- Drepanócitos não evidenciados
+- Agregados plaquetários não evidenciados
+- Plaquetas gigantes não evidenciadas
+- Células imaturas críticas não evidenciadas
+
+Não repetir frases longas.
+Não usar linguagem diagnóstica.
+Não incluir hipóteses clínicas.
+Cada item deve ser curto, objetivo e auditável.
+
+====================================================================
+RESUMO EXECUTIVO OBRIGATÓRIO
+====================================================================
+
+Preencher obrigatoriamente:
+
+executiveSummary.mainFinding
+executiveSummary.riskLevel
+executiveSummary.confidence
+executiveSummary.pattern
+executiveSummary.humanReview
+
+Cada campo deve conter no máximo uma frase curta.
+
+Objetivo:
+permitir compreensão da análise em menos de 10 segundos.
+
+Não usar diagnóstico definitivo.
+
+Não usar linguagem alarmista.
+
+Usar linguagem objetiva, hospitalar e educacional.
+
+====================================================================
+DESCRIÇÃO OBRIGATÓRIA DAS TRÊS SÉRIES HEMATOLÓGICAS
+====================================================================
+
+Os campos:
+
+morphologyAnalysis.erythrocyteReview
+morphologyAnalysis.leukocyteReview
+morphologyAnalysis.plateletReview
+
+devem SEMPRE ser preenchidos.
+
+Nunca retornar string vazia.
+
+Mesmo quando não houver alterações relevantes,
+descrever:
+
+- elementos visualizados
+- padrão predominante
+- principais achados ausentes
+- limitações da avaliação
+
+A IA deve obrigatoriamente revisar:
+
+1. Série eritrocitária
+2. Série leucocitária
+3. Série plaquetária
+
+em toda imagem analisada.
+
+Os campos:
+
+morphologyAnalysis.erythrocyteReview
+morphologyAnalysis.leukocyteReview
+morphologyAnalysis.plateletReview
+
+devem SEMPRE ser preenchidos.
+
+Nunca retornar string vazia.
+
+====================================================================
+TAMANHO MÍNIMO DAS DESCRIÇÕES
+====================================================================
+
+morphologyAnalysis.erythrocyteReview:
+mínimo 150 caracteres.
+
+Descrever:
+- tamanho eritrocitário
+- cromia
+- anisocitose
+- poiquilocitose
+- alterações ausentes
+- limitações da avaliação
+
+morphologyAnalysis.leukocyteReview:
+mínimo 150 caracteres.
+
+Descrever:
+- população predominante
+- maturação celular
+- características nucleares
+- características citoplasmáticas
+- heterogeneidade populacional
+- alterações ausentes
+
+morphologyAnalysis.plateletReview:
+mínimo 100 caracteres.
+
+Descrever:
+- quantidade aparente
+- distribuição
+- agregação
+- gigantismo plaquetário
+- alterações ausentes
+- limitações da avaliação
+
+Nunca retornar:
+
+""
+
+ou
+
+"Não avaliado"
+
+ou
+
+"Sem alterações"
+
+sem descrição morfológica complementar.
+
+====================================================================
+RACIOCÍNIO MORFOLÓGICO OBRIGATÓRIO
+====================================================================
+
+A IA deve obrigatoriamente explicar:
+
+1. O que visualmente foi identificado.
+
+2. Quais características sustentam a classificação celular.
+
+3. Quais características afastam outras hipóteses.
+
+4. Se existe heterogeneidade populacional.
+
+5. Se existe monomorfismo populacional.
+
+6. Se existe maturação preservada.
+
+7. Se existe padrão reacional.
+
+8. Se existe padrão suspeito para neoplasia hematológica.
+
+9. Grau de confiança de cada inferência.
+
+10. Limitações da imagem.
+
+A conclusão final deve ser baseada apenas em estruturas realmente observadas.
+
+Nunca inferir blastos, plasmoblastos ou malignidade sem evidências morfológicas inequívocas.
 
 ====================================================================
 REGRAS OBRIGATÓRIAS PARA O OBJETO findings
@@ -3212,25 +3832,60 @@ immatureCells = true
 Se houver suspeita morfológica de blastos:
 blastSuspicion = true
 
-Se qualquer campo acima for true:
+====================================================================
+BLOQUEIO DE NORMALIDADE
+====================================================================
+
+Se qualquer um dos seguintes campos for true:
+
+- largeMononuclearCells
+- reactiveLymphocytes
+- atypicalLymphocytes
+- plasmacytoidCells
+- plasmocytes
+- plasmablasts
+- monomorphicPopulation
+- immatureCells
+- blastSuspicion
+
+Então:
 
 normalityBlocked = true
 
-Adicionar justificativa em blockNormalReason.
+Adicionar justificativa específica em blockNormalReason.
 
-morphologicRiskClass nunca pode ser CLASS_0_NORMAL.
+morphologicRiskClass não pode ser CLASS_0_NORMAL.
 
-Classificação mínima:
+====================================================================
+CLASSIFICAÇÃO DE RISCO
+====================================================================
+
+Se houver apenas célula mononuclear grande isolada,
+linfócito reativo isolado ou linfócito atípico isolado,
+sem evidência de população sustentada:
+
+CLASS_1_LIMITED_FIELD_ATYPICAL_CELL
+
+Se houver população celular atípica sustentada,
+repetição de células semelhantes,
+padrão reacional amplo ou múltiplas células atípicas:
+
 CLASS_2_ATYPICAL_POPULATION
 
-Se houver monomorfismo, plasmócitos/plasmoblastos ou forte suspeita de clonalidade:
+Se houver população monomórfica,
+predomínio plasmocitoide,
+plasmócitos numerosos,
+plasmoblastos suspeitos
+ou padrão sugestivo de clonalidade:
+
 CLASS_3_POSSIBLE_CLONALITY
 
-Se houver suspeita blástica:
+Se houver critérios morfológicos convincentes de blastos:
+
 CLASS_4_BLAST_SUSPICION
 
-Nunca retornar normalidade se houver população atípica, plasmocitoide, monomórfica, imatura ou suspeita blástica.
-
+Nunca retornar CLASS_0_NORMAL quando houver população atípica,
+plasmocitoide, monomórfica, imatura ou suspeita blástica.
 ====================================================================
 ESTILO
 ====================================================================
@@ -3323,7 +3978,7 @@ A calculadora diferencial é opcional.
 A Super IA deve funcionar completamente sem ela.
 
 Execute o pipeline completo em UMA resposta JSON única, preservando:
-imageQuality, visualExtraction, morphologyAnalysis, visualEvidence,
+imageQuality, visualExtraction, whatAISees, positiveFindings, negativeFindingsStructured, executiveSummary, morphologyAnalysis, visualEvidence,
 erythrocyteFindings, leukocyteFindings, plateletFindings, blastSuspicion,
 overallAssessment, structuredReport, possibleClinicalCorrelations,
 associatedEducationalHypotheses, clinicalCorrelationNeeds, clinicalMeaning,
@@ -3334,6 +3989,29 @@ negativeFindings.
 
 const compactHospitalPrompt = `
 Você é uma IA hematológica educacional especializada em morfologia de sangue periférico.
+
+Você deve raciocinar como um hematologista com experiência em hematologia clínica, citomorfologia e hematopatologia.
+
+Sua primeira responsabilidade NÃO é classificar.
+
+Sua primeira responsabilidade é OBSERVAR.
+
+Antes de interpretar qualquer achado:
+
+1. Descreva o campo microscópico.
+2. Descreva a celularidade.
+3. Descreva a população predominante.
+4. Descreva heterogeneidade ou monomorfismo.
+5. Descreva características nucleares.
+6. Descreva características citoplasmáticas.
+7. Descreva o fundo eritrocitário.
+8. Descreva a representatividade plaquetária.
+
+Somente depois realize interpretação hematológica.
+
+Nunca iniciar a análise pela conclusão.
+
+Sempre iniciar pela observação morfológica.
 
 Responda SOMENTE JSON válido em português do Brasil.
 
@@ -3386,6 +4064,31 @@ Responda SOMENTE JSON válido em português do Brasil.
 
     Avaliar:
     1. Qualidade da imagem.
+
+    DESCRIÇÃO MORFOLÓGICA OBRIGATÓRIA
+
+    A IA deve produzir uma descrição semelhante à de um hematologista observando a lâmina.
+
+    Responder obrigatoriamente:
+
+    - Como o campo se apresenta globalmente.
+    - Se há hipercelularidade ou hipocelularidade relativa.
+    - Qual população domina o campo.
+    - Se existe diversidade celular.
+    - Se existe repetição de um mesmo tipo celular.
+    - Se existe monomorfismo.
+    - Se existe heterogeneidade.
+    - Como se apresentam os núcleos.
+    - Como se apresenta a cromatina.
+    - Como se apresenta o citoplasma.
+    - Como se apresenta o fundo eritrocitário.
+    - Como se apresentam as plaquetas.
+
+    Evitar conclusões precoces.
+
+    Primeiro descrever.
+    Depois interpretar.
+
     2. Eritrócitos: tamanho, cor, anisocitose, poiquilocitose, esquizócitos.
     3. Leucócitos: neutrófilos, linfócitos, monócitos, células reativas, atípicas ou imaturas.
     4. Plaquetas: quantidade, agregados, gigantismo.
@@ -3395,6 +4098,21 @@ Responda SOMENTE JSON válido em português do Brasil.
     Blastos inequívocos; bastonetes de Auer; população blástica significativa; células imaturas críticas; esquizócitos relevantes.
 
     Retorne obrigatoriamente JSON com:
+
+    whatAISees contendo obrigatoriamente:
+    - globalField
+    - cellularity
+    - erythrocytes
+    - leukocytes
+    - platelets
+    - dominantFinding
+    - unusualStructures
+    - negativeFindings
+    - imageLimitations
+    - freeNarrative
+
+    positiveFindings,
+    negativeFindingsStructured,
 
     imageQuality,
     visualExtraction,
@@ -3445,6 +4163,39 @@ Responda SOMENTE JSON válido em português do Brasil.
       "prominentNucleolus": false
     }
 
+    REGRAS DE NARRATIVA
+
+    Não repetir continuamente:
+
+    "população celular atípica"
+    "população mononuclear atípica"
+    "requer correlação"
+    "morfologia preservada"
+    "padrão reacional"
+
+    Cada seção deve acrescentar informação nova.
+
+    Se uma informação já foi descrita:
+
+    não repetir a mesma frase.
+
+    Substituir repetição por aprofundamento.
+
+    Ruim:
+
+    "População celular atípica."
+    "População celular atípica."
+    "População celular atípica."
+
+    Bom:
+
+    "Predomínio de células mononucleares."
+    "Relativa uniformidade morfológica."
+    "Cromatina discretamente frouxa."
+    "Ausência de critérios inequívocos de blasto."
+
+    Cada parágrafo deve acrescentar conhecimento.
+
     Marcar true apenas quando houver evidência visual observável.
     Nunca inferir características não visualizadas.
 
@@ -3455,6 +4206,37 @@ Responda SOMENTE JSON válido em português do Brasil.
     none, REACTIVE_LYMPHOCYTE_TYPICAL, DOWNEY_TYPE_I, DOWNEY_TYPE_II, DOWNEY_TYPE_III_IMMUNOBLASTOID, PLASMACYTOID_LYMPHOCYTE, ATYPICAL_LYMPHOCYTE_UNCLASSIFIED.
 
     Sempre escrever interpretiveSynthesis, clinicalMeaning, hematologicReasoning e educationalImpact em português do Brasil.
+
+    ESTILO DE ESPECIALISTA
+
+    A descrição deve parecer escrita por um hematologista experiente.
+
+    Priorizar:
+
+    - observação morfológica
+    - raciocínio biológico
+    - limitações do campo
+    - diferenciais morfológicos
+
+    Não agir como classificador automático.
+
+    Agir como observador microscópico.
+
+    Sempre responder:
+
+    1. O que vejo.
+    2. O que isso sugere.
+    3. O que isso NÃO permite concluir.
+    4. O que seria necessário para confirmar.
+
+    A qualidade da descrição é mais importante do que a classificação.
+
+    Evitar respostas curtas.
+
+    Evitar respostas genéricas.
+
+    Produzir descrições morfológicas ricas, detalhadas e educacionais.
+
     `;
 
     console.log("================================");
@@ -3473,7 +4255,7 @@ Responda SOMENTE JSON válido em português do Brasil.
     const completion = await openai.chat.completions.create({
       model: OPENAI_MODEL,
       temperature: 0.12,
-      max_tokens: 1800,
+      max_tokens: 4000,
       response_format: { type: "json_object" },
       messages: [
         {
@@ -3548,6 +4330,11 @@ Responda SOMENTE JSON válido em português do Brasil.
         mergedAnalysis,
       );
 
+    mergedAnalysis =
+      sanitizeNarrativeRepetition(
+        mergedAnalysis,
+      );
+
     const globalPattern =
       analyzeGlobalPattern(
         mergedAnalysis,
@@ -3559,20 +4346,103 @@ Responda SOMENTE JSON válido em português do Brasil.
     mergedAnalysis.morphologyAnalysis =
       mergedAnalysis.morphologyAnalysis || {};
 
+    if (
+      typeof mergedAnalysis.morphologyAnalysis
+        ?.visualMorphologyDescription === 'string'
+    ) {
+
+      mergedAnalysis.morphologyAnalysis
+        .visualMorphologyDescription = {
+
+        globalView:
+          mergedAnalysis.morphologyAnalysis
+            .visualMorphologyDescription,
+
+        dominantPopulation: '',
+
+        cellularity: '',
+
+        nuclearFeatures: '',
+
+        cytoplasmicFeatures: '',
+
+        populationHeterogeneity: '',
+
+        erythrocyteBackground: '',
+
+        plateletBackground: '',
+
+        criticalNegativeFindings: '',
+
+        overallImpression: '',
+      };
+    }
+
     mergedAnalysis.morphologyAnalysis.visualMorphologyDescription =
       mergedAnalysis.morphologyAnalysis.visualMorphologyDescription || {
+
         globalView:
-          "Campo microscópico avaliado com descrição global limitada pela resposta visual disponível.",
+          'Campo microscópico avaliado com descrição global limitada pela resposta visual disponível.',
+
         dominantPopulation:
-          mergedAnalysis.globalPattern?.dominantPattern || "Não definida",
+          mergedAnalysis.globalPattern?.dominantPattern ||
+          'Não definida',
+
         cellularity:
-          "Celularidade estimada a partir do campo analisado.",
-        architecturalPattern:
-          mergedAnalysis.globalPattern?.populationDistribution || "Não definido",
+          'Celularidade estimada a partir do campo analisado.',
+
+        nuclearFeatures: '',
+
+        cytoplasmicFeatures: '',
+
+        populationHeterogeneity: '',
+
+        erythrocyteBackground: '',
+
+        plateletBackground: '',
+
+        criticalNegativeFindings: '',
+
         overallImpression:
+          mergedAnalysis.globalPattern?.globalSummary ||
+          'Requer correlação com múltiplos campos.',
+      };
+
+    const existingVisualDescription =
+      mergedAnalysis.morphologyAnalysis.visualMorphologyDescription;
+
+    const hasValidVisualDescription =
+      existingVisualDescription &&
+      typeof existingVisualDescription === "object" &&
+      Object.values(existingVisualDescription).some(
+        (value) => String(value || "").trim().length > 0,
+      );
+
+    if (!hasValidVisualDescription) {
+      mergedAnalysis.morphologyAnalysis.visualMorphologyDescription = {
+        globalView:
+          mergedAnalysis.whatAISees?.globalField ||
+          "Campo microscópico avaliado com descrição global limitada pela resposta visual disponível.",
+
+        dominantPopulation:
+          mergedAnalysis.whatAISees?.dominantFinding ||
+          mergedAnalysis.globalPattern?.dominantPattern ||
+          "Não definida",
+
+        cellularity:
+          mergedAnalysis.whatAISees?.cellularity ||
+          "Celularidade estimada a partir do campo analisado.",
+
+        architecturalPattern:
+          mergedAnalysis.globalPattern?.populationDistribution ||
+          "Não definido",
+
+        overallImpression:
+          mergedAnalysis.whatAISees?.freeNarrative ||
           mergedAnalysis.globalPattern?.globalSummary ||
           "Requer correlação com múltiplos campos.",
       };
+    }
 
     console.log("================================");
     console.log("GLOBAL PATTERN");
@@ -4741,6 +5611,11 @@ if (isAtypicalPopulation) {
 }
 
       data.totalUses++;
+
+      validation.result =
+        sanitizeNarrativeRepetition(
+          validation.result,
+        );
 
       validation.result =
         sanitizeHematologyLanguage(
