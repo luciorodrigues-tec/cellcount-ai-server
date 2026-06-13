@@ -660,7 +660,7 @@ function normalizeMedicalResponse(
 
   const uniquePositiveFindings =
     [...new Set(positiveFindings)]
-      .filter((item) => String(item || "").trim().isNotEmpty);
+      .filter((item) => String(item || "").trim().length > 0);
 
   const executiveSummary =
     typeof data.executiveSummary === "object" &&
@@ -700,7 +700,7 @@ function normalizeMedicalResponse(
 
   const uniqueNegativeFindings =
     [...new Set(negativeFindingsStructured)]
-      .filter((item) => String(item || "").trim().isNotEmpty);
+      .filter((item) => String(item || "").trim().length > 0);
 
   return {
 
@@ -882,12 +882,6 @@ function normalizeMedicalResponse(
 
     visualEvidence,
 
-    whatAISees:
-      typeof data.whatAISees === "object" &&
-      data.whatAISees !== null
-        ? data.whatAISees
-        : {},
-
     positiveFindings:
       uniquePositiveFindings,
 
@@ -897,44 +891,51 @@ function normalizeMedicalResponse(
     executiveSummary,
 
     whatAISees: {
-
       globalField:
-        normalizedResponse?.morphologyAnalysis?.overview ||
+        data?.whatAISees?.globalField ||
+        data?.morphologyAnalysis?.overview ||
         '',
 
       cellularity:
+        data?.whatAISees?.cellularity ||
         'Campo limitado para avaliação quantitativa.',
 
       erythrocytes:
-        normalizedResponse?.morphologyAnalysis?.erythrocyteReview ||
+        data?.whatAISees?.erythrocytes ||
+        data?.morphologyAnalysis?.erythrocyteReview ||
         '',
 
       leukocytes:
-        normalizedResponse?.morphologyAnalysis?.leukocyteReview ||
+        data?.whatAISees?.leukocytes ||
+        data?.morphologyAnalysis?.leukocyteReview ||
         '',
 
       platelets:
-        normalizedResponse?.morphologyAnalysis?.plateletReview ||
+        data?.whatAISees?.platelets ||
+        data?.morphologyAnalysis?.plateletReview ||
         '',
 
       dominantFinding:
-        normalizedResponse?.globalPattern?.dominantPattern ||
+        data?.whatAISees?.dominantFinding ||
+        data?.morphologyAnalysis?.summary ||
         '',
 
       unusualStructures:
+        data?.whatAISees?.unusualStructures ||
         '',
 
       negativeFindings:
-        normalizedResponse?.morphologyAnalysis?.absentFindings ||
+        data?.whatAISees?.negativeFindings ||
+        data?.morphologyAnalysis?.absentFindings ||
         '',
 
       imageLimitations:
-        normalizedResponse?.fieldAdequacy?.adequateForPopulationAssessment === false
-          ? 'Campo limitado para avaliação populacional.'
-          : '',
+        data?.whatAISees?.imageLimitations ||
+        'Análise limitada ao campo enviado.',
 
       freeNarrative:
-        normalizedResponse?.morphologyAnalysis?.summary ||
+        data?.whatAISees?.freeNarrative ||
+        data?.morphologyAnalysis?.summary ||
         '',
 
       positiveFindings:
@@ -4433,9 +4434,20 @@ Responda SOMENTE JSON válido em português do Brasil.
           mergedAnalysis.whatAISees?.cellularity ||
           "Celularidade estimada a partir do campo analisado.",
 
-        architecturalPattern:
-          mergedAnalysis.globalPattern?.populationDistribution ||
-          "Não definido",
+        nuclearFeatures: "",
+
+        cytoplasmicFeatures: "",
+
+        populationHeterogeneity: "",
+
+        erythrocyteBackground:
+          mergedAnalysis.whatAISees?.erythrocytes || "",
+
+        plateletBackground:
+          mergedAnalysis.whatAISees?.platelets || "",
+
+        criticalNegativeFindings:
+          mergedAnalysis.whatAISees?.negativeFindings || "",
 
         overallImpression:
           mergedAnalysis.whatAISees?.freeNarrative ||
