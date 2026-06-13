@@ -426,6 +426,14 @@ function sanitizeNarrativeRepetition(result = {}) {
   cloned.morphologyAnalysis.summary =
     sanitizeNarrativeText(cloned.morphologyAnalysis.summary);
 
+  cloned.morphologyAnalysis.absentFindings =
+    sanitizeNarrativeText(cloned.morphologyAnalysis.absentFindings);
+
+  cloned.morphologyAnalysis.negativeFindings =
+    Array.isArray(cloned.morphologyAnalysis.negativeFindings)
+      ? [...new Set(cloned.morphologyAnalysis.negativeFindings)]
+      : cloned.morphologyAnalysis.negativeFindings;
+
   cloned.structuredReport.conclusion =
     sanitizeNarrativeText(cloned.structuredReport.conclusion);
 
@@ -450,15 +458,15 @@ function normalizeMedicalResponse(
 
   const defaultAbsentFindings = `
 
-  ✓ Blastos inequívocos ausentes
+  ✓ Blastos inequívocos não evidenciados
 
-  ✓ Bastonetes de Auer ausentes
+  ✓ Bastonetes de Auer não evidenciados
 
-  ✓ População blástica significativa não observada
+  ✓ População blástica significativa não evidenciada
 
-  ✓ Células imaturas críticas não observadas
+  ✓ Células imaturas críticas não evidenciadas
 
-  ✓ Esquizócitos relevantes não observados`;
+  ✓ Esquizócitos clinicamente relevantes não evidenciados`;
 
   const atypicalLymphocyteSubtype =
     findings.atypicalLymphocyteSubtype ||
@@ -4558,118 +4566,80 @@ Responda SOMENTE JSON válido em português do Brasil.
           ),
       });
 
-  function semanticAtypiaEngine(text = "") {
+// ============================================================================
+// SAFE SEMANTIC FINDINGS — não promove achados críticos por texto livre
+// ============================================================================
 
-    const t = text.toLowerCase();
+const rawFindings =
+  mergedAnalysis.rawResponse?.findings ||
+  mergedAnalysis.rawResponse?.positiveFindings ||
+  {};
 
-    return {
+const safeSemanticFindings = {
+  largeMononuclearCells:
+    rawFindings.largeMononuclearCells === true &&
+    mergedAnalysis.fieldAdequacy?.visibleLeukocytes >= 8,
 
-      largeMononuclearCells:
-        t.includes("celulas mononucleares grandes") ||
-        t.includes("celula mononuclear grande") ||
-        t.includes("large mononuclear cells") ||
-        t.includes("large mononuclear cell") ||
-        t.includes("large mononuclear"),
+  reactiveLymphocytes:
+    rawFindings.reactiveLymphocytes === true &&
+    mergedAnalysis.fieldAdequacy?.visibleLeukocytes >= 4,
 
-      reactiveLymphocytes:
-        t.includes("linfocitos reativos") ||
-        t.includes("linfocito reativo") ||
-        t.includes("reactive lymphocyte") ||
-        t.includes("reactive lymphocytes") ||
-        t.includes("reactive process") ||
-        t.includes("reactive lymphocytosis") ||
-        t.includes("virocito") ||
-        t.includes("virocitos"),
+  atypicalLymphocytes:
+    rawFindings.atypicalLymphocytes === true &&
+    mergedAnalysis.fieldAdequacy?.visibleLeukocytes >= 4,
 
-      atypicalLymphocytes:
-        t.includes("linfocitos atipicos") ||
-        t.includes("linfocito atipico") ||
-        t.includes("atypical lymphocyte") ||
-        t.includes("atypical lymphocytes") ||
-        t.includes("atypical cell") ||
-        t.includes("atypical cells"),
+  plasmacytoidCells:
+    rawFindings.plasmacytoidCells === true &&
+    mergedAnalysis.fieldAdequacy?.visibleLeukocytes >= 8,
 
-      plasmacytoidCells:
-        t.includes("plasmocitoide") ||
-        t.includes("plasmocitoides") ||
-        t.includes("plasmacytoid"),
+  plasmocytes:
+    rawFindings.plasmocytes === true &&
+    mergedAnalysis.fieldAdequacy?.visibleLeukocytes >= 8,
 
-      plasmocytes:
-        t.includes("plasmocito") ||
-        t.includes("plasmocitos") ||
-        t.includes("plasma cell") ||
-        t.includes("plasma cells"),
+  plasmablasts:
+    rawFindings.plasmablasts === true &&
+    rawFindings.blastSuspicion === true,
 
-      plasmablasts:
-        t.includes("plasmoblasto") ||
-        t.includes("plasmoblastos") ||
-        t.includes("plasmoblastico") ||
-        t.includes("plasmablast") ||
-        t.includes("plasmablasts"),
+  monomorphicPopulation:
+    rawFindings.monomorphicPopulation === true &&
+    mergedAnalysis.fieldAdequacy?.adequateForPopulationAssessment === true,
 
-      monomorphicPopulation:
-        t.includes("monomorfica") ||
-        t.includes("monomorfismo") ||
-        t.includes("monomorphic population") ||
-        t.includes("monomorphic"),
+  blastSuspicion:
+    rawFindings.blastSuspicion === true,
+};
 
-      blastSuspicion:
-        t.includes("blasto suspeito") ||
-        t.includes("suspeita blastica") ||
-        t.includes("blast suspicion") ||
-        t.includes("suspicious blast"),
-    };
-  }
+console.log(
+  'SEMANTIC FINDINGS',
+  JSON.stringify(safeSemanticFindings, null, 2),
+);
 
-    const semanticFindings =
-      semanticAtypiaEngine(
-        extractedText,
-      );
+mergedAnalysis.findings = {
+  ...mergedAnalysis.findings,
 
-    console.log(
-      'SEMANTIC FINDINGS',
-      JSON.stringify(
-        semanticFindings,
-        null,
-        2,
-      ),
-    );
+  largeMononuclearCells:
+    safeSemanticFindings.largeMononuclearCells,
 
-    mergedAnalysis.findings = {
-      ...mergedAnalysis.findings,
+  reactiveLymphocytes:
+    safeSemanticFindings.reactiveLymphocytes,
 
-      largeMononuclearCells:
-        mergedAnalysis.findings.largeMononuclearCells ||
-        semanticFindings.largeMononuclearCells,
+  atypicalLymphocytes:
+    safeSemanticFindings.atypicalLymphocytes,
 
-      reactiveLymphocytes:
-        mergedAnalysis.findings.reactiveLymphocytes ||
-        semanticFindings.reactiveLymphocytes,
+  plasmacytoidCells:
+    safeSemanticFindings.plasmacytoidCells,
 
-      atypicalLymphocytes:
-        mergedAnalysis.findings.atypicalLymphocytes ||
-        semanticFindings.atypicalLymphocytes,
+  plasmocytes:
+    safeSemanticFindings.plasmocytes,
 
-      plasmacytoidCells:
-        mergedAnalysis.findings.plasmacytoidCells ||
-        semanticFindings.plasmacytoidCells,
+  plasmablasts:
+    safeSemanticFindings.plasmablasts,
 
-      plasmocytes:
-        mergedAnalysis.findings.plasmocytes ||
-        semanticFindings.plasmocytes,
+  monomorphicPopulation:
+    safeSemanticFindings.monomorphicPopulation,
 
-      plasmablasts:
-        mergedAnalysis.findings.plasmablasts ||
-        semanticFindings.plasmablasts,
-
-      monomorphicPopulation:
-        mergedAnalysis.findings.monomorphicPopulation ||
-        semanticFindings.monomorphicPopulation,
-
-      blastSuspicion:
-        mergedAnalysis.findings.blastSuspicion ||
-        semanticFindings.blastSuspicion,
-    };
+  blastSuspicion:
+    safeSemanticFindings.blastSuspicion,
+};
 
 // ============================================================================
 // ANTI FALSE NORMAL — REACTIVE / ATYPICAL LYMPHOID GATE
@@ -4830,6 +4800,36 @@ if (hasReactiveOrAtypicalSignal) {
     mergedAnalysis.antiOvercallingAnalysis =
       antiOvercallingAnalysis;
 
+// ============================================================================
+// PLASMABLAST / MONOMORPHISM SAFETY LOCK
+// ============================================================================
+
+if (
+  mergedAnalysis.findings?.plasmablasts === true &&
+  mergedAnalysis.findings?.monomorphicPopulation !== true &&
+  mergedAnalysis.findings?.blastSuspicion !== true
+) {
+  mergedAnalysis.findings.plasmablasts = false;
+
+  mergedAnalysis.morphologicRiskClass =
+    "CLASS_2_REACTIVE_MONONUCLEOSIS_PATTERN";
+
+  mergedAnalysis.riskLevel =
+    "Padrão reacional/atípico sem evidência de população blástica";
+
+  mergedAnalysis.blockNormalReason =
+    Array.isArray(mergedAnalysis.blockNormalReason)
+      ? mergedAnalysis.blockNormalReason
+      : [];
+
+  mergedAnalysis.blockNormalReason.push(
+    "Plasmoblasto não sustentado por monomorfismo ou suspeita blástica inequívoca."
+  );
+
+  mergedAnalysis.blockNormalReason =
+    [...new Set(mergedAnalysis.blockNormalReason)];
+}
+
     const lymphoidPatternAnalysis =
       classifyLymphoidPattern({
         findings: mergedAnalysis.findings || {},
@@ -4904,8 +4904,30 @@ if (hasReactiveOrAtypicalSignal) {
     const riskClass =
       mergedAnalysis?.morphologicRiskClass || '';
 
+    finalStructuredReport = {
+      ...finalStructuredReport,
+
+      conclusion:
+        mergedAnalysis?.overallAssessment?.mainImpression ||
+        mergedAnalysis?.riskLevel ||
+        'Achado hematológico inespecífico.',
+
+      hematologicMeaning:
+        mergedAnalysis?.clinicalMeaning ||
+        'A interpretação depende de correlação clínico-laboratorial.',
+
+      recommendation:
+        mergedAnalysis?.overallAssessment
+          ?.recommendedCorrelation ||
+        'Correlacionar com hemograma completo e avaliação microscópica profissional.',
+    };
+
+    const currentRiskClass =
+      mergedAnalysis?.morphologicRiskClass || '';
+
     if (
-      riskClass === 'CLASS_1_LIMITED_FIELD_ATYPICAL_CELL'
+      currentRiskClass ===
+      'CLASS_1_LIMITED_FIELD_ATYPICAL_CELL'
     ) {
       finalStructuredReport = {
         ...finalStructuredReport,
@@ -5428,27 +5450,37 @@ if (
 }
 
 // ====================================================================
-// RISK COHERENCE OVERRIDE
+// RISK COHERENCE OVERRIDE — FIELD-AWARE
 // ====================================================================
 
 const currentRiskClass =
   validation.result.morphologicRiskClass || "";
 
+const visibleLeukocytesRisk =
+  validation.result.fieldAdequacy?.visibleLeukocytes || 0;
+
+const adequatePopulationRisk =
+  validation.result.fieldAdequacy?.adequateForPopulationAssessment === true;
+
 const hasAtypicalPopulation =
-  currentRiskClass === "CLASS_2_ATYPICAL_POPULATION" ||
-  currentRiskClass === "CLASS_2_ATYPICAL_REACTIVE_PATTERN" ||
-  currentRiskClass === "CLASS_3_SUSPICIOUS_ATYPICAL_POPULATION" ||
-  validation.result.findings?.monomorphicPopulation === true ||
-  validation.result.findings?.plasmacytoidCells === true ||
-  validation.result.findings?.plasmablasts === true ||
-  validation.result.findings?.plasmocytes === true ||
-  validation.result.findings?.largeMononuclearCells === true;
+  adequatePopulationRisk === true &&
+  visibleLeukocytesRisk >= 8 &&
+  (
+    currentRiskClass === "CLASS_2_ATYPICAL_POPULATION" ||
+    currentRiskClass === "CLASS_2_ATYPICAL_REACTIVE_PATTERN" ||
+    currentRiskClass === "CLASS_3_SUSPICIOUS_ATYPICAL_POPULATION" ||
+    validation.result.findings?.monomorphicPopulation === true ||
+    validation.result.findings?.plasmacytoidCells === true ||
+    validation.result.findings?.plasmablasts === true ||
+    validation.result.findings?.plasmocytes === true ||
+    validation.result.findings?.largeMononuclearCells === true
+  );
 
 if (hasAtypicalPopulation) {
   validation.result.normalityBlocked = true;
 
   validation.result.riskLevel =
-    "RISCO INTERMEDIÁRIO";
+    "Alteração morfológica relevante — padrão indeterminado";
 
   validation.result.overallAssessment =
     validation.result.overallAssessment || {};
@@ -5456,7 +5488,7 @@ if (hasAtypicalPopulation) {
   validation.result.overallAssessment.requiresHumanReview = true;
 
   validation.result.overallAssessment.riskCategory =
-    "RISCO INTERMEDIÁRIO — REVISÃO ESPECIALIZADA RECOMENDADA";
+    "Alteração morfológica relevante";
 
   validation.result.confidenceAnalysis =
     validation.result.confidenceAnalysis || {};
@@ -5472,18 +5504,8 @@ if (hasAtypicalPopulation) {
 
   validation.result.confidenceAnalysis.hematologicRisk.score =
     Math.max(
-      Number(
-        validation.result.confidenceAnalysis.hematologicRisk.score || 0,
-      ),
+      Number(validation.result.confidenceAnalysis.hematologicRisk.score || 0),
       45,
-    );
-
-  validation.result.confidenceAnalysis.globalConfidenceScore =
-    Math.max(
-      Number(
-        validation.result.confidenceAnalysis.globalConfidenceScore || 55,
-      ),
-      68,
     );
 
   validation.result.blockNormalReason =
@@ -5492,7 +5514,7 @@ if (hasAtypicalPopulation) {
       : [];
 
   validation.result.blockNormalReason.push(
-    "População celular atípica impede classificação como baixo risco morfológico."
+    "População celular atípica sustentada impede classificação como baixo risco morfológico."
   );
 
   validation.result.blockNormalReason =
@@ -5558,33 +5580,47 @@ if (limitedConfidence) {
 }
 
 // ====================================================================
-// ATYPICAL POPULATION LANGUAGE SAFETY
+// ATYPICAL POPULATION LANGUAGE SAFETY — FIELD-AWARE
 // ====================================================================
 
 const globalConfidence =
   Number(
     validation.result.confidenceAnalysis?.globalConfidenceScore ||
-    validation.result.confidenceAnalysis?.globalConfidence ||
+    validation.result.confidenceAnalysis?.confidenceHierarchy?.global ||
     0,
   );
 
-const isAtypicalPopulation =
-  validation.result.morphologicRiskClass === "CLASS_2_ATYPICAL_POPULATION" ||
-  validation.result.morphologicRiskClass === "CLASS_3_HETEROGENEOUS_ATYPICAL_POPULATION" ||
+const visibleLeukocytesLanguage =
+  validation.result.fieldAdequacy?.visibleLeukocytes || 0;
+
+const adequatePopulationLanguage =
+  validation.result.fieldAdequacy?.adequateForPopulationAssessment === true;
+
+const hasStrongAtypia =
   validation.result.findings?.monomorphicPopulation === true ||
-  validation.result.findings?.plasmacytoidCells === true ||
   validation.result.findings?.plasmablasts === true ||
-  validation.result.findings?.plasmocytes === true ||
-  validation.result.findings?.largeMononuclearCells === true;
+  validation.result.findings?.plasmacytoidCells === true;
+
+const hasSupportiveAtypia =
+  validation.result.findings?.largeMononuclearCells === true ||
+  validation.result.findings?.plasmocytes === true;
+
+const isAtypicalPopulation =
+  adequatePopulationLanguage === true &&
+  visibleLeukocytesLanguage >= 12 &&
+  (
+    hasStrongAtypia ||
+    (
+      hasSupportiveAtypia &&
+      globalConfidence >= 70
+    )
+  );
 
 if (isAtypicalPopulation) {
   validation.result.normalityBlocked = true;
 
-  validation.result.morphologicRiskClass =
-    "CLASS_3_HETEROGENEOUS_ATYPICAL_POPULATION";
-
   validation.result.riskLevel =
-    "ALTERAÇÃO MORFOLÓGICA RELEVANTE — PADRÃO INDETERMINADO";
+    "Alteração morfológica relevante — padrão indeterminado";
 
   validation.result.overallAssessment =
     validation.result.overallAssessment || {};
@@ -5592,19 +5628,18 @@ if (isAtypicalPopulation) {
   validation.result.overallAssessment.requiresHumanReview = true;
 
   validation.result.overallAssessment.riskCategory =
-    "ALTERAÇÃO MORFOLÓGICA RELEVANTE";
+    "Alteração morfológica relevante";
 
   validation.result.confidenceAnalysis =
     validation.result.confidenceAnalysis || {};
 
-  validation.result.confidenceAnalysis.globalConfidenceScore =
-    Math.max(globalConfidence, 68);
-
   validation.result.confidenceAnalysis.riskClassification =
-    "PADRÃO INDETERMINADO — REVISÃO ESPECIALIZADA RECOMENDADA";
+    "Padrão indeterminado — revisão especializada recomendada";
 
   const safeMainFinding =
-    "Foi identificada população mononuclear atípica relativamente uniforme, não compatível com morfologia hematológica preservada. O campo isolado não permite definir com segurança natureza reacional, clonal ou imatura, exigindo correlação hematológica especializada.";
+    globalConfidence < 70
+      ? "Sugere-se alteração mononuclear atípica em campo com representatividade suficiente, porém sem confirmação de natureza reacional, clonal ou imatura pela imagem isolada."
+      : "Observa-se alteração mononuclear atípica em campo com representatividade suficiente, sem critérios para diagnóstico definitivo pela imagem isolada.";
 
   validation.result.mainFinding = safeMainFinding;
   validation.result.primaryFinding = safeMainFinding;
@@ -5616,13 +5651,11 @@ if (isAtypicalPopulation) {
     safeMainFinding;
 
   validation.result.morphologyAnalysis.overview =
-    "População mononuclear atípica observada. A amostra não deve ser classificada como morfologia preservada.";
+    "Alteração morfológica mononuclear observada em campo representativo. A classificação exige correlação com múltiplos campos e hemograma.";
 
   validation.result.morphologyAnalysis.leukocyteReview =
-    "Observa-se população mononuclear relativamente uniforme com características atípicas. O campo isolado não permite definir com segurança se o padrão é reacional, clonal ou imaturo.";
+    "Há alteração leucocitária/mononuclear em campo com representatividade suficiente. Não há evidência inequívoca de blastos ou bastonetes de Auer.";
 }
-
-      data.totalUses++;
 
       validation.result =
         sanitizeNarrativeRepetition(
@@ -5666,12 +5699,53 @@ if (isAtypicalPopulation) {
       );
       console.log("================================");
 
+// ============================================================================
+// FINAL CONSISTENCY LOCK — evita contradição entre cards do Flutter
+// ============================================================================
+
+const finalResult = validation.result;
+
+const hasAtypicalPopulationFinal =
+  finalResult?.normalityBlocked === true ||
+  finalResult?.morphologicRiskClass === "CLASS_2_ATYPICAL_POPULATION" ||
+  finalResult?.riskLevel
+    ?.toLowerCase()
+    ?.includes("atípica");
+
+if (hasAtypicalPopulationFinal) {
+  finalResult.morphologyAnalysis =
+    finalResult.morphologyAnalysis || {};
+
+  finalResult.whatAISees =
+    finalResult.whatAISees || {};
+
+  finalResult.morphologyAnalysis.overview =
+    "População celular atípica observada. A amostra não deve ser classificada como morfologia preservada.";
+
+  finalResult.whatAISees.freeNarrative =
+    "Campo com achado morfológico relevante. A avaliação isolada não permite definir natureza reacional, clonal ou imatura sem correlação hematológica.";
+
+  finalResult.morphologyAnalysis.leukocyteReview =
+    "Observa-se achado leucocitário/mononuclear atípico em campo limitado. A imagem isolada não permite definir com segurança natureza reacional, clonal ou imatura. Não há evidência inequívoca de blastos.";
+
+  finalResult.clinicalMeaning =
+    "A presença de achado celular atípico em campo isolado requer correlação com hemograma completo, diferencial leucocitário, contexto clínico e revisão microscópica profissional. A imagem não permite diagnóstico definitivo.";
+
+  finalResult.interpretiveSynthesis =
+    "Achado morfológico atípico identificado em campo limitado. A interpretação deve permanecer conservadora, sem inferir malignidade, clonalidade ou leucemia apenas pela imagem.";
+
+  if (finalResult.hematologicReasoning) {
+    finalResult.hematologicReasoning.finalInterpretation =
+      "Achado celular atípico em campo limitado, sem evidência inequívoca de blastos. Necessária correlação clínico-laboratorial.";
+  }
+}
+
       return res.json({
 
         success: true,
 
         analysis:
-          validation.result,
+          finalResult,
 
         metadata: {
 
