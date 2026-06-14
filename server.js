@@ -5890,7 +5890,7 @@ if (isAtypicalPopulation) {
 // FINAL CONSISTENCY LOCK — evita contradição entre cards do Flutter
 // ============================================================================
 
-const finalResult = validation.result;
+let finalResult = validation.result;
 
 // ============================================================================
 // PARASITE / PLASMODIUM GOVERNOR V1
@@ -6267,11 +6267,6 @@ console.log(
   ),
 );
 console.log("================================");
-
-  finalResult =
-    applyLimitedFieldFinalLock(
-      finalResult,
-    );
 
       return res.json({
 
