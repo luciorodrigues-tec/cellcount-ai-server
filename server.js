@@ -5705,12 +5705,84 @@ if (isAtypicalPopulation) {
 
 const finalResult = validation.result;
 
+finalResult.findings =
+  finalResult.findings || {};
+
+// ============================================================================
+// FINAL REPORT GOVERNOR V1
+// ============================================================================
+
+const finalVisibleLeukocytes =
+  finalResult.fieldAdequacy?.visibleLeukocytes || 0;
+
+const lowPopulation =
+  finalVisibleLeukocytes < 8;
+
+if (lowPopulation) {
+  finalResult.finalClassification =
+    "CLASS_1_LIMITED_FIELD";
+
+  finalResult.finalConclusion =
+    "Campo microscópico limitado contendo poucos leucócitos maduros. Não há evidência inequívoca de blastos ou células imaturas críticas.";
+
+  finalResult.finalRecommendation =
+    "Recomenda-se avaliação de múltiplos campos e correlação com hemograma.";
+
+  finalResult.hideEducationalHypotheses = true;
+  finalResult.hideClinicalCorrelations = true;
+  finalResult.hideDifferentialDiagnosis = true;
+  finalResult.hidePopulationAnalysis = true;
+
+  finalResult.populationAnalysis = null;
+  finalResult.educationalHypotheses = [];
+  finalResult.clinicalCorrelations = [];
+  finalResult.differentialDiagnosis = [];
+  finalResult.patternRecognition = null;
+
+  finalResult.interpretiveSynthesis =
+    "Campo microscópico limitado. Ausência de blastos inequívocos ou células imaturas críticas.";
+
+  finalResult.populationSummary =
+    "Número insuficiente de leucócitos para análise populacional confiável.";
+
+  finalResult.atypicalPopulationDetected = false;
+  finalResult.reactivePopulationDetected = false;
+  finalResult.clonalPopulationDetected = false;
+
+  finalResult.findings.monomorphicPopulation = false;
+  finalResult.findings.atypicalPopulation = false;
+  finalResult.findings.clonalPopulation = false;
+
+  // =========================================================
+  // LIMITED FIELD SAFETY LOCK
+  // =========================================================
+
+  finalResult.findings.plasmablasts = false;
+  finalResult.findings.atypicalLymphocytes = false;
+  finalResult.findings.largeMononuclearCells = false;
+  finalResult.findings.reactiveLymphocytes = false;
+
+  finalResult.normalityBlocked = false;
+  finalResult.blockNormalReason = [];
+
+  finalResult.morphologicRiskClass =
+    "CLASS_1_LIMITED_FIELD";
+
+  finalResult.riskLevel =
+    "Campo microscópico limitado";
+
+}
+
 const hasAtypicalPopulationFinal =
-  finalResult?.normalityBlocked === true ||
-  finalResult?.morphologicRiskClass === "CLASS_2_ATYPICAL_POPULATION" ||
-  finalResult?.riskLevel
-    ?.toLowerCase()
-    ?.includes("atípica");
+  !lowPopulation &&
+  (
+    finalResult?.normalityBlocked === true ||
+    finalResult?.morphologicRiskClass ===
+      "CLASS_2_ATYPICAL_POPULATION" ||
+    finalResult?.riskLevel
+      ?.toLowerCase()
+      ?.includes("atípica")
+  );
 
 if (hasAtypicalPopulationFinal) {
   finalResult.morphologyAnalysis =
