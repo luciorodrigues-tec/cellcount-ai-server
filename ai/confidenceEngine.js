@@ -19,6 +19,65 @@ export function buildConfidenceAnalysis({
   if (!analysis) {
     return buildEmptyConfidence();
   }
+
+  const isLimitedField =
+    analysis?.finalClassification === "CLASS_1_LIMITED_FIELD" ||
+    analysis?.morphologicRiskClass === "CLASS_1_LIMITED_FIELD" ||
+    analysis?.morphologicRiskClass === "CLASS_1_LIMITED_FIELD_ATYPICAL_CELL";
+
+  if (isLimitedField) {
+    return {
+      globalConfidenceScore: 35,
+
+      hematologicRisk: {
+        level: "indeterminate",
+        score: 0,
+        label: "CLASSIFICAÇÃO MORFOLÓGICA INDETERMINADA",
+      },
+
+      microscopyQuality: {
+        score: 55,
+        classification: "Moderada",
+      },
+
+      confidenceMatrix: {
+        blastConfidence: 0,
+        schistocyteConfidence: 0,
+        erythrocyteConfidence: 0,
+        plateletConfidence: 0,
+        inflammatoryPatternConfidence: 0,
+        dysplasiaConfidence: 0,
+        diagnosticCoherenceConfidence: 0,
+      },
+
+      confidenceHierarchy: {
+        cellLevel: 25,
+        morphologyLevel: 25,
+        diagnosticLevel: 0,
+        global: 35,
+      },
+
+      calibration: {
+        version: "V4_LIMITED_FIELD_LOCK",
+        strategy: "limited_field_no_global_normality",
+        safetyAware: true,
+        limitedFieldLock: true,
+      },
+
+      safetySignals: {
+        visualEvidenceScore: 0,
+        diagnosticReliability: 0,
+        morphologyCoherence: 0,
+        artifactProbability: 0,
+        falsePositiveRisk: 0,
+        safeDiagnosticGate: false,
+      },
+
+      summary:
+        "Campo microscópico limitado. A confiança global não deve ser interpretada como normalidade hematológica.",
+    };
+  }
+
   const text = normalizeText(
     [
       extractedText,
@@ -496,9 +555,10 @@ function buildSafetyProfile({
       "morfologia normal",
       "normal morphology",
       "normal pattern",
-      "campo normal",
-      "baixo risco"
-    ]);
+      "campo normal"
+    ]) &&
+    analysis?.finalClassification !== "CLASS_1_LIMITED_FIELD" &&
+    analysis?.normalityBlocked !== true;
 
   return {
     visualEvidenceScore,
@@ -876,16 +936,13 @@ function calculatePlateletConfidence({
   if (
     hasPositiveFinding(text, [
       "plaquetas preservadas",
-      "plaquetas presentes",
-      "plaquetas",
-      "platelets",
-      "adequado",
-      "adequate",
-      "sem alteracoes plaquetarias",
-      "sem alterações plaquetárias",
+      "plaquetas presentes em campo representativo",
+      "platelets adequate in representative field",
+      "sem alterações plaquetárias em campo representativo",
+      "sem alteracoes plaquetarias em campo representativo",
     ])
   ) {
-    score += 16;
+    score += 8;
   }
 
   if (plateletScores.plateletAggregation >= 5) {
@@ -1206,6 +1263,7 @@ function calculateGlobalScore({
 
   if (
     safetyProfile?.normalPattern &&
+    analysis?.finalClassification !== "CLASS_1_LIMITED_FIELD" &&
     blastConfidence <= 20 &&
     schistocyteConfidence <= 20
   ) {
@@ -1268,9 +1326,9 @@ function calculateRiskCategory({
 
   if (
     safetyProfile?.normalPattern &&
+    analysis?.finalClassification !== "CLASS_1_LIMITED_FIELD" &&
     blastConfidence <= 20 &&
-    schistocyteConfidence <= 20 &&
-    dysplasiaConfidence <= 20
+    schistocyteConfidence <= 20
   ) {
     riskScore = Math.min(riskScore, 15);
   }

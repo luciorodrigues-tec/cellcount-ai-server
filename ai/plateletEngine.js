@@ -299,30 +299,33 @@ export function analyzePlatelets(
   }
 
   // ==========================================================================
-  // NEGATIVE VALIDATION
+  // CONSERVATIVE PLATELET VALIDATION
   // ==========================================================================
 
-  const normalPlateletFeatures = [
+  const representativeFieldIndicators = [
 
-    "platelets preserved",
-    "plaquetas preservadas",
-    "adequate platelet count",
-    "contagem adequada",
+    "platelets preserved in representative field",
+    "plaquetas preservadas em campo representativo",
+
+    "adequate platelet count in representative field",
+    "contagem adequada em campo representativo",
+
+    "platelets adequate in representative field",
   ];
 
   if (
     containsAny(
       text,
-      normalPlateletFeatures,
+      representativeFieldIndicators,
     )
   ) {
 
-    scores.thrombocytopenia -= 3;
+    scores.thrombocytopenia -= 2;
 
-    scores.consumptivePattern -= 3;
+    scores.consumptivePattern -= 2;
 
     reasoning.push(
-      "Descrição de preservação plaquetária reduz padrão consumptivo.",
+      "Descrição plaquetária proveniente de campo representativo reduz discretamente a suspeita de padrão consumptivo.",
     );
   }
 
@@ -499,7 +502,7 @@ function buildSummary(
     findings.length === 0
   ) {
 
-    return "Sem alterações plaquetárias significativas.";
+    return "Avaliação plaquetária sem alteração específica detectada pelo motor plaquetário; interpretar conforme representatividade do campo.";
   }
 
   return findings

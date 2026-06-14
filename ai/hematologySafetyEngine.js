@@ -404,18 +404,23 @@ function buildEvidenceProfile({
       "esquizócito",
     ]);
 
-  const normalPattern = containsAny(allText, [
-    "sem alteracoes",
-    "sem alterações",
-    "morfologia normal",
-    "sem evidencia",
-    "sem evidência",
-    "sem sustentacao",
-    "sem sustentação",
-    "baixo risco",
-    "low risk",
-    "normal pattern",
-  ]);
+  const limitedField =
+    analysis?.finalClassification ===
+      "CLASS_1_LIMITED_FIELD" ||
+    analysis?.normalityBlocked === true;
+
+  const normalPattern =
+    !limitedField &&
+    containsAny(allText, [
+      "sem alteracoes",
+      "sem alterações",
+      "morfologia normal",
+      "sem evidencia",
+      "sem evidência",
+      "sem sustentacao",
+      "sem sustentação",
+      "normal pattern",
+    ]);
 
   const qualityLabel = normalizeText(JSON.stringify(imageQuality));
 
@@ -1078,7 +1083,12 @@ function validateBlastConsistency({
     safetyAlerts.push("Modo manual reduz confiabilidade proliferativa.");
   }
 
-  if (evidenceProfile.normalPattern && !blastMorphologySignal.present) {
+  if (
+    evidenceProfile.normalPattern &&
+    analysis?.finalClassification !==
+      "CLASS_1_LIMITED_FIELD" &&
+    !blastMorphologySignal.present
+  ) {
     confidence = Math.min(confidence, 12);
   }
 
@@ -1377,12 +1387,7 @@ function isPositiveValue(value = "") {
     text.includes("moderate") ||
     text.includes("moderada") ||
     text.includes("high") ||
-    text.includes("alta") ||
-    text.includes("adequado") ||
-    text.includes("adequada") ||
-    text.includes("adequate") ||
-    text.includes("preservado") ||
-    text.includes("preservada")
+    text.includes("alta")
   );
 }
 
