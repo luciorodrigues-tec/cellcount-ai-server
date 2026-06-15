@@ -450,8 +450,9 @@ function sanitizeNarrativeRepetition(result = {}) {
 }
 
 // ============================================================================
-// LIMITED FIELD FINAL LOCK V3
-// Bloqueia falso normal em campo limitado e evita overcall parasitário.
+// LIMITED FIELD FINAL LOCK V4 — HEMOPARASITE SAFE GOVERNOR
+// Bloqueia falso normal em campo limitado e força segurança para estruturas
+// extracelulares/intraeritrocitárias suspeitas.
 // ============================================================================
 
 function isLimitedFieldResult(result = {}) {
@@ -465,42 +466,97 @@ function isLimitedFieldResult(result = {}) {
 }
 
 function detectHemoparasitePattern(result = {}) {
-  const raw = JSON.stringify(result || {}).toLowerCase();
+  const raw = JSON.stringify(result || {})
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+
+  const hasGenericUnusualStructure =
+    raw.includes("estrutura incomum") ||
+    raw.includes("estrutura extracelular") ||
+    raw.includes("estrutura alongada") ||
+    raw.includes("estrutura curvilinea") ||
+    raw.includes("estrutura curvilínea") ||
+    raw.includes("estrutura filamentosa") ||
+    raw.includes("estrutura serpiginosa") ||
+    raw.includes("estrutura flagelada") ||
+    raw.includes("organismo extracelular") ||
+    raw.includes("forma extracelular") ||
+    raw.includes("forma alongada") ||
+    raw.includes("forma flagelada");
 
   const hasParasiteSignal =
     raw.includes("parasita") ||
     raw.includes("hemoparasita") ||
+    raw.includes("protozoario") ||
+    raw.includes("protozoário") ||
     raw.includes("plasmodium") ||
     raw.includes("babesia") ||
     raw.includes("trypanosoma") ||
     raw.includes("tripanossoma") ||
-    raw.includes("microfilária") ||
     raw.includes("microfilaria") ||
+    raw.includes("microfilária") ||
+    raw.includes("filaria") ||
     raw.includes("filária") ||
-    raw.includes("filaria");
+    hasGenericUnusualStructure;
 
   const extracellularLong =
     raw.includes("extracelular") ||
     raw.includes("alongado") ||
+    raw.includes("curvilineo") ||
+    raw.includes("curvilíneo") ||
     raw.includes("filamentoso") ||
     raw.includes("serpiginoso") ||
     raw.includes("flagelo") ||
+    raw.includes("flagelado") ||
     raw.includes("membrana ondulante") ||
     raw.includes("trypanosoma") ||
     raw.includes("tripanossoma") ||
+    raw.includes("microfilaria") ||
     raw.includes("microfilária") ||
-    raw.includes("microfilaria");
+    hasGenericUnusualStructure;
 
   const intracellular =
     raw.includes("intraeritroc") ||
-    raw.includes("anel intraeritrocitário") ||
     raw.includes("anel intraeritrocitario") ||
+    raw.includes("anel intraeritrocitário") ||
     raw.includes("forma anelar") ||
-    raw.includes("trofozoíto") ||
     raw.includes("trofozoito") ||
+    raw.includes("trofozoíto") ||
     raw.includes("esquizonte") ||
-    raw.includes("gametócito") ||
-    raw.includes("gametocito");
+    raw.includes("gametocito") ||
+    raw.includes("gametócito");
+
+  const trypanosoma =
+    raw.includes("trypanosoma") ||
+    raw.includes("tripanossoma") ||
+    raw.includes("tripomastigota") ||
+    raw.includes("flagelo") ||
+    raw.includes("flagelado") ||
+    raw.includes("membrana ondulante") ||
+    raw.includes("cinetoplasto") ||
+    (
+      extracellularLong &&
+      (
+        raw.includes("curvilineo") ||
+        raw.includes("curvilíneo") ||
+        raw.includes("serpiginoso") ||
+        raw.includes("alongado") ||
+        raw.includes("flagelada") ||
+        raw.includes("flagelado")
+      )
+    );
+
+  const microfilaria =
+    raw.includes("microfilaria") ||
+    raw.includes("microfilária") ||
+    raw.includes("filaria") ||
+    raw.includes("filária") ||
+    (
+      extracellularLong &&
+      raw.includes("filamentoso") &&
+      !raw.includes("flagelo")
+    );
 
   if (!hasParasiteSignal) {
     return {
@@ -512,12 +568,32 @@ function detectHemoparasitePattern(result = {}) {
   }
 
   if (extracellularLong) {
+    if (trypanosoma) {
+      return {
+        suspected: true,
+        type: "TRYPANOSOMA_SUSPECT",
+        blockPlasmodium: true,
+        label:
+          "Estrutura extracelular alongada/curvilínea suspeita para hemoparasita flagelado, com padrão morfológico que pode lembrar Trypanosoma spp.; não classificar como Plasmodium spp.",
+      };
+    }
+
+    if (microfilaria) {
+      return {
+        suspected: true,
+        type: "MICROFILARIA_SUSPECT",
+        blockPlasmodium: true,
+        label:
+          "Estrutura filamentosa extracelular suspeita para microfilária circulante; não classificar como Plasmodium spp.",
+      };
+    }
+
     return {
       suspected: true,
       type: "EXTRACELLULAR_HEMOPARASITE_SUSPECT",
       blockPlasmodium: true,
       label:
-        "Hemoparasita extracelular alongado suspeito; não classificar automaticamente como Plasmodium spp.",
+        "Estrutura extracelular alongada/filamentosa incomum suspeita para hemoparasita ou artefato; não classificar automaticamente como Plasmodium spp.",
     };
   }
 
@@ -531,20 +607,32 @@ function detectHemoparasitePattern(result = {}) {
     };
   }
 
+  if (intracellular && raw.includes("babesia")) {
+    return {
+      suspected: true,
+      type: "BABESIA_SUSPECT",
+      blockPlasmodium: true,
+      label:
+        "Estruturas intraeritrocitárias suspeitas para Babesia spp.; não classificar automaticamente como Plasmodium spp.",
+    };
+  }
+
   return {
     suspected: true,
-    type: "UNDEFINED_HEMOPARASITE",
+    type: "UNDEFINED_HEMOPARASITE_OR_ARTIFACT",
     blockPlasmodium: true,
     label:
-      "Hemoparasita suspeito não definido pela imagem isolada.",
+      "Estrutura incomum suspeita para hemoparasita ou artefato; imagem isolada não permite identificação definitiva.",
   };
 }
 
 function applyLimitedFieldFinalLock(result = {}) {
   if (!result || typeof result !== "object") return result;
-  if (!isLimitedFieldResult(result)) return result;
 
   const parasite = detectHemoparasitePattern(result);
+  const isLimited = isLimitedFieldResult(result);
+
+  if (!isLimited && !parasite.suspected) return result;
 
   const locked = {
     ...result,
@@ -554,83 +642,112 @@ function applyLimitedFieldFinalLock(result = {}) {
     patternRecognition: { ...(result.patternRecognition || {}) },
     structuredReport: { ...(result.structuredReport || {}) },
     overallAssessment: { ...(result.overallAssessment || {}) },
+    confidenceAnalysis: { ...(result.confidenceAnalysis || {}) },
   };
 
-  locked.finalClassification = "CLASS_1_LIMITED_FIELD";
-  locked.morphologicRiskClass = "CLASS_1_LIMITED_FIELD";
-  locked.normalityBlocked = true;
-  locked.requiresHumanReview = true;
+  if (isLimited) {
+    locked.finalClassification = "CLASS_1_LIMITED_FIELD";
+    locked.morphologicRiskClass = "CLASS_1_LIMITED_FIELD";
+    locked.riskLevel = "Campo limitado";
+    locked.normalityBlocked = true;
+    locked.requiresHumanReview = true;
 
-  locked.blockNormalReason = [
-    ...new Set([
-      ...(locked.blockNormalReason || []),
-      "Campo microscópico limitado",
-      "Baixa representatividade celular",
-      "Não afirmar normalidade global pela imagem isolada",
-    ]),
-  ];
+    locked.blockNormalReason = [
+      ...new Set([
+        ...(Array.isArray(locked.blockNormalReason)
+          ? locked.blockNormalReason
+          : []),
+        "Campo microscópico limitado",
+        "Baixa representatividade celular",
+        "Não afirmar normalidade global pela imagem isolada",
+      ]),
+    ];
+  }
 
   if (parasite.suspected) {
+    locked.finalClassification = isLimited
+      ? "CLASS_1_LIMITED_FIELD"
+      : locked.finalClassification || "CLASS_2_UNUSUAL_STRUCTURE";
+
+    locked.morphologicRiskClass = isLimited
+      ? "CLASS_1_LIMITED_FIELD"
+      : "CLASS_2_UNUSUAL_STRUCTURE";
+
+    locked.riskLevel = "Achado parasitário/estrutura incomum suspeita";
+    locked.normalityBlocked = true;
+    locked.requiresHumanReview = true;
+
+    locked.blockNormalReason = [
+      ...new Set([
+        ...(Array.isArray(locked.blockNormalReason)
+          ? locked.blockNormalReason
+          : []),
+        "Estrutura incomum suspeita para hemoparasita ou artefato",
+        "Não afirmar normalidade global diante de estrutura extracelular/intraeritrocitária suspeita",
+      ]),
+    ];
+
     locked.findings.parasiteSuspected = true;
     locked.findings.parasiteType = parasite.type;
     locked.findings.blockPlasmodiumDiagnosis = parasite.blockPlasmodium;
     locked.findings.plasmodiumSuspected =
       parasite.type === "PLASMODIUM_SUSPECT";
 
-    locked.riskLevel = "Campo limitado com achado parasitário suspeito";
-    locked.mainFinding = parasite.label;
-    locked.primaryFinding = parasite.label;
-
     locked.parasiteAnalysis = {
       suspected: true,
       parasiteType: parasite.type,
       blockPlasmodiumDiagnosis: parasite.blockPlasmodium,
       interpretation: parasite.blockPlasmodium
-        ? "Há sinal parasitário, porém o padrão descrito não sustenta classificação automática como Plasmodium spp."
-        : "Há sinal intraeritrocitário suspeito para Plasmodium spp.; requer confirmação laboratorial.",
+        ? "Há estrutura incomum/hemoparasitária suspeita, porém o padrão não sustenta classificação automática como Plasmodium spp."
+        : "Há estruturas intraeritrocitárias suspeitas para Plasmodium spp.; requer confirmação laboratorial.",
       recommendation:
-        "Confirmar por revisão microscópica profissional, gota espessa/esfregaço seriado e testes complementares conforme protocolo.",
+        "Confirmar por revisão microscópica profissional, avaliação de múltiplos campos, gota espessa/esfregaço seriado e testes complementares conforme protocolo.",
     };
+
+    locked.mainFinding = parasite.label;
+    locked.primaryFinding = parasite.label;
 
     locked.morphologyAnalysis.summary = parasite.label;
     locked.morphologyAnalysis.overview =
-      "Campo microscópico limitado com achado parasitário suspeito. A imagem isolada não permite diagnóstico definitivo, identificação de espécie ou quantificação.";
+      "Campo microscópico com estrutura incomum suspeita. A imagem isolada não permite diagnóstico definitivo, identificação de espécie ou quantificação.";
     locked.morphologyAnalysis.erythrocyteReview =
-      parasite.blockPlasmodium
-        ? "Hemácias visíveis no campo. O achado suspeito não sustenta, isoladamente, classificação automática como Plasmodium spp."
-        : "Hemácias com estruturas intraeritrocitárias suspeitas. Recomenda-se avaliação de múltiplos campos e confirmação laboratorial.";
+      "Hemácias visíveis no campo, com avaliação global limitada. A presença de estrutura incomum exige exclusão de hemoparasita ou artefato.";
     locked.morphologyAnalysis.leukocyteReview =
-      "Avaliação leucocitária limitada. Não há evidência inequívoca de blastos neste campo.";
+      "Poucos leucócitos maduros visíveis. Não há evidência inequívoca de blastos neste campo.";
     locked.morphologyAnalysis.plateletReview =
-      "Avaliação plaquetária limitada ao campo enviado.";
+      "Plaquetas podem ser visualizadas, porém a avaliação quantitativa global permanece limitada pela imagem isolada.";
     locked.morphologyAnalysis.biologicalInterpretation =
-      "Achado parasitário suspeito em campo limitado. A interpretação deve permanecer educacional e dependente de confirmação parasitológica.";
+      "Achado parasitário/estrutura incomum suspeita em imagem isolada. A interpretação deve permanecer educacional e dependente de confirmação microscópica.";
     locked.morphologyAnalysis.differentialDiagnosis =
-      parasite.blockPlasmodium
-        ? "Diferenciais educacionais: hemoparasita extracelular, Babesia, Trypanosoma, microfilária ou artefato. Plasmodium spp. não deve ser inferido automaticamente."
-        : "Hipótese educacional: Plasmodium spp.; considerar diferenciais e confirmação laboratorial.";
+      "Diferenciais educacionais: hemoparasita extracelular, Trypanosoma spp., microfilária, Babesia/Plasmodium conforme padrão intraeritrocitário, ou artefato de lâmina/corante.";
 
     locked.whatAISees.dominantFinding = parasite.label;
     locked.whatAISees.unusualStructures = parasite.label;
     locked.whatAISees.imageLimitations =
-      "Campo limitado; não permite diagnóstico definitivo, espécie ou quantificação parasitária.";
+      "Imagem/campo isolado; não permite diagnóstico definitivo, identificação de espécie ou quantificação parasitária.";
+    locked.whatAISees.freeNarrative =
+      `Observa-se campo microscópico limitado, com hemácias ao fundo e poucos leucócitos maduros. ${parasite.label}. Não há blastos inequívocos neste campo. A interpretação requer avaliação de múltiplos campos e confirmação laboratorial.`;
 
     locked.patternRecognition.overallPattern =
-      "Campo limitado com achado parasitário suspeito";
+      "Estrutura incomum/hemoparasita suspeito em campo limitado";
+    locked.patternRecognition.artifactPattern =
+      "Artefato deve permanecer no diferencial até confirmação microscópica.";
 
     locked.clinicalMeaning =
-      "Achado parasitário suspeito. A imagem isolada não permite diagnóstico definitivo, identificação de espécie ou quantificação. Requer confirmação laboratorial.";
+      "Achado suspeito para hemoparasita ou estrutura incomum. A imagem isolada não permite diagnóstico definitivo, identificação de espécie, parasitemia ou gravidade. Requer confirmação laboratorial e revisão microscópica profissional.";
+
     locked.interpretiveSynthesis =
-      `${parasite.label} A confirmação exige correlação clínico-laboratorial e revisão parasitológica adequada.`;
+      `${parasite.label}. A confirmação exige correlação clínico-laboratorial, revisão parasitológica adequada e avaliação de múltiplos campos.`;
 
     locked.hematologicReasoning = {
-      whatISee: parasite.label,
+      whatISee:
+        parasite.label,
       whatItResembles:
-        "Achado parasitário suspeito em campo limitado.",
+        "Estrutura incomum extracelular/intraeritrocitária que pode representar hemoparasita ou artefato.",
       whatICannotConfirm:
-        "Não é possível confirmar espécie, parasitemia, gravidade ou diagnóstico definitivo apenas pela imagem.",
+        "Não é possível confirmar espécie, parasitemia, gravidade, origem artefatual ou diagnóstico definitivo apenas pela imagem.",
       finalInterpretation:
-        "Achado parasitário suspeito em campo limitado; requer confirmação laboratorial e revisão microscópica profissional.",
+        "Achado parasitário/estrutura incomum suspeita; requer confirmação laboratorial e revisão microscópica profissional.",
     };
 
     locked.structuredReport.conclusion = parasite.label;
@@ -640,13 +757,19 @@ function applyLimitedFieldFinalLock(result = {}) {
 
     locked.overallAssessment.requiresHumanReview = true;
     locked.overallAssessment.riskCategory =
-      "CLASS_1_LIMITED_FIELD_PARASITE_SUSPECTED";
+      "CLASS_2_UNUSUAL_HEMOPARASITE_STRUCTURE";
     locked.overallAssessment.mainImpression = parasite.label;
+
+    locked.confidenceAnalysis.globalConfidenceScore = Math.min(
+      Number(locked.confidenceAnalysis.globalConfidenceScore || 40),
+      40,
+    );
+
+    locked.confidenceAnalysis.summary =
+      "Campo com estrutura incomum/hemoparasitária suspeita. A confiança global não deve ser interpretada como normalidade hematológica.";
 
     return locked;
   }
-
-  locked.riskLevel = "Campo limitado";
 
   locked.mainFinding =
     "Campo microscópico limitado contendo poucos leucócitos maduros. Não há evidência inequívoca de blastos ou células imaturas críticas.";
@@ -703,6 +826,11 @@ function applyLimitedFieldFinalLock(result = {}) {
   locked.structuredReport.hematologicMeaning = locked.clinicalMeaning;
   locked.structuredReport.recommendation =
     "Correlacionar com hemograma completo, dados clínicos e revisão microscópica profissional.";
+
+  locked.confidenceAnalysis.globalConfidenceScore = Math.min(
+    Number(locked.confidenceAnalysis.globalConfidenceScore || 40),
+    40,
+  );
 
   return locked;
 }
@@ -3100,6 +3228,58 @@ Descrever SOMENTE estruturas VISUALMENTE observadas:
 - artefatos
 
 NÃO interpretar ainda.
+
+====================================================================
+VARREDURA OBRIGATÓRIA PARA HEMOPARASITAS E ESTRUTURAS INCOMUNS
+====================================================================
+
+Antes de concluir "nenhuma estrutura incomum", avaliar obrigatoriamente:
+
+1. Estruturas extracelulares alongadas
+2. Estruturas curvilíneas ou serpiginosas
+3. Estruturas filamentares
+4. Estruturas com aspecto flagelado
+5. Estruturas com possível membrana ondulante
+6. Estruturas compatíveis com tripomastigota
+7. Estruturas intraeritrocitárias em anel
+8. Inclusões intraeritrocitárias suspeitas
+9. Formas compatíveis com Babesia/Plasmodium
+10. Artefatos que mimetizem hemoparasitas
+
+SE houver qualquer estrutura alongada, curva, filamentosa, flagelada ou extracelular destacada do fundo eritrocitário:
+
+É PROIBIDO escrever:
+- nenhuma estrutura incomum
+- campo normal
+- morfologia preservada
+- sem alterações relevantes
+- estado hematológico normal
+
+Deve preencher obrigatoriamente:
+
+whatAISees.unusualStructures =
+"Estrutura extracelular alongada/curvilínea incomum observada; diferencial inclui hemoparasita ou artefato."
+
+positiveFindings incluir:
+"Estrutura extracelular incomum observada"
+
+findings.parasiteSuspected = true
+
+morphologicRiskClass nunca pode ser CLASS_0_NORMAL.
+
+requiresHumanReview = true
+
+clinicalMeaning deve dizer:
+"A imagem isolada não permite diagnóstico definitivo, espécie, parasitemia ou gravidade. Requer revisão microscópica profissional e correlação laboratorial."
+
+Se a estrutura for extracelular alongada/flagelada, NÃO classificar como Plasmodium spp.
+Preferir:
+"Hemoparasita extracelular suspeito, com diferencial incluindo Trypanosoma spp. ou artefato."
+
+Se a estrutura for intraeritrocitária anelar, considerar:
+"Plasmodium/Babesia no diferencial educacional, dependente de confirmação laboratorial."
+
+Nunca afirmar diagnóstico definitivo.
 
 ====================================================================
 
