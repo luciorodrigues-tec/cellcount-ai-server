@@ -450,8 +450,8 @@ function sanitizeNarrativeRepetition(result = {}) {
 }
 
 // ============================================================================
-// LIMITED FIELD FINAL LOCK
-// Bloqueia falso normal em campo limitado.
+// LIMITED FIELD FINAL LOCK V3
+// Bloqueia falso normal em campo limitado e evita overcall parasitário.
 // ============================================================================
 
 function isLimitedFieldResult(result = {}) {
@@ -459,23 +459,92 @@ function isLimitedFieldResult(result = {}) {
     result?.finalClassification === "CLASS_1_LIMITED_FIELD" ||
     result?.morphologicRiskClass === "CLASS_1_LIMITED_FIELD" ||
     result?.morphologicRiskClass === "CLASS_1_LIMITED_FIELD_ATYPICAL_CELL" ||
-    result?.fieldAdequacy?.adequateForPopulationAssessment === false
+    result?.fieldAdequacy?.adequateForPopulationAssessment === false ||
+    result?.fieldAdequacy?.limitedField === true
   );
+}
+
+function detectHemoparasitePattern(result = {}) {
+  const raw = JSON.stringify(result || {}).toLowerCase();
+
+  const hasParasiteSignal =
+    raw.includes("parasita") ||
+    raw.includes("hemoparasita") ||
+    raw.includes("plasmodium") ||
+    raw.includes("babesia") ||
+    raw.includes("trypanosoma") ||
+    raw.includes("tripanossoma") ||
+    raw.includes("microfilária") ||
+    raw.includes("microfilaria") ||
+    raw.includes("filária") ||
+    raw.includes("filaria");
+
+  const extracellularLong =
+    raw.includes("extracelular") ||
+    raw.includes("alongado") ||
+    raw.includes("filamentoso") ||
+    raw.includes("serpiginoso") ||
+    raw.includes("flagelo") ||
+    raw.includes("membrana ondulante") ||
+    raw.includes("trypanosoma") ||
+    raw.includes("tripanossoma") ||
+    raw.includes("microfilária") ||
+    raw.includes("microfilaria");
+
+  const intracellular =
+    raw.includes("intraeritroc") ||
+    raw.includes("anel intraeritrocitário") ||
+    raw.includes("anel intraeritrocitario") ||
+    raw.includes("forma anelar") ||
+    raw.includes("trofozoíto") ||
+    raw.includes("trofozoito") ||
+    raw.includes("esquizonte") ||
+    raw.includes("gametócito") ||
+    raw.includes("gametocito");
+
+  if (!hasParasiteSignal) {
+    return {
+      suspected: false,
+      type: "NONE",
+      blockPlasmodium: false,
+      label: "",
+    };
+  }
+
+  if (extracellularLong) {
+    return {
+      suspected: true,
+      type: "EXTRACELLULAR_HEMOPARASITE_SUSPECT",
+      blockPlasmodium: true,
+      label:
+        "Hemoparasita extracelular alongado suspeito; não classificar automaticamente como Plasmodium spp.",
+    };
+  }
+
+  if (intracellular && raw.includes("plasmodium")) {
+    return {
+      suspected: true,
+      type: "PLASMODIUM_SUSPECT",
+      blockPlasmodium: false,
+      label:
+        "Estruturas intraeritrocitárias suspeitas para Plasmodium spp.; requer confirmação laboratorial.",
+    };
+  }
+
+  return {
+    suspected: true,
+    type: "UNDEFINED_HEMOPARASITE",
+    blockPlasmodium: true,
+    label:
+      "Hemoparasita suspeito não definido pela imagem isolada.",
+  };
 }
 
 function applyLimitedFieldFinalLock(result = {}) {
   if (!result || typeof result !== "object") return result;
   if (!isLimitedFieldResult(result)) return result;
 
-  const rawText = JSON.stringify(result || {}).toLowerCase();
-
-  const hasParasite =
-    result?.parasiteAnalysis?.suspected === true ||
-    result?.findings?.parasiteSuspected === true ||
-    rawText.includes("plasmodium") ||
-    rawText.includes("parasita") ||
-    rawText.includes("hemoparasita") ||
-    rawText.includes("intraeritrocit");
+  const parasite = detectHemoparasitePattern(result);
 
   const locked = {
     ...result,
@@ -485,151 +554,155 @@ function applyLimitedFieldFinalLock(result = {}) {
     patternRecognition: { ...(result.patternRecognition || {}) },
     structuredReport: { ...(result.structuredReport || {}) },
     overallAssessment: { ...(result.overallAssessment || {}) },
-    erythrocyteFindings: { ...(result.erythrocyteFindings || {}) },
-    leukocyteFindings: { ...(result.leukocyteFindings || {}) },
-    plateletFindings: { ...(result.plateletFindings || {}) },
   };
 
   locked.finalClassification = "CLASS_1_LIMITED_FIELD";
   locked.morphologicRiskClass = "CLASS_1_LIMITED_FIELD";
+  locked.normalityBlocked = true;
   locked.requiresHumanReview = true;
 
-  if (hasParasite) {
-    locked.riskLevel = "Campo limitado com achado parasitário suspeito";
+  locked.blockNormalReason = [
+    ...new Set([
+      ...(locked.blockNormalReason || []),
+      "Campo microscópico limitado",
+      "Baixa representatividade celular",
+      "Não afirmar normalidade global pela imagem isolada",
+    ]),
+  ];
 
+  if (parasite.suspected) {
     locked.findings.parasiteSuspected = true;
-    locked.findings.plasmodiumSuspected = true;
+    locked.findings.parasiteType = parasite.type;
+    locked.findings.blockPlasmodiumDiagnosis = parasite.blockPlasmodium;
+    locked.findings.plasmodiumSuspected =
+      parasite.type === "PLASMODIUM_SUSPECT";
+
+    locked.riskLevel = "Campo limitado com achado parasitário suspeito";
+    locked.mainFinding = parasite.label;
+    locked.primaryFinding = parasite.label;
 
     locked.parasiteAnalysis = {
       suspected: true,
-      genus: "Plasmodium spp.",
-      probableSpecies:
-        result?.parasiteAnalysis?.probableSpecies ||
-        "Espécie não definida pela imagem isolada",
-      formsObserved:
-        result?.parasiteAnalysis?.formsObserved?.length
-          ? result.parasiteAnalysis.formsObserved
-          : [
-              "Trofozoíto anelar intraeritrocitário suspeito",
-              "Forma delicada em anel/crescente compatível com hemoparasita",
-              "Pigmento/estrutura cromática parasitária suspeita",
-            ],
-      interpretation:
-        "Há estruturas intraeritrocitárias sugestivas de Plasmodium spp. A imagem isolada não define espécie, parasitemia ou gravidade.",
-      safetyNote:
-        "Confirmar por gota espessa, esfregaço seriado, teste rápido/PCR conforme protocolo e revisão microscópica profissional.",
+      parasiteType: parasite.type,
+      blockPlasmodiumDiagnosis: parasite.blockPlasmodium,
+      interpretation: parasite.blockPlasmodium
+        ? "Há sinal parasitário, porém o padrão descrito não sustenta classificação automática como Plasmodium spp."
+        : "Há sinal intraeritrocitário suspeito para Plasmodium spp.; requer confirmação laboratorial.",
+      recommendation:
+        "Confirmar por revisão microscópica profissional, gota espessa/esfregaço seriado e testes complementares conforme protocolo.",
     };
 
-    locked.mainFinding =
-      "Estruturas intraeritrocitárias sugestivas de Plasmodium spp. em campo microscópico limitado.";
-
-    locked.primaryFinding = locked.mainFinding;
-
-    locked.morphologyAnalysis.summary =
-      "Campo microscópico limitado com estruturas intraeritrocitárias sugestivas de Plasmodium spp. Recomenda-se confirmação laboratorial e avaliação de múltiplos campos.";
-
+    locked.morphologyAnalysis.summary = parasite.label;
     locked.morphologyAnalysis.overview =
-      "Campo microscópico limitado com achado parasitário intraeritrocitário suspeito. Não afirmar normalidade global da lâmina.";
-
-    locked.morphologyAnalysis.freeDescription =
-      "Observam-se estruturas intraeritrocitárias sugestivas de hemoparasita, compatíveis com Plasmodium spp. A imagem isolada não permite definir espécie ou parasitemia.";
-
-    locked.morphologyAnalysis.fullDescription =
-      locked.morphologyAnalysis.freeDescription;
-
-    locked.morphologyAnalysis.description =
-      locked.morphologyAnalysis.freeDescription;
-
-    locked.morphologyAnalysis.broadDescription =
-      locked.morphologyAnalysis.freeDescription;
-
-    locked.morphologyAnalysis.globalOverview =
-      locked.morphologyAnalysis.overview;
-
+      "Campo microscópico limitado com achado parasitário suspeito. A imagem isolada não permite diagnóstico definitivo, identificação de espécie ou quantificação.";
     locked.morphologyAnalysis.erythrocyteReview =
-      "Avaliação eritrocitária limitada ao campo enviado. Há estruturas intraeritrocitárias sugestivas de hemoparasita/Plasmodium spp.; não afirmar normocitose, normocromia ou preservação eritrocitária global.";
-
+      parasite.blockPlasmodium
+        ? "Hemácias visíveis no campo. O achado suspeito não sustenta, isoladamente, classificação automática como Plasmodium spp."
+        : "Hemácias com estruturas intraeritrocitárias suspeitas. Recomenda-se avaliação de múltiplos campos e confirmação laboratorial.";
     locked.morphologyAnalysis.leukocyteReview =
-      "Poucos leucócitos maduros visíveis. Não há evidência inequívoca de blastos ou células imaturas críticas neste campo.";
-
+      "Avaliação leucocitária limitada. Não há evidência inequívoca de blastos neste campo.";
     locked.morphologyAnalysis.plateletReview =
-      "Avaliação plaquetária limitada pela representatividade do campo. Não afirmar número adequado ou preservação plaquetária global.";
-
+      "Avaliação plaquetária limitada ao campo enviado.";
     locked.morphologyAnalysis.biologicalInterpretation =
-      "Achado sugestivo de hemoparasita intraeritrocitário. Requer confirmação laboratorial específica e revisão microscópica profissional.";
-
+      "Achado parasitário suspeito em campo limitado. A interpretação deve permanecer educacional e dependente de confirmação parasitológica.";
     locked.morphologyAnalysis.differentialDiagnosis =
-      "Hipótese educacional principal: Plasmodium spp. Diferenciais morfológicos/artifatuais devem ser excluídos por revisão microscópica e exames confirmatórios.";
+      parasite.blockPlasmodium
+        ? "Diferenciais educacionais: hemoparasita extracelular, Babesia, Trypanosoma, microfilária ou artefato. Plasmodium spp. não deve ser inferido automaticamente."
+        : "Hipótese educacional: Plasmodium spp.; considerar diferenciais e confirmação laboratorial.";
 
-    locked.whatAISees.globalField =
-      "Campo microscópico limitado com achado parasitário suspeito.";
-
-    locked.whatAISees.cellularity =
-      "Campo não representativo para conclusão hematológica global.";
-
-    locked.whatAISees.erythrocytes =
-      "Hemácias com estruturas intraeritrocitárias sugestivas de Plasmodium spp.";
-
-    locked.whatAISees.leukocytes =
-      "Poucos leucócitos maduros visíveis; sem blastos inequívocos.";
-
-    locked.whatAISees.platelets =
-      "Avaliação plaquetária limitada.";
-
-    locked.whatAISees.dominantFinding =
-      "Estruturas intraeritrocitárias sugestivas de Plasmodium spp.";
-
-    locked.whatAISees.unusualStructures =
-      "Formas parasitárias intraeritrocitárias suspeitas.";
-
-    locked.whatAISees.freeNarrative =
-      "A imagem mostra estruturas intraeritrocitárias sugestivas de Plasmodium spp. O campo é limitado e exige confirmação laboratorial.";
-
-    locked.patternRecognition.erythrocytePattern =
-      "Achado intraeritrocitário sugestivo de hemoparasita";
+    locked.whatAISees.dominantFinding = parasite.label;
+    locked.whatAISees.unusualStructures = parasite.label;
+    locked.whatAISees.imageLimitations =
+      "Campo limitado; não permite diagnóstico definitivo, espécie ou quantificação parasitária.";
 
     locked.patternRecognition.overallPattern =
-      "Campo limitado com suspeita de Plasmodium spp.";
-
-    locked.interpretiveSynthesis =
-      "Campo microscópico limitado com estruturas intraeritrocitárias sugestivas de Plasmodium spp. A imagem isolada não permite definir espécie ou parasitemia. Recomenda-se confirmação laboratorial.";
+      "Campo limitado com achado parasitário suspeito";
 
     locked.clinicalMeaning =
-      "Achado sugestivo de malária/hemoparasitose em campo limitado. Correlacionar com clínica, gota espessa, esfregaço seriado, teste rápido/PCR e revisão microscópica profissional.";
+      "Achado parasitário suspeito. A imagem isolada não permite diagnóstico definitivo, identificação de espécie ou quantificação. Requer confirmação laboratorial.";
+    locked.interpretiveSynthesis =
+      `${parasite.label} A confirmação exige correlação clínico-laboratorial e revisão parasitológica adequada.`;
 
     locked.hematologicReasoning = {
-      whatISee:
-        "Estruturas intraeritrocitárias sugestivas de hemoparasita.",
+      whatISee: parasite.label,
       whatItResembles:
-        "Plasmodium spp., com provável forma anelar/trofozoítica intraeritrocitária.",
+        "Achado parasitário suspeito em campo limitado.",
       whatICannotConfirm:
         "Não é possível confirmar espécie, parasitemia, gravidade ou diagnóstico definitivo apenas pela imagem.",
       finalInterpretation:
-        "Suspeita morfológica de Plasmodium spp. em campo limitado; confirmar laboratorialmente.",
+        "Achado parasitário suspeito em campo limitado; requer confirmação laboratorial e revisão microscópica profissional.",
     };
 
-    locked.structuredReport.conclusion =
-      locked.morphologyAnalysis.summary;
-
-    locked.structuredReport.hematologicMeaning =
-      locked.clinicalMeaning;
-
+    locked.structuredReport.conclusion = parasite.label;
+    locked.structuredReport.hematologicMeaning = locked.clinicalMeaning;
     locked.structuredReport.recommendation =
-      "Confirmar por gota espessa, esfregaço periférico seriado, teste rápido/PCR conforme protocolo e revisão microscópica profissional.";
-
-    locked.overallAssessment.mainImpression =
-      locked.morphologyAnalysis.summary;
+      "Confirmar por revisão microscópica profissional, gota espessa/esfregaço seriado e métodos complementares conforme protocolo.";
 
     locked.overallAssessment.requiresHumanReview = true;
-    locked.overallAssessment.riskCategory = "CLASS_1_LIMITED_FIELD_PARASITE_SUSPECTED";
+    locked.overallAssessment.riskCategory =
+      "CLASS_1_LIMITED_FIELD_PARASITE_SUSPECTED";
+    locked.overallAssessment.mainImpression = parasite.label;
 
     return locked;
   }
 
-  locked.riskLevel = "Classificação morfológica indeterminada";
+  locked.riskLevel = "Campo limitado";
 
-  locked.morphologyAnalysis.summary =
-    "Campo microscópico limitado contendo poucos leucócitos maduros. Não há evidência inequívoca de blastos ou células imaturas críticas. Recomenda-se avaliação de múltiplos campos e correlação com hemograma.";
+  locked.mainFinding =
+    "Campo microscópico limitado contendo poucos leucócitos maduros. Não há evidência inequívoca de blastos ou células imaturas críticas.";
+
+  locked.primaryFinding = locked.mainFinding;
+
+  locked.morphologyAnalysis.summary = locked.mainFinding;
+
+  locked.morphologyAnalysis.overview =
+    "Campo microscópico limitado para conclusão morfológica global. A baixa representatividade celular impede afirmar morfologia preservada, estado hematológico normal ou padrão populacional sustentado.";
+
+  locked.morphologyAnalysis.erythrocyteReview =
+    "Hemácias visíveis no campo, porém a imagem isolada não permite afirmar normocitose, normocromia ou preservação eritrocitária global.";
+
+  locked.morphologyAnalysis.leukocyteReview =
+    "Poucos leucócitos maduros visíveis. Não há evidência inequívoca de blastos ou células imaturas críticas neste campo analisado.";
+
+  locked.morphologyAnalysis.plateletReview =
+    "Plaquetas podem ser visualizadas no campo, porém a imagem isolada não permite afirmar número adequado, preservação global ou ausência de alteração plaquetária.";
+
+  locked.morphologyAnalysis.biologicalInterpretation =
+    "A baixa representatividade celular limita a interpretação. O campo analisado não demonstra elementos críticos inequívocos, mas também não permite conclusão global sobre normalidade hematológica.";
+
+  locked.morphologyAnalysis.differentialDiagnosis = "";
+
+  locked.patternRecognition.erythrocytePattern = "Avaliação limitada";
+  locked.patternRecognition.leukocytePattern =
+    "Baixa representatividade leucocitária";
+  locked.patternRecognition.plateletPattern = "Avaliação limitada";
+  locked.patternRecognition.overallPattern =
+    "Campo limitado para conclusão populacional";
+
+  locked.clinicalMeaning =
+    "Campo limitado. A imagem isolada não permite afirmar estado hematológico normal ou morfologia preservada global. Recomenda-se correlação com hemograma completo, dados clínicos e revisão microscópica profissional.";
+
+  locked.interpretiveSynthesis =
+    "A baixa representatividade celular limita a interpretação. O campo analisado não demonstra blastos inequívocos ou células imaturas críticas, porém não permite conclusão global sobre normalidade hematológica.";
+
+  locked.hematologicReasoning = {
+    whatISee:
+      "Campo microscópico com poucos leucócitos maduros visíveis e fundo eritrocitário predominante.",
+    whatItResembles:
+      "Campo limitado para avaliação populacional.",
+    whatICannotConfirm:
+      "Não é possível confirmar normalidade global, morfologia preservada, estado hematológico normal, clonalidade, malignidade ou diagnóstico definitivo pela imagem isolada.",
+    finalInterpretation: locked.mainFinding,
+  };
+
+  locked.overallAssessment.requiresHumanReview = true;
+  locked.overallAssessment.riskCategory = "CLASS_1_LIMITED_FIELD";
+  locked.overallAssessment.mainImpression = locked.mainFinding;
+
+  locked.structuredReport.conclusion = locked.mainFinding;
+  locked.structuredReport.hematologicMeaning = locked.clinicalMeaning;
+  locked.structuredReport.recommendation =
+    "Correlacionar com hemograma completo, dados clínicos e revisão microscópica profissional.";
 
   return locked;
 }
@@ -5899,116 +5972,13 @@ if (isAtypicalPopulation) {
 
 let finalResult = validation.result;
 
-// ============================================================================
-// PARASITE / PLASMODIUM GOVERNOR V1
-// ============================================================================
-
-finalResult.findings = finalResult.findings || {};
-finalResult.morphologyAnalysis = finalResult.morphologyAnalysis || {};
-finalResult.whatAISees = finalResult.whatAISees || {};
-
-const rawTextForParasite = JSON.stringify(finalResult).toLowerCase();
-
-const hasPlasmodiumSignal =
-  rawTextForParasite.includes("plasmodium") ||
-  rawTextForParasite.includes("parasita intraeritroc") ||
-  rawTextForParasite.includes("parasitas intraeritroc") ||
-  rawTextForParasite.includes("gametócito") ||
-  rawTextForParasite.includes("gametocito") ||
-  rawTextForParasite.includes("falciforme") ||
-  rawTextForParasite.includes("crescente");
-
-if (hasPlasmodiumSignal) {
-  finalResult.normalityBlocked = true;
-
-  finalResult.findings.parasiteSuspected = true;
-  finalResult.findings.plasmodiumSuspected = true;
-
-  finalResult.parasiteAnalysis = {
-    suspected: true,
-    genus: "Plasmodium spp.",
-    probableSpecies:
-      rawTextForParasite.includes("falciforme") ||
-      rawTextForParasite.includes("crescente") ||
-      rawTextForParasite.includes("falciparum")
-        ? "Plasmodium falciparum sugerido morfologicamente"
-        : "Espécie não definida pela imagem isolada",
-
-    formsObserved: [
-      rawTextForParasite.includes("gametócito") ||
-      rawTextForParasite.includes("gametocito") ||
-      rawTextForParasite.includes("falciforme") ||
-      rawTextForParasite.includes("crescente")
-        ? "Gametócito falciforme/crescente sugestivo"
-        : "Gametócito não confirmado neste campo",
-
-      rawTextForParasite.includes("anel") ||
-      rawTextForParasite.includes("forma anelar") ||
-      rawTextForParasite.includes("trofozoíto jovem") ||
-      rawTextForParasite.includes("trofozoito jovem")
-        ? "Forma anelar intraeritrocitária sugestiva"
-        : "Formas anelares intraeritrocitárias não confirmadas neste campo",
-
-      rawTextForParasite.includes("trofozoíto") ||
-      rawTextForParasite.includes("trofozoito")
-        ? "Trofozoíto observado/sugerido"
-        : "Trofozoítos maduros não evidenciados neste campo",
-
-      rawTextForParasite.includes("esquizonte")
-        ? "Esquizonte observado/sugerido"
-        : "Esquizontes não evidenciados neste campo",
-    ],
-
-    dominantForm:
-      rawTextForParasite.includes("gametócito") ||
-      rawTextForParasite.includes("gametocito") ||
-      rawTextForParasite.includes("falciforme") ||
-      rawTextForParasite.includes("crescente")
-        ? "Gametócito falciforme/crescente"
-        : "Forma parasitária não totalmente definida",
-
-    interpretation:
-      "Achado parasitário sugestivo de Plasmodium spp. A identificação da espécie e da fase evolutiva deve ser confirmada em múltiplos campos, gota espessa/esfregaço completo e correlação laboratorial.",
-
-    safetyNote:
-      "A imagem isolada não permite quantificação de parasitemia nem confirmação definitiva da espécie.",
-  };
-
-  finalResult.finalClassification =
-    finalResult.finalClassification === "CLASS_1_LIMITED_FIELD"
-      ? "CLASS_1_LIMITED_FIELD_WITH_PARASITE_SUSPICION"
-      : "CLASS_PARASITIC_FINDING";
-
-  finalResult.riskLevel =
-    "Achado parasitário sugestivo — requer confirmação laboratorial";
-
-  finalResult.mainFinding =
-    "Achado parasitário sugestivo de Plasmodium spp. Recomenda-se avaliação de múltiplos campos, gota espessa/esfregaço completo e correlação clínico-laboratorial.";
-
-  finalResult.primaryFinding = finalResult.mainFinding;
-
-  finalResult.morphologyAnalysis.overview =
-    "Campo com achado parasitário sugestivo de Plasmodium spp. A amostra não deve ser classificada como morfologia preservada global.";
-
-  finalResult.morphologyAnalysis.erythrocyteReview =
-    "Eritrócitos com possível parasitismo intraeritrocitário. Avaliar formas anelares, trofozoítos, esquizontes e gametócitos em múltiplos campos.";
-
-  finalResult.morphologyAnalysis.leukocyteReview =
-    "Leucócitos sem evidência inequívoca de blastos neste campo. O foco morfológico principal é parasitológico.";
-
-  finalResult.clinicalMeaning =
-    "Achado compatível com suspeita parasitológica por Plasmodium spp. A confirmação exige gota espessa, esfregaço completo, identificação de espécie e quantificação de parasitemia conforme protocolo laboratorial.";
-
-  finalResult.interpretiveSynthesis =
-    "A imagem sugere presença de Plasmodium spp., com necessidade de confirmação em exame parasitológico adequado. Não deve ser interpretada como lâmina hematologicamente normal.";
-}
-
 finalResult.findings = finalResult.findings || {};
 finalResult.morphologyAnalysis = finalResult.morphologyAnalysis || {};
 finalResult.whatAISees = finalResult.whatAISees || {};
 finalResult.overallAssessment = finalResult.overallAssessment || {};
 finalResult.structuredReport = finalResult.structuredReport || {};
 finalResult.confidenceAnalysis = finalResult.confidenceAnalysis || {};
+finalResult.patternRecognition = finalResult.patternRecognition || {};
 
 const finalVisibleLeukocytes =
   finalResult.visibleLeukocytes ??
@@ -6021,7 +5991,8 @@ const isLimitedFieldFinal =
   finalResult.finalClassification === "CLASS_1_LIMITED_FIELD" ||
   finalResult.morphologicRiskClass === "CLASS_1_LIMITED_FIELD" ||
   finalResult.morphologicRiskClass === "CLASS_1_LIMITED_FIELD_ATYPICAL_CELL" ||
-  finalResult.fieldAdequacy?.adequateForPopulationAssessment === false;
+  finalResult.fieldAdequacy?.adequateForPopulationAssessment === false ||
+  finalResult.fieldAdequacy?.limitedField === true;
 
 const limitedConclusion =
   "Campo microscópico limitado contendo poucos leucócitos maduros. Não há evidência inequívoca de blastos ou células imaturas críticas.";
@@ -6033,7 +6004,19 @@ if (isLimitedFieldFinal && finalResult.findings?.parasiteSuspected !== true) {
   finalResult.finalClassification = "CLASS_1_LIMITED_FIELD";
   finalResult.morphologicRiskClass = "CLASS_1_LIMITED_FIELD";
   finalResult.riskLevel = "Campo limitado";
-  finalResult.normalityBlocked = false;
+  finalResult.normalityBlocked = true;
+  finalResult.requiresHumanReview = true;
+
+  finalResult.blockNormalReason = [
+    ...new Set([
+      ...(Array.isArray(finalResult.blockNormalReason)
+        ? finalResult.blockNormalReason
+        : []),
+      "Campo microscópico limitado",
+      "Baixa representatividade celular",
+      "Não afirmar normalidade global pela imagem isolada",
+    ]),
+  ];
 
   finalResult.finalConclusion = limitedConclusion;
   finalResult.mainFinding = limitedConclusion;
@@ -6045,9 +6028,6 @@ if (isLimitedFieldFinal && finalResult.findings?.parasiteSuspected !== true) {
   finalResult.hideDifferentialDiagnosis = true;
   finalResult.hidePopulationAnalysis = true;
 
-  finalResult.populationAnalysis = null;
-  finalResult.patternRecognition = null;
-
   finalResult.educationalHypotheses = [];
   finalResult.associatedEducationalHypotheses = [];
   finalResult.clinicalCorrelations = [];
@@ -6057,32 +6037,32 @@ if (isLimitedFieldFinal && finalResult.findings?.parasiteSuspected !== true) {
     "Revisão microscópica profissional",
     "Avaliação de múltiplos campos da lâmina",
   ];
+
   finalResult.differentialDiagnosis = [];
 
-  finalResult.atypicalPopulationDetected = false;
-  finalResult.reactivePopulationDetected = false;
-  finalResult.clonalPopulationDetected = false;
-
-  finalResult.findings.reactiveLymphocytes = false;
-  finalResult.findings.largeMononuclearCells = false;
-  finalResult.findings.plasmacytoidCells = false;
-  finalResult.findings.plasmocytes = false;
-  finalResult.findings.plasmablasts = false;
-  finalResult.findings.atypicalLymphocytes = false;
-  finalResult.findings.monomorphicPopulation = false;
-  finalResult.findings.atypicalPopulation = false;
-  finalResult.findings.clonalPopulation = false;
   finalResult.findings.immatureCells = false;
   finalResult.findings.blastSuspicion = false;
+  finalResult.findings.plasmablasts =
+    finalResult.findings.plasmablasts === true &&
+    finalResult.findings.monomorphicPopulation === true;
+
+  finalResult.patternRecognition = {
+    ...(finalResult.patternRecognition || {}),
+    erythrocytePattern: "Avaliação limitada",
+    leukocytePattern: "Baixa representatividade leucocitária",
+    plateletPattern: "Avaliação limitada",
+    artifactPattern:
+      finalResult.patternRecognition?.artifactPattern || "Não definido",
+    overallPattern: "Campo limitado para conclusão populacional",
+  };
 
   finalResult.morphologyAnalysis.overview =
-    "Campo microscópico limitado para conclusão morfológica global. A baixa representatividade celular impede afirmar morfologia preservada ou padrão populacional sustentado.";
+    "Campo microscópico limitado para conclusão morfológica global. A baixa representatividade celular impede afirmar morfologia preservada, estado hematológico normal ou padrão populacional sustentado.";
 
-  finalResult.morphologyAnalysis.summary =
-    limitedConclusion;
+  finalResult.morphologyAnalysis.summary = limitedConclusion;
 
   finalResult.morphologyAnalysis.erythrocyteReview =
-    "Avaliação eritrocitária limitada ao campo enviado. Não é adequado afirmar preservação global da série eritrocitária apenas por este campo isolado.";
+    "Avaliação eritrocitária limitada ao campo enviado. Hemácias são visíveis, porém não é adequado afirmar normocitose, normocromia ou preservação global da série eritrocitária apenas por este campo isolado.";
 
   finalResult.morphologyAnalysis.leukocyteReview =
     "Avaliação leucocitária limitada por baixa representatividade celular. Observam-se poucos leucócitos maduros, sem evidência inequívoca de blastos ou células imaturas críticas. Não é possível inferir padrão reacional, clonal ou populacional sustentado.";
@@ -6091,9 +6071,12 @@ if (isLimitedFieldFinal && finalResult.findings?.parasiteSuspected !== true) {
     "Avaliação plaquetária limitada ao campo enviado. A imagem isolada não permite conclusão quantitativa ou morfológica global confiável da série plaquetária.";
 
   finalResult.morphologyAnalysis.biologicalInterpretation =
-    "A baixa representatividade do campo impede conclusão hematológica global. Os achados devem ser interpretados de forma conservadora e correlacionados com hemograma e revisão de múltiplos campos.";
+    "A baixa representatividade do campo impede conclusão hematológica global. Os achados devem ser interpretados de forma conservadora e correlacionados com hemograma completo e revisão de múltiplos campos.";
 
   finalResult.morphologyAnalysis.differentialDiagnosis = "";
+
+  finalResult.morphologyAnalysis.absentFindings =
+    "No campo analisado, não há evidência inequívoca de blastos, bastonetes de Auer ou células imaturas críticas. A representatividade limitada não permite exclusão diagnóstica global.";
 
   finalResult.whatAISees.globalField =
     "Campo microscópico limitado para avaliação global.";
@@ -6111,97 +6094,53 @@ if (isLimitedFieldFinal && finalResult.findings?.parasiteSuspected !== true) {
     "Avaliação plaquetária limitada pela representatividade do campo.";
 
   finalResult.whatAISees.dominantFinding =
-    "Campo limitado.";
+    "Campo microscópico limitado.";
 
   finalResult.whatAISees.unusualStructures =
-    "Nenhuma estrutura crítica inequívoca evidenciada no campo limitado.";
+    finalResult.whatAISees.unusualStructures || "";
 
   finalResult.whatAISees.negativeFindings =
-    "Blastos inequívocos não evidenciados. Células imaturas críticas não evidenciadas. Bastonetes de Auer não evidenciados.";
+    "Blastos inequívocos, bastonetes de Auer e células imaturas críticas não evidenciados neste campo.";
 
   finalResult.whatAISees.imageLimitations =
-    "Análise limitada ao campo enviado, com baixa representatividade para conclusão global.";
+    "Campo único/limitado; não permite conclusão hematológica global.";
 
   finalResult.whatAISees.freeNarrative =
-    "Campo microscópico limitado. A imagem permite triagem morfológica inicial, mas não permite afirmar morfologia preservada, estado hematológico normal ou padrão populacional sustentado.";
-
-  finalResult.interpretiveSynthesis =
-    "Campo microscópico limitado. Ausência de blastos inequívocos ou células imaturas críticas no campo analisado. A imagem isolada não permite classificar a lâmina como normal ou preservada.";
+    "Observa-se campo microscópico limitado, com baixa representatividade leucocitária para análise populacional confiável. Não há evidência inequívoca de blastos ou células imaturas críticas neste campo. A interpretação deve ser correlacionada com hemograma completo, múltiplos campos da lâmina e revisão microscópica profissional.";
 
   finalResult.clinicalMeaning =
-    "A baixa representatividade celular limita a interpretação. O campo analisado não demonstra blastos inequívocos ou células imaturas críticas, porém não permite conclusão global sobre normalidade hematológica. Recomenda-se correlação com hemograma completo, dados clínicos e revisão microscópica profissional.";
+    "Campo limitado. A imagem isolada não permite afirmar estado hematológico normal ou morfologia preservada global. Recomenda-se correlação com hemograma completo, dados clínicos e revisão microscópica profissional.";
+
+  finalResult.interpretiveSynthesis =
+    "A baixa representatividade celular limita a interpretação. O campo analisado não demonstra blastos inequívocos ou células imaturas críticas, porém não permite conclusão global sobre normalidade hematológica.";
 
   finalResult.hematologicReasoning = {
     whatISee:
       "Campo microscópico com poucos leucócitos maduros visíveis e fundo eritrocitário predominante.",
     whatItResembles:
-      "Campo limitado para avaliação populacional. Não há base suficiente para afirmar padrão normal, reacional ou clonal sustentado.",
+      "Campo limitado para avaliação populacional, sem base suficiente para inferir padrão normal, reacional ou clonal sustentado.",
     whatICannotConfirm:
-      "Não é possível confirmar normalidade global, morfologia preservada, estado hematológico normal, clonalidade, malignidade ou diagnóstico definitivo pela imagem isolada.",
-    finalInterpretation:
-      limitedConclusion,
+      "Não é possível confirmar normalidade global, morfologia preservada, clonalidade, malignidade, parasitemia ou diagnóstico definitivo pela imagem isolada.",
+    finalInterpretation: limitedConclusion,
   };
 
+  finalResult.structuredReport.conclusion = limitedConclusion;
+  finalResult.structuredReport.hematologicMeaning =
+    finalResult.clinicalMeaning;
+  finalResult.structuredReport.recommendation = limitedRecommendation;
+  finalResult.structuredReport.resumoMorfologico =
+    "Campo microscópico limitado; não emitir conclusão global de normalidade ou preservação.";
+  finalResult.structuredReport.interpretacaoEducacional =
+    "A baixa representatividade celular impede afirmar morfologia preservada, normocitose, normocromia, número plaquetário adequado ou estado hematológico normal.";
+  finalResult.structuredReport.limitacoes =
+    "Campo limitado. Necessária avaliação de múltiplos campos, hemograma completo e revisão microscópica profissional.";
+
+  finalResult.overallAssessment.mainImpression = limitedConclusion;
   finalResult.overallAssessment.requiresHumanReview = true;
   finalResult.overallAssessment.riskCategory = "CLASS_1_LIMITED_FIELD";
-  finalResult.overallAssessment.mainImpression = limitedConclusion;
-
-  finalResult.structuredReport.resumoMorfologico =
-    "Campo microscópico limitado para conclusão global.";
-
-  finalResult.structuredReport.interpretacaoEducacional =
-    "A baixa representatividade celular impede afirmar morfologia preservada ou estado hematológico normal.";
-
-  finalResult.structuredReport.limitacoes =
-    limitedRecommendation;
 
   finalResult.confidenceAnalysis.riskClassification =
     "Campo limitado — revisão de múltiplos campos recomendada";
-
-// ============================================================================
-// LIMITED FIELD — TEXT HARD LOCK
-// Remove conclusões globais incompatíveis com campo limitado
-// ============================================================================
-
-finalResult.erythrocyteFindings = {};
-finalResult.leukocyteFindings = {};
-finalResult.plateletFindings = {};
-
-finalResult.morphologyAnalysis.erythrocyteReview =
-  "Avaliação eritrocitária limitada ao campo enviado. Não foram observadas alterações eritrocitárias marcantes neste campo, mas a imagem isolada não permite afirmar normocitose, normocromia ou preservação global.";
-
-finalResult.morphologyAnalysis.leukocyteReview =
-  "Avaliação leucocitária limitada por baixa representatividade. Poucos leucócitos maduros são visíveis, sem evidência inequívoca de blastos ou células imaturas críticas neste campo. A imagem isolada não permite afirmar normalidade leucocitária global.";
-
-finalResult.morphologyAnalysis.plateletReview =
-  "Avaliação plaquetária limitada ao campo enviado. Plaquetas podem ser visualizadas, mas a imagem isolada não permite afirmar número adequado, preservação global ou ausência de alteração plaquetária.";
-
-finalResult.morphologyAnalysis.absentFindings =
-  "No campo analisado, não há evidência inequívoca de blastos, bastonetes de Auer ou células imaturas críticas. A representatividade limitada não permite exclusão diagnóstica global.";
-
-finalResult.whatAISees.erythrocytes =
-  "Hemácias visíveis no campo, sem alterações marcantes evidentes nesta imagem isolada; não afirmar normocitose/normocromia global.";
-
-finalResult.whatAISees.platelets =
-  "Plaquetas visíveis no campo, porém sem base para afirmar quantidade global adequada.";
-
-finalResult.whatAISees.negativeFindings =
-  "Elementos críticos não evidenciados no campo analisado, sem exclusão global pela baixa representatividade.";
-
-finalResult.structuredReport.resumoMorfologico =
-  "Campo microscópico limitado; não emitir conclusão global de normalidade ou preservação.";
-
-finalResult.structuredReport.interpretacaoEducacional =
-  "A baixa representatividade celular impede afirmar morfologia preservada, normocitose, normocromia, número plaquetário adequado ou estado hematológico normal.";
-
-finalResult.structuredReport.limitacoes =
-  "Campo limitado. Necessária avaliação de múltiplos campos, hemograma completo e revisão microscópica profissional.";
-
-finalResult.overallAssessment.mainImpression =
-  finalResult.finalConclusion;
-
-finalResult.overallAssessment.requiresHumanReview = true;
-
 }
 
 const hasAtypicalPopulationFinal =
@@ -6210,45 +6149,31 @@ const hasAtypicalPopulationFinal =
     finalResult?.normalityBlocked === true ||
     finalResult?.morphologicRiskClass === "CLASS_2_ATYPICAL_POPULATION" ||
     finalResult?.morphologicRiskClass === "CLASS_3_HETEROGENEOUS_ATYPICAL_POPULATION" ||
+    finalResult?.morphologicRiskClass === "CLASS_3_SUSPICIOUS_ATYPICAL_POPULATION" ||
     finalResult?.findings?.monomorphicPopulation === true ||
     finalResult?.findings?.plasmacytoidCells === true ||
-    finalResult?.findings?.plasmablasts === true ||
     finalResult?.findings?.plasmocytes === true ||
+    finalResult?.findings?.plasmablasts === true ||
     finalResult?.findings?.largeMononuclearCells === true ||
-    finalResult?.riskLevel?.toLowerCase()?.includes("atípica")
+    finalResult?.findings?.atypicalLymphocytes === true
   );
 
 if (hasAtypicalPopulationFinal) {
   finalResult.normalityBlocked = true;
 
-  finalResult.riskLevel =
-    "Alteração morfológica relevante — padrão indeterminado";
+  finalResult.blockNormalReason = [
+    ...new Set([
+      ...(Array.isArray(finalResult.blockNormalReason)
+        ? finalResult.blockNormalReason
+        : []),
+      "Achado morfológico atípico impede classificação como normal.",
+    ]),
+  ];
 
   finalResult.overallAssessment.requiresHumanReview = true;
-  finalResult.overallAssessment.riskCategory =
-    "Alteração morfológica relevante";
-
-  finalResult.confidenceAnalysis.riskClassification =
-    "Padrão indeterminado — revisão especializada recomendada";
-
-  const safeMainFinding =
-    "Observa-se alteração mononuclear atípica em campo representativo. A imagem isolada não permite definir natureza reacional, clonal ou imatura.";
-
-  finalResult.mainFinding = safeMainFinding;
-  finalResult.primaryFinding = safeMainFinding;
-  finalResult.morphologyAnalysis.summary = safeMainFinding;
-
-  finalResult.morphologyAnalysis.overview =
-    "População celular atípica observada. A amostra não deve ser classificada como morfologia preservada.";
-
-  finalResult.whatAISees.freeNarrative =
-    "Campo com achado morfológico relevante. A avaliação isolada não permite definir natureza reacional, clonal ou imatura sem correlação hematológica.";
-
-  finalResult.morphologyAnalysis.leukocyteReview =
-    "Observa-se achado leucocitário/mononuclear atípico. A imagem isolada não permite definir com segurança natureza reacional, clonal ou imatura. Não há evidência inequívoca de blastos.";
 
   finalResult.clinicalMeaning =
-    "A presença de achado celular atípico requer correlação com hemograma completo, diferencial leucocitário, contexto clínico e revisão microscópica profissional. A imagem não permite diagnóstico definitivo.";
+    "Achado morfológico atípico identificado. A imagem não permite diagnóstico definitivo. Recomenda-se correlação com hemograma completo, dados clínicos e revisão microscópica profissional.";
 
   finalResult.interpretiveSynthesis =
     "Achado morfológico atípico identificado. A interpretação deve permanecer conservadora, sem inferir malignidade, clonalidade ou leucemia apenas pela imagem.";
