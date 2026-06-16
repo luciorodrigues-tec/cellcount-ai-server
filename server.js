@@ -6887,6 +6887,29 @@ ${question}
           ?.content ||
         "Não foi possível gerar resposta.";
 
+      // ====================================
+      // LIMPEZA DE REPETIÇÕES EDUCACIONAIS
+      // ====================================
+
+      finalResult.associatedEducationalHypotheses = [];
+      finalResult.possibleClinicalCorrelations = [];
+      finalResult.clinicalCorrelationNeeds = [];
+
+      finalResult.hideEducationalHypotheses = true;
+      finalResult.hideClinicalCorrelations = true;
+
+      // ====================================
+
+      return res.json({
+
+        success: true,
+
+        analysis: finalResult,
+
+        metadata: {
+
+          model: OPENAI_MODEL,
+
 
       return res.json({
 
