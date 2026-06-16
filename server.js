@@ -471,55 +471,22 @@ function detectHemoparasitePattern(result = {}) {
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "");
 
-  const hasGenericUnusualStructure =
-    raw.includes("estrutura incomum") ||
-    raw.includes("estrutura extracelular") ||
-    raw.includes("estrutura alongada") ||
-    raw.includes("estrutura curvilinea") ||
-    raw.includes("estrutura curvilínea") ||
-    raw.includes("estrutura filamentosa") ||
-    raw.includes("estrutura serpiginosa") ||
-    raw.includes("estrutura flagelada") ||
-    raw.includes("organismo extracelular") ||
-    raw.includes("forma extracelular") ||
-    raw.includes("forma alongada") ||
-    raw.includes("forma flagelada");
-
-  const hasParasiteSignal =
-    raw.includes("parasita") ||
-    raw.includes("hemoparasita") ||
-    raw.includes("protozoario") ||
-    raw.includes("protozoário") ||
-    raw.includes("plasmodium") ||
-    raw.includes("babesia") ||
-    raw.includes("trypanosoma") ||
-    raw.includes("tripanossoma") ||
-    raw.includes("microfilaria") ||
-    raw.includes("microfilária") ||
-    raw.includes("filaria") ||
-    raw.includes("filária") ||
-    hasGenericUnusualStructure;
-
-  const extracellularLong =
-    raw.includes("extracelular") ||
-    raw.includes("alongado") ||
-    raw.includes("curvilineo") ||
-    raw.includes("curvilíneo") ||
-    raw.includes("filamentoso") ||
-    raw.includes("serpiginoso") ||
-    raw.includes("flagelo") ||
-    raw.includes("flagelado") ||
+  const strongTrypanosomaEvidence =
+    raw.includes("kinetoplast") ||
+    raw.includes("cinetoplasto") ||
+    raw.includes("undulating membrane") ||
     raw.includes("membrana ondulante") ||
-    raw.includes("trypanosoma") ||
-    raw.includes("tripanossoma") ||
+    raw.includes("flagellum") ||
+    raw.includes("flagelo") ||
+    raw.includes("trypomastigote") ||
+    raw.includes("tripomastigota");
+
+  const strongMicrofilariaEvidence =
     raw.includes("microfilaria") ||
-    raw.includes("microfilária") ||
-    hasGenericUnusualStructure;
+    raw.includes("microfilária");
 
   const intracellular =
     raw.includes("intraeritroc") ||
-    raw.includes("anel intraeritrocitario") ||
-    raw.includes("anel intraeritrocitário") ||
     raw.includes("forma anelar") ||
     raw.includes("trofozoito") ||
     raw.includes("trofozoíto") ||
@@ -527,73 +494,25 @@ function detectHemoparasitePattern(result = {}) {
     raw.includes("gametocito") ||
     raw.includes("gametócito");
 
-  const trypanosoma =
-    raw.includes("trypanosoma") ||
-    raw.includes("tripanossoma") ||
-    raw.includes("tripomastigota") ||
-    raw.includes("flagelo") ||
-    raw.includes("flagelado") ||
-    raw.includes("membrana ondulante") ||
-    raw.includes("cinetoplasto") ||
-    (
-      extracellularLong &&
-      (
-        raw.includes("curvilineo") ||
-        raw.includes("curvilíneo") ||
-        raw.includes("serpiginoso") ||
-        raw.includes("alongado") ||
-        raw.includes("flagelada") ||
-        raw.includes("flagelado")
-      )
-    );
-
-  const microfilaria =
-    raw.includes("microfilaria") ||
-    raw.includes("microfilária") ||
-    raw.includes("filaria") ||
-    raw.includes("filária") ||
-    (
-      extracellularLong &&
-      raw.includes("filamentoso") &&
-      !raw.includes("flagelo")
-    );
-
-  if (!hasParasiteSignal) {
+  if (strongTrypanosomaEvidence) {
     return {
-      suspected: false,
-      type: "NONE",
-      blockPlasmodium: false,
-      label: "",
+      suspected: true,
+      type: "TRYPANOSOMA_SUSPECT",
+      confidence: "moderate",
+      blockPlasmodium: true,
+      label:
+        "Estrutura extracelular com critérios sugestivos de hemoflagelado circulante. Requer confirmação laboratorial.",
     };
   }
 
-  if (extracellularLong) {
-    if (trypanosoma) {
-      return {
-        suspected: true,
-        type: "TRYPANOSOMA_SUSPECT",
-        blockPlasmodium: true,
-        label:
-          "Estrutura extracelular alongada/curvilínea suspeita para hemoparasita flagelado, com padrão morfológico que pode lembrar Trypanosoma spp.; não classificar como Plasmodium spp.",
-      };
-    }
-
-    if (microfilaria) {
-      return {
-        suspected: true,
-        type: "MICROFILARIA_SUSPECT",
-        blockPlasmodium: true,
-        label:
-          "Estrutura filamentosa extracelular suspeita para microfilária circulante; não classificar como Plasmodium spp.",
-      };
-    }
-
+  if (strongMicrofilariaEvidence) {
     return {
       suspected: true,
-      type: "EXTRACELLULAR_HEMOPARASITE_SUSPECT",
+      type: "MICROFILARIA_SUSPECT",
+      confidence: "moderate",
       blockPlasmodium: true,
       label:
-        "Estrutura extracelular alongada/filamentosa incomum suspeita para hemoparasita ou artefato; não classificar automaticamente como Plasmodium spp.",
+        "Estrutura filamentosa extracelular suspeita para microfilária circulante. Requer confirmação laboratorial.",
     };
   }
 
@@ -601,6 +520,7 @@ function detectHemoparasitePattern(result = {}) {
     return {
       suspected: true,
       type: "PLASMODIUM_SUSPECT",
+      confidence: "moderate",
       blockPlasmodium: false,
       label:
         "Estruturas intraeritrocitárias suspeitas para Plasmodium spp.; requer confirmação laboratorial.",
@@ -611,18 +531,19 @@ function detectHemoparasitePattern(result = {}) {
     return {
       suspected: true,
       type: "BABESIA_SUSPECT",
+      confidence: "moderate",
       blockPlasmodium: true,
       label:
-        "Estruturas intraeritrocitárias suspeitas para Babesia spp.; não classificar automaticamente como Plasmodium spp.",
+        "Estruturas intraeritrocitárias suspeitas para Babesia spp.; requer confirmação laboratorial.",
     };
   }
 
   return {
-    suspected: true,
-    type: "UNDEFINED_HEMOPARASITE_OR_ARTIFACT",
-    blockPlasmodium: true,
-    label:
-      "Estrutura incomum suspeita para hemoparasita ou artefato; imagem isolada não permite identificação definitiva.",
+    suspected: false,
+    type: "NONE",
+    confidence: "low",
+    blockPlasmodium: false,
+    label: "",
   };
 }
 
@@ -693,7 +614,7 @@ function applyLimitedFieldFinalLock(result = {}) {
           : parasite.type === "BABESIA_SUSPECT"
             ? "Babesia spp."
             : parasite.type === "TRYPANOSOMA_SUSPECT"
-              ? "Hemoflagelado suspeito / Trypanosoma-like"
+              ? "Estrutura extracelular inespecífica"
               : parasite.type === "MICROFILARIA_SUSPECT"
                 ? "Microfilária suspeita"
                 : "Hemoparasita ou artefato não definido",
@@ -6834,17 +6755,14 @@ Pergunta:
 
 ${question}
 
-
-`
-        }
+`,
+        },
       ];
-
 
       for (const file of uploadedFiles) {
 
         const base64 =
           file.buffer.toString("base64");
-
 
         content.push({
 
@@ -6854,7 +6772,6 @@ ${question}
 
             url:
               `data:${file.mimetype};base64,${base64}`,
-
           },
         });
       }
@@ -6879,7 +6796,6 @@ ${question}
           ],
         });
 
-
       const answer =
         completion
           ?.choices?.[0]
@@ -6887,51 +6803,22 @@ ${question}
           ?.content ||
         "Não foi possível gerar resposta.";
 
-      // ====================================
-      // LIMPEZA DE REPETIÇÕES EDUCACIONAIS
-      // ====================================
-
-      finalResult.associatedEducationalHypotheses = [];
-      finalResult.possibleClinicalCorrelations = [];
-      finalResult.clinicalCorrelationNeeds = [];
-
-      finalResult.hideEducationalHypotheses = true;
-      finalResult.hideClinicalCorrelations = true;
-
-      // ====================================
-
       return res.json({
 
         success: true,
-
-        analysis: finalResult,
-
-        metadata: {
-
-          model: OPENAI_MODEL,
-
-
-      return res.json({
-
-        success:
-          true,
 
         answer,
 
         attachments:
           uploadedFiles.length,
-
       });
 
-
     } catch (error) {
-
 
       console.error(
         "HEMA ASK ERROR:",
         error,
       );
-
 
       return res.status(500).json({
 
@@ -6940,7 +6827,6 @@ ${question}
 
         error:
           error.message,
-
       });
     }
   },
@@ -6973,5 +6859,5 @@ app.listen(
     console.log(
       "🚀 PIPELINE ENTERPRISE V6 SAFE HYBRID ONLINE",
     );
-  }
+  },
 );

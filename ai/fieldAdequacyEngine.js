@@ -219,7 +219,7 @@ export function applyFieldAdequacyRules(analysis = {}) {
         : "A baixa representatividade celular limita a interpretação. O campo analisado não demonstra elementos críticos inequívocos, mas também não permite conclusão global sobre normalidade hematológica.",
     differentialDiagnosis:
       fieldAdequacy.parasiteSignal || fieldAdequacy.unusualStructureSignal
-        ? "Diferenciais educacionais: hemoparasita extracelular, Trypanosoma spp., microfilária, Babesia/Plasmodium conforme padrão intraeritrocitário, ou artefato."
+        ? "Estrutura inespecífica possível; considerar artefato, precipitado de corante ou material extracelular. Não classificar automaticamente como hemoparasita sem critérios morfológicos fortes."
         : "",
     summary:
       fieldAdequacy.parasiteSignal || fieldAdequacy.unusualStructureSignal
