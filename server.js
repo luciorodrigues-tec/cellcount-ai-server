@@ -6072,6 +6072,24 @@ const limitedRecommendation =
   "Recomenda-se análise de múltiplos campos da lâmina, correlação com hemograma completo e revisão por profissional habilitado antes de qualquer conclusão diagnóstica.";
 
 const hasCriticalHematologicFinding =
+
+const rawFinalText =
+  JSON.stringify(finalResult || {})
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+
+const textSuggestsBlastPattern =
+  rawFinalText.includes("blasto") ||
+  rawFinalText.includes("blast") ||
+  rawFinalText.includes("celulas imaturas") ||
+  rawFinalText.includes("celula imatura") ||
+  rawFinalText.includes("populacao monomorfica") ||
+  rawFinalText.includes("monomorphic") ||
+  rawFinalText.includes("alta relacao nucleo") ||
+  rawFinalText.includes("relacao n/c") ||
+  rawFinalText.includes("nucleo citoplasma");
+
   finalResult.findings?.blastSuspicion === true ||
   finalResult.findings?.immatureCells === true ||
   finalResult.findings?.monomorphicPopulation === true ||
@@ -6088,7 +6106,8 @@ const blastLock =
   finalResult.findings?.blastSuspicion === true ||
   finalResult.findings?.immatureCells === true ||
   finalResult.findings?.monomorphicPopulation === true ||
-  finalResult.findings?.plasmablasts === true;
+  finalResult.findings?.plasmablasts === true ||
+  textSuggestsBlastPattern === true;
 
 if (blastLock) {
 
@@ -6113,6 +6132,28 @@ if (blastLock) {
       "Necessária revisão hematológica especializada",
     ]),
   ];
+
+  finalResult.mainFinding =
+    "População mononuclear imatura/atípica suspeita. A morfologia exige revisão hematológica especializada.";
+
+  finalResult.primaryFinding =
+    finalResult.mainFinding;
+
+  finalResult.finalConclusion =
+    finalResult.mainFinding;
+
+  finalResult.morphologyAnalysis.summary =
+    finalResult.mainFinding;
+
+  finalResult.morphologyAnalysis.overview =
+    finalResult.mainFinding;
+
+  finalResult.clinicalMeaning =
+    "Achado morfológico de alta relevância. A imagem sugere população celular imatura/atípica, não devendo ser classificada como campo limitado simples.";
+
+  finalResult.interpretiveSynthesis =
+    "Não afirmar ausência de blastos. Recomenda-se revisão microscópica profissional imediata e correlação com hemograma, contagem diferencial e, se indicado, imunofenotipagem.";
+
 }
 
 if (
