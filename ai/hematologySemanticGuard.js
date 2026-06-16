@@ -1,13 +1,30 @@
 export function sanitizeHematologyLanguage(result = {}) {
-  const findings = result.findings || {};
+  if (!result || typeof result !== "object") return result;
+
+  result.findings = result.findings || {};
+  result.morphologyAnalysis = normalizeObject(result.morphologyAnalysis);
+  result.patternRecognition = normalizeObject(result.patternRecognition);
+  result.overallAssessment = normalizeObject(result.overallAssessment);
+  result.structuredReport = normalizeObject(result.structuredReport);
+
+  const findings = result.findings;
   const visualEvidence = result.visualEvidence || {};
   const fieldAdequacy = result.fieldAdequacy || {};
+
+  const limitedField =
+    result.finalClassification === "CLASS_1_LIMITED_FIELD" ||
+    result.morphologicRiskClass === "CLASS_1_LIMITED_FIELD" ||
+    result.morphologicRiskClass === "CLASS_1_LIMITED_FIELD_ATYPICAL_CELL" ||
+    fieldAdequacy.adequateForPopulationAssessment === false ||
+    fieldAdequacy.limitedField === true;
 
   const hasPopulationSignal =
     findings.monomorphicPopulation === true ||
     findings.plasmacytoidCells === true ||
     findings.plasmablasts === true ||
-    findings.largeMononuclearCells === true;
+    findings.largeMononuclearCells === true ||
+    findings.atypicalLymphocytes === true ||
+    findings.reactiveLymphocytes === true;
 
   const hasStrongBlastEvidence =
     findings.blastSuspicion === true &&
@@ -15,21 +32,71 @@ export function sanitizeHematologyLanguage(result = {}) {
     visualEvidence.cellSizeIncrease === true &&
     fieldAdequacy.adequateForBlastScreening === true;
 
-  result.morphologyAnalysis = normalizeObject(result.morphologyAnalysis);
-  result.patternRecognition = normalizeObject(result.patternRecognition);
-  result.overallAssessment = normalizeObject(result.overallAssessment);
-  result.structuredReport = normalizeObject(result.structuredReport);
-
-  if (hasPopulationSignal) {
+  if (limitedField) {
     result.normalityBlocked = true;
+    result.requiresHumanReview = true;
+    result.morphologicRiskClass = "CLASS_1_LIMITED_FIELD";
+    result.finalClassification = "CLASS_1_LIMITED_FIELD";
+
+    result.blockNormalReason = [
+      ...new Set([
+        ...(result.blockNormalReason || []),
+        "Campo microscópico limitado",
+        "Baixa representatividade celular",
+        "Não afirmar normalidade global",
+      ]),
+    ];
 
     result.riskLevel =
-      "População mononuclear atípica / indeterminada";
+      result.findings?.parasiteSuspected === true
+        ? "Campo limitado com achado parasitário suspeito"
+        : "Classificação morfológica indeterminada";
 
-    result.morphologicRiskClass =
-      hasStrongBlastEvidence
-        ? "CLASS_4_BLAST_SUSPICION"
-        : "CLASS_2_ATYPICAL_POPULATION";
+    result.morphologyAnalysis.overview =
+      "Campo microscópico limitado para conclusão morfológica global. A baixa representatividade celular impede afirmar morfologia preservada, estado hematológico normal ou padrão populacional sustentado.";
+
+    result.morphologyAnalysis.erythrocyteReview =
+      "Avaliação eritrocitária limitada ao campo enviado. Não afirmar normocitose, normocromia ou preservação eritrocitária global pela imagem isolada.";
+
+    result.morphologyAnalysis.leukocyteReview =
+      "Poucos leucócitos maduros visíveis. Sem evidência inequívoca de blastos ou células imaturas críticas neste campo analisado.";
+
+    result.morphologyAnalysis.plateletReview =
+      "Avaliação plaquetária limitada pela representatividade do campo. Não afirmar número adequado ou preservação plaquetária global.";
+
+    result.morphologyAnalysis.summary =
+      "Campo microscópico limitado contendo poucos leucócitos maduros. Não há evidência inequívoca de blastos ou células imaturas críticas. Recomenda-se avaliação de múltiplos campos e correlação com hemograma.";
+
+    result.interpretiveSynthesis =
+      "A baixa representatividade celular limita a interpretação. O campo analisado não demonstra blastos inequívocos ou células imaturas críticas, porém não permite conclusão global sobre normalidade hematológica.";
+
+    result.clinicalMeaning =
+      "Campo limitado. A imagem isolada não permite afirmar estado hematológico normal ou morfologia preservada global. Recomenda-se correlação com hemograma completo, dados clínicos e revisão microscópica profissional.";
+
+    result.hematologicReasoning = {
+      whatISee:
+        "Campo microscópico com poucos leucócitos maduros visíveis e fundo eritrocitário predominante.",
+      whatItResembles:
+        "Campo limitado para avaliação populacional. Não há base suficiente para afirmar padrão normal, reacional ou clonal sustentado.",
+      whatICannotConfirm:
+        "Não é possível confirmar normalidade global, morfologia preservada, estado hematológico normal, clonalidade, malignidade ou diagnóstico definitivo pela imagem isolada.",
+      finalInterpretation:
+        "Campo microscópico limitado contendo poucos leucócitos maduros. Não há evidência inequívoca de blastos ou células imaturas críticas.",
+    };
+
+    result.overallAssessment.requiresHumanReview = true;
+    result.overallAssessment.riskCategory = "CLASS_1_LIMITED_FIELD";
+    result.overallAssessment.mainImpression =
+      result.morphologyAnalysis.summary;
+  }
+
+  if (hasPopulationSignal && !limitedField) {
+    result.normalityBlocked = true;
+    result.riskLevel = "População mononuclear atípica / indeterminada";
+
+    result.morphologicRiskClass = hasStrongBlastEvidence
+      ? "CLASS_4_BLAST_SUSPICION"
+      : "CLASS_2_ATYPICAL_POPULATION";
 
     result.morphologyAnalysis.overview =
       "População mononuclear atípica observada. A amostra não deve ser classificada como morfologia preservada.";
@@ -37,114 +104,71 @@ export function sanitizeHematologyLanguage(result = {}) {
     result.morphologyAnalysis.leukocyteReview =
       "Observa-se população mononuclear relativamente uniforme com características atípicas. O campo isolado não permite definir com segurança se o padrão é reacional, clonal ou imaturo.";
 
-    result.morphologyAnalysis.biologicalInterpretation =
-      "O achado indica alteração morfológica leucocitária relevante, exigindo correlação com hemograma completo, avaliação de múltiplos campos da lâmina e revisão microscópica profissional.";
-
-    result.morphologyAnalysis.differentialDiagnosis =
-      "Hipóteses educacionais amplas: população linfoide reacional exuberante, população linfoplasmocitoide/plasmocitoide, processo hematológico clonal ou artefato de campo. A imagem isolada não permite diagnóstico definitivo.";
-
     result.morphologyAnalysis.summary =
       "População mononuclear atípica observada. Recomenda-se correlação hematológica especializada.";
-
-    result.patternRecognition.leukocytePattern =
-      "População mononuclear atípica";
-
-    result.patternRecognition.overallPattern =
-      "Campo com população mononuclear atípica, sem conclusão diagnóstica definitiva.";
-
-    result.interpretiveSynthesis =
-      "A imagem demonstra população mononuclear relativamente uniforme com aspecto atípico. Esse padrão não deve ser descrito como célula isolada nem como morfologia preservada. A interpretação deve permanecer conservadora: há alteração morfológica relevante, porém a imagem isolada não permite definir linhagem, clonalidade ou imaturidade de forma conclusiva.";
-
-    result.clinicalMeaning =
-      "A presença de população mononuclear atípica pode ter diferentes significados hematológicos e não deve ser interpretada isoladamente como diagnóstico. O achado requer correlação com hemograma completo, diferencial leucocitário, contexto clínico e revisão microscópica profissional. Citometria de fluxo ou outros exames podem ser considerados conforme indicação clínica.";
-
-    result.hematologicReasoning =
-      "O raciocínio hematológico diferencia uma população mononuclear atípica de uma célula reacional isolada. Neste campo há múltiplas células com semelhança morfológica, o que impede classificar o achado como evento focal isolado. Ao mesmo tempo, a imagem não confirma blastos inequívocos nem natureza neoplásica. A conclusão adequada é população atípica indeterminada com necessidade de correlação.";
 
     result.overallAssessment.requiresHumanReview = true;
     result.overallAssessment.riskCategory = result.morphologicRiskClass;
     result.overallAssessment.mainImpression =
-      "População mononuclear atípica observada em campo limitado. O achado impede classificação como morfologia preservada e requer correlação com hemograma completo, múltiplos campos da lâmina e revisão profissional.";
-
-    result.structuredReport.leukocyteFindings =
-      "População mononuclear atípica observada.";
-    result.structuredReport.blastSuspicion =
-      hasStrongBlastEvidence;
-    result.structuredReport.recommendation =
-      "Correlacionar com hemograma completo, revisão microscópica profissional e exames complementares conforme contexto clínico.";
+      "População mononuclear atípica observada. Requer correlação com hemograma completo, múltiplos campos da lâmina e revisão profissional.";
   }
 
   if (!hasStrongBlastEvidence) {
     findings.blastSuspicion = false;
 
     if (result.morphologicRiskClass === "CLASS_4_BLAST_SUSPICION") {
-      result.morphologicRiskClass =
-        hasPopulationSignal
-          ? "CLASS_2_ATYPICAL_POPULATION"
-          : "CLASS_1_LIMITED_FIELD_ATYPICAL_CELL";
+      result.morphologicRiskClass = hasPopulationSignal
+        ? "CLASS_2_ATYPICAL_POPULATION"
+        : "CLASS_1_LIMITED_FIELD";
     }
   }
 
   result.findings = findings;
 
-  replaceEverywhere(
-    result,
-    [
-      "célula mononuclear isolada",
-      "celula mononuclear isolada",
-      "achado mononuclear isolado",
-    ],
-    hasPopulationSignal
-      ? "população mononuclear atípica"
-      : "possível reatividade celular isolada",
-  );
-
-  replaceEverywhere(
-    result,
-    [
-      "possível atipia/reatividade",
-      "possível reatividade/reatividade",
-      "possível padrão reacional/atípico",
-    ],
-    hasPopulationSignal
-      ? "padrão mononuclear atípico"
-      : "possível reatividade celular isolada",
-  );
+  scrubUnsafeNormalLanguage(result, limitedField || hasPopulationSignal);
 
   return result;
 }
 
 function normalizeObject(value) {
-  if (
-    value &&
-    typeof value === "object" &&
-    !Array.isArray(value)
-  ) {
+  if (value && typeof value === "object" && !Array.isArray(value)) {
     return value;
   }
 
   return {};
 }
 
-function replaceEverywhere(obj, searchTerms, replacement) {
-  if (!obj || typeof obj !== "object") return;
+function scrubUnsafeNormalLanguage(obj, shouldScrub = true) {
+  if (!shouldScrub || !obj || typeof obj !== "object") return;
 
-  Object.keys(obj).forEach((key) => {
+  const replacements = [
+    [/estado hematológico normal/gi, "estado hematológico global não confirmado"],
+    [/padrão hematológico normal/gi, "padrão hematológico global não confirmado"],
+    [/esfregaço sanguíneo normal/gi, "campo microscópico sem elementos críticos inequívocos"],
+    [/morfologia normal/gi, "morfologia global não confirmada"],
+    [/morfologia preservada/gi, "morfologia global não confirmada"],
+    [/sem alterações patológicas significativas/gi, "sem elementos críticos inequívocos neste campo"],
+    [/eritrócitos normocíticos e normocrômicos/gi, "hemácias visíveis sem avaliação global conclusiva"],
+    [/normocítico e normocrômico/gi, "avaliação eritrocitária global limitada"],
+    [/normocíticos e normocrômicos/gi, "sem base para afirmar normocitose/normocromia global"],
+    [/plaquetas em quantidade adequada/gi, "plaquetas visíveis com avaliação quantitativa limitada"],
+    [/plaquetas normais/gi, "avaliação plaquetária global limitada"],
+    [/avaliação confiável/gi, "avaliação limitada ao campo enviado"],
+  ];
+
+  for (const key of Object.keys(obj)) {
     const value = obj[key];
 
     if (typeof value === "string") {
       let text = value;
 
-      for (const term of searchTerms) {
-        text = text.replace(
-          new RegExp(term, "gi"),
-          replacement,
-        );
+      for (const [pattern, replacement] of replacements) {
+        text = text.replace(pattern, replacement);
       }
 
       obj[key] = text;
-    } else if (typeof value === "object") {
-      replaceEverywhere(value, searchTerms, replacement);
+    } else if (value && typeof value === "object") {
+      scrubUnsafeNormalLanguage(value, shouldScrub);
     }
-  });
+  }
 }

@@ -645,71 +645,69 @@ function applyLimitedFieldFinalLock(result = {}) {
     confidenceAnalysis: { ...(result.confidenceAnalysis || {}) },
   };
 
-  if (isLimited) {
-    locked.finalClassification = "CLASS_1_LIMITED_FIELD";
-    locked.morphologicRiskClass = "CLASS_1_LIMITED_FIELD";
-    locked.riskLevel = "Campo limitado";
-    locked.normalityBlocked = true;
-    locked.requiresHumanReview = true;
+  locked.normalityBlocked = true;
+  locked.requiresHumanReview = true;
 
-    locked.blockNormalReason = [
-      ...new Set([
-        ...(Array.isArray(locked.blockNormalReason)
-          ? locked.blockNormalReason
-          : []),
-        "Campo microscópico limitado",
-        "Baixa representatividade celular",
-        "Não afirmar normalidade global pela imagem isolada",
-      ]),
-    ];
-  }
+  locked.blockNormalReason = [
+    ...new Set([
+      ...(Array.isArray(locked.blockNormalReason) ? locked.blockNormalReason : []),
+      ...(isLimited
+        ? [
+            "Campo microscópico limitado",
+            "Baixa representatividade celular",
+            "Não afirmar normalidade global pela imagem isolada",
+          ]
+        : []),
+      ...(parasite.suspected
+        ? [
+            "Estrutura incomum suspeita para hemoparasita ou artefato",
+            "Não afirmar normalidade global diante de estrutura parasitária suspeita",
+          ]
+        : []),
+    ]),
+  ];
 
   if (parasite.suspected) {
     locked.finalClassification = isLimited
-      ? "CLASS_1_LIMITED_FIELD"
-      : locked.finalClassification || "CLASS_2_UNUSUAL_STRUCTURE";
+      ? "CLASS_1_LIMITED_FIELD_HEMOPARASITE_SUSPECT"
+      : "CLASS_2_UNUSUAL_HEMOPARASITE_STRUCTURE";
 
-    locked.morphologicRiskClass = isLimited
-      ? "CLASS_1_LIMITED_FIELD"
-      : "CLASS_2_UNUSUAL_STRUCTURE";
-
-    locked.riskLevel = "Achado parasitário/estrutura incomum suspeita";
-    locked.normalityBlocked = true;
-    locked.requiresHumanReview = true;
-
-    locked.blockNormalReason = [
-      ...new Set([
-        ...(Array.isArray(locked.blockNormalReason)
-          ? locked.blockNormalReason
-          : []),
-        "Estrutura incomum suspeita para hemoparasita ou artefato",
-        "Não afirmar normalidade global diante de estrutura extracelular/intraeritrocitária suspeita",
-      ]),
-    ];
+    locked.morphologicRiskClass = locked.finalClassification;
+    locked.riskLevel = "Estrutura hemoparasitária suspeita";
+    locked.mainFinding = parasite.label;
+    locked.primaryFinding = parasite.label;
+    locked.finalConclusion = parasite.label;
 
     locked.findings.parasiteSuspected = true;
+    locked.findings.unusualStructureSuspected = true;
     locked.findings.parasiteType = parasite.type;
     locked.findings.blockPlasmodiumDiagnosis = parasite.blockPlasmodium;
-    locked.findings.plasmodiumSuspected =
-      parasite.type === "PLASMODIUM_SUSPECT";
+    locked.findings.plasmodiumSuspected = parasite.type === "PLASMODIUM_SUSPECT";
 
     locked.parasiteAnalysis = {
       suspected: true,
       parasiteType: parasite.type,
+      parasiteName:
+        parasite.type === "PLASMODIUM_SUSPECT"
+          ? "Plasmodium spp."
+          : parasite.type === "BABESIA_SUSPECT"
+            ? "Babesia spp."
+            : parasite.type === "TRYPANOSOMA_SUSPECT"
+              ? "Hemoflagelado suspeito / Trypanosoma-like"
+              : parasite.type === "MICROFILARIA_SUSPECT"
+                ? "Microfilária suspeita"
+                : "Hemoparasita ou artefato não definido",
       blockPlasmodiumDiagnosis: parasite.blockPlasmodium,
       interpretation: parasite.blockPlasmodium
         ? "Há estrutura incomum/hemoparasitária suspeita, porém o padrão não sustenta classificação automática como Plasmodium spp."
         : "Há estruturas intraeritrocitárias suspeitas para Plasmodium spp.; requer confirmação laboratorial.",
       recommendation:
-        "Confirmar por revisão microscópica profissional, avaliação de múltiplos campos, gota espessa/esfregaço seriado e testes complementares conforme protocolo.",
+        "Confirmar por revisão microscópica profissional, avaliação de múltiplos campos, gota espessa/esfregaço seriado e métodos complementares conforme protocolo.",
     };
-
-    locked.mainFinding = parasite.label;
-    locked.primaryFinding = parasite.label;
 
     locked.morphologyAnalysis.summary = parasite.label;
     locked.morphologyAnalysis.overview =
-      "Campo microscópico com estrutura incomum suspeita. A imagem isolada não permite diagnóstico definitivo, identificação de espécie ou quantificação.";
+      "Campo microscópico com estrutura hemoparasitária/extracelular incomum suspeita. A imagem isolada não permite diagnóstico definitivo, identificação de espécie ou quantificação.";
     locked.morphologyAnalysis.erythrocyteReview =
       "Hemácias visíveis no campo, com avaliação global limitada. A presença de estrutura incomum exige exclusão de hemoparasita ou artefato.";
     locked.morphologyAnalysis.leukocyteReview =
@@ -717,7 +715,7 @@ function applyLimitedFieldFinalLock(result = {}) {
     locked.morphologyAnalysis.plateletReview =
       "Plaquetas podem ser visualizadas, porém a avaliação quantitativa global permanece limitada pela imagem isolada.";
     locked.morphologyAnalysis.biologicalInterpretation =
-      "Achado parasitário/estrutura incomum suspeita em imagem isolada. A interpretação deve permanecer educacional e dependente de confirmação microscópica.";
+      "Achado hemoparasitário/estrutura incomum suspeita. A interpretação deve permanecer educacional e dependente de confirmação microscópica.";
     locked.morphologyAnalysis.differentialDiagnosis =
       "Diferenciais educacionais: hemoparasita extracelular, Trypanosoma spp., microfilária, Babesia/Plasmodium conforme padrão intraeritrocitário, ou artefato de lâmina/corante.";
 
@@ -729,9 +727,9 @@ function applyLimitedFieldFinalLock(result = {}) {
       `Observa-se campo microscópico limitado, com hemácias ao fundo e poucos leucócitos maduros. ${parasite.label}. Não há blastos inequívocos neste campo. A interpretação requer avaliação de múltiplos campos e confirmação laboratorial.`;
 
     locked.patternRecognition.overallPattern =
-      "Estrutura incomum/hemoparasita suspeito em campo limitado";
+      "Estrutura hemoparasitária suspeita em campo limitado";
     locked.patternRecognition.artifactPattern =
-      "Artefato deve permanecer no diferencial até confirmação microscópica.";
+      "Artefato permanece no diferencial até confirmação microscópica.";
 
     locked.clinicalMeaning =
       "Achado suspeito para hemoparasita ou estrutura incomum. A imagem isolada não permite diagnóstico definitivo, identificação de espécie, parasitemia ou gravidade. Requer confirmação laboratorial e revisão microscópica profissional.";
@@ -740,10 +738,9 @@ function applyLimitedFieldFinalLock(result = {}) {
       `${parasite.label}. A confirmação exige correlação clínico-laboratorial, revisão parasitológica adequada e avaliação de múltiplos campos.`;
 
     locked.hematologicReasoning = {
-      whatISee:
-        parasite.label,
+      whatISee: parasite.label,
       whatItResembles:
-        "Estrutura incomum extracelular/intraeritrocitária que pode representar hemoparasita ou artefato.",
+        "Estrutura extracelular/intraeritrocitária incomum que pode representar hemoparasita ou artefato.",
       whatICannotConfirm:
         "Não é possível confirmar espécie, parasitemia, gravidade, origem artefatual ou diagnóstico definitivo apenas pela imagem.",
       finalInterpretation:
@@ -766,57 +763,30 @@ function applyLimitedFieldFinalLock(result = {}) {
     );
 
     locked.confidenceAnalysis.summary =
-      "Campo com estrutura incomum/hemoparasitária suspeita. A confiança global não deve ser interpretada como normalidade hematológica.";
+      "Campo com estrutura hemoparasitária suspeita. A confiança global não deve ser interpretada como normalidade hematológica.";
 
     return locked;
   }
+
+  locked.finalClassification = "CLASS_1_LIMITED_FIELD";
+  locked.morphologicRiskClass = "CLASS_1_LIMITED_FIELD";
+  locked.riskLevel = "Campo limitado";
 
   locked.mainFinding =
     "Campo microscópico limitado contendo poucos leucócitos maduros. Não há evidência inequívoca de blastos ou células imaturas críticas.";
 
   locked.primaryFinding = locked.mainFinding;
+  locked.finalConclusion = locked.mainFinding;
 
   locked.morphologyAnalysis.summary = locked.mainFinding;
-
   locked.morphologyAnalysis.overview =
     "Campo microscópico limitado para conclusão morfológica global. A baixa representatividade celular impede afirmar morfologia preservada, estado hematológico normal ou padrão populacional sustentado.";
-
-  locked.morphologyAnalysis.erythrocyteReview =
-    "Hemácias visíveis no campo, porém a imagem isolada não permite afirmar normocitose, normocromia ou preservação eritrocitária global.";
-
-  locked.morphologyAnalysis.leukocyteReview =
-    "Poucos leucócitos maduros visíveis. Não há evidência inequívoca de blastos ou células imaturas críticas neste campo analisado.";
-
-  locked.morphologyAnalysis.plateletReview =
-    "Plaquetas podem ser visualizadas no campo, porém a imagem isolada não permite afirmar número adequado, preservação global ou ausência de alteração plaquetária.";
-
-  locked.morphologyAnalysis.biologicalInterpretation =
-    "A baixa representatividade celular limita a interpretação. O campo analisado não demonstra elementos críticos inequívocos, mas também não permite conclusão global sobre normalidade hematológica.";
-
-  locked.morphologyAnalysis.differentialDiagnosis = "";
-
-  locked.patternRecognition.erythrocytePattern = "Avaliação limitada";
-  locked.patternRecognition.leukocytePattern =
-    "Baixa representatividade leucocitária";
-  locked.patternRecognition.plateletPattern = "Avaliação limitada";
-  locked.patternRecognition.overallPattern =
-    "Campo limitado para conclusão populacional";
 
   locked.clinicalMeaning =
     "Campo limitado. A imagem isolada não permite afirmar estado hematológico normal ou morfologia preservada global. Recomenda-se correlação com hemograma completo, dados clínicos e revisão microscópica profissional.";
 
   locked.interpretiveSynthesis =
     "A baixa representatividade celular limita a interpretação. O campo analisado não demonstra blastos inequívocos ou células imaturas críticas, porém não permite conclusão global sobre normalidade hematológica.";
-
-  locked.hematologicReasoning = {
-    whatISee:
-      "Campo microscópico com poucos leucócitos maduros visíveis e fundo eritrocitário predominante.",
-    whatItResembles:
-      "Campo limitado para avaliação populacional.",
-    whatICannotConfirm:
-      "Não é possível confirmar normalidade global, morfologia preservada, estado hematológico normal, clonalidade, malignidade ou diagnóstico definitivo pela imagem isolada.",
-    finalInterpretation: locked.mainFinding,
-  };
 
   locked.overallAssessment.requiresHumanReview = true;
   locked.overallAssessment.riskCategory = "CLASS_1_LIMITED_FIELD";
@@ -6398,33 +6368,47 @@ console.log(
 );
 console.log("================================");
 
-      return res.json({
+finalResult.hideEducationalHypotheses = true;
+finalResult.hideClinicalCorrelations = true;
 
-        success: true,
+finalResult.associatedEducationalHypotheses = [];
+finalResult.possibleClinicalCorrelations = [];
+finalResult.clinicalCorrelationNeeds = [];
 
-        analysis:
-          finalResult,
+finalResult.associatedEducationalHypotheses = [];
+finalResult.possibleClinicalCorrelations = [];
+finalResult.clinicalCorrelationNeeds = [];
 
-        metadata: {
+finalResult.hideEducationalHypotheses = true;
+finalResult.hideClinicalCorrelations = true;
 
-          model:
-            OPENAI_MODEL,
+return res.json({
 
-          timestamp:
-            new Date()
-              .toISOString(),
+  success: true,
 
-          images:
-            uploadedFiles.length,
+  analysis:
+    finalResult,
 
-          userId,
+  metadata: {
 
-          totalUses:
-            data.totalUses,
+    model:
+      OPENAI_MODEL,
 
-          analysisSource,
-        },
-      });
+    timestamp:
+      new Date()
+        .toISOString(),
+
+    images:
+      uploadedFiles.length,
+
+    userId,
+
+    totalUses:
+      data.totalUses,
+
+    analysisSource,
+  },
+});
 
     } catch (error) {
 
