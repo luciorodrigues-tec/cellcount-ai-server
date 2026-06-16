@@ -6066,17 +6066,105 @@ const isLimitedFieldFinal =
   finalResult.fieldAdequacy?.limitedField === true;
 
 const limitedConclusion =
-  "Campo microscópico limitado contendo poucos leucócitos maduros. Não há evidência inequívoca de blastos ou células imaturas críticas.";
+  "Campo microscópico limitado e insuficiente para avaliação populacional confiável. A ausência de alterações críticas não pode ser afirmada com segurança a partir deste campo isolado.";
 
 const limitedRecommendation =
-  "Recomenda-se avaliação de múltiplos campos da lâmina, correlação com hemograma completo e revisão microscópica profissional.";
+  "Recomenda-se análise de múltiplos campos da lâmina, correlação com hemograma completo e revisão por profissional habilitado antes de qualquer conclusão diagnóstica.";
 
-if (isLimitedFieldFinal && finalResult.findings?.parasiteSuspected !== true) {
+const hasCriticalHematologicFinding =
+  finalResult.findings?.blastSuspicion === true ||
+  finalResult.findings?.immatureCells === true ||
+  finalResult.findings?.monomorphicPopulation === true ||
+  finalResult.findings?.plasmablasts === true ||
+  finalResult.findings?.largeMononuclearCells === true ||
+  finalResult.findings?.atypicalLymphocytes === true ||
+  finalResult.findings?.parasiteSuspected === true;
+
+// =====================================================
+// BLAST SAFETY LOCK
+// =====================================================
+
+const blastLock =
+  finalResult.findings?.blastSuspicion === true ||
+  finalResult.findings?.immatureCells === true ||
+  finalResult.findings?.monomorphicPopulation === true ||
+  finalResult.findings?.plasmablasts === true;
+
+if (blastLock) {
+
+  finalResult.normalityBlocked = true;
+  finalResult.requiresHumanReview = true;
+
+  finalResult.finalClassification =
+    "CLASS_4_BLAST_SUSPICION";
+
+  finalResult.morphologicRiskClass =
+    "CLASS_4_BLAST_SUSPICION";
+
+  finalResult.riskLevel =
+    "Suspeita de população imatura/blástica";
+
+  finalResult.blockNormalReason = [
+    ...new Set([
+      ...(Array.isArray(finalResult.blockNormalReason)
+        ? finalResult.blockNormalReason
+        : []),
+      "Suspeita de células imaturas/blásticas",
+      "Necessária revisão hematológica especializada",
+    ]),
+  ];
+}
+
+if (
+  isLimitedFieldFinal &&
+  !hasCriticalHematologicFinding
+) {
+
   finalResult.finalClassification = "CLASS_1_LIMITED_FIELD";
   finalResult.morphologicRiskClass = "CLASS_1_LIMITED_FIELD";
   finalResult.riskLevel = "Campo limitado";
   finalResult.normalityBlocked = true;
   finalResult.requiresHumanReview = true;
+
+  // =====================================================
+  // HOSPITAL PREMIUM CLEANUP
+  // =====================================================
+
+  finalResult.showRadar = false;
+  finalResult.hideAISeeingCard = true;
+  finalResult.hideEducationalHypotheses = true;
+  finalResult.hideClinicalCorrelations = true;
+  finalResult.hideDifferentialDiagnosis = true;
+  finalResult.hidePopulationAnalysis = true;
+
+  finalResult.riskLevel =
+    "Não aplicável (campo limitado)";
+
+  finalResult.confidenceAnalysis =
+    finalResult.confidenceAnalysis || {};
+
+  finalResult.confidenceAnalysis.globalConfidenceScore =
+    Math.min(
+      Number(
+        finalResult.confidenceAnalysis
+          .globalConfidenceScore || 35
+      ),
+      35,
+    );
+
+  finalResult.confidenceAnalysis.summary =
+    "Campo microscópico limitado. A confiança global não deve ser interpretada como normalidade hematológica.";
+
+  finalResult.whatAISees =
+    finalResult.whatAISees || {};
+
+  finalResult.whatAISees.unusualStructures = "";
+
+  finalResult.associatedEducationalHypotheses = [];
+  finalResult.possibleClinicalCorrelations = [];
+  finalResult.clinicalCorrelationNeeds = [];
+
+  // =====================================================
 
   finalResult.blockNormalReason = [
     ...new Set([
