@@ -553,6 +553,95 @@ function applyLimitedFieldFinalLock(result = {}) {
   const parasite = detectHemoparasitePattern(result);
   const isLimited = isLimitedFieldResult(result);
 
+    const rawPositiveFindings =
+      result.rawResponse?.positiveFindings || {};
+
+    const hasCriticalBlastFinding =
+      result.findings?.blastSuspicion === true ||
+      result.findings?.immatureCells === true ||
+      result.findings?.monomorphicPopulation === true ||
+      result.findings?.plasmablasts === true ||
+      rawPositiveFindings.blastSuspicion === true ||
+      rawPositiveFindings.immatureCells === true ||
+      rawPositiveFindings.monomorphicPopulation === true ||
+      result.rawResponse?.blastSuspicion === true;
+
+    if (hasCriticalBlastFinding) {
+      const locked = {
+        ...result,
+        findings: { ...(result.findings || {}) },
+        morphologyAnalysis: { ...(result.morphologyAnalysis || {}) },
+        whatAISees: { ...(result.whatAISees || {}) },
+        structuredReport: { ...(result.structuredReport || {}) },
+        overallAssessment: { ...(result.overallAssessment || {}) },
+        confidenceAnalysis: { ...(result.confidenceAnalysis || {}) },
+      };
+
+      locked.findings.blastSuspicion = true;
+      locked.findings.immatureCells =
+        locked.findings.immatureCells === true ||
+        rawPositiveFindings.immatureCells === true;
+
+      locked.findings.monomorphicPopulation =
+        locked.findings.monomorphicPopulation === true ||
+        rawPositiveFindings.monomorphicPopulation === true;
+
+      locked.normalityBlocked = true;
+      locked.requiresHumanReview = true;
+      locked.finalClassification = "CLASS_4_BLAST_SUSPICION";
+      locked.morphologicRiskClass = "CLASS_4_BLAST_SUSPICION";
+      locked.riskLevel = "Suspeita de população imatura/blástica";
+
+      locked.blockNormalReason = [
+        ...new Set([
+          ...(Array.isArray(locked.blockNormalReason)
+            ? locked.blockNormalReason
+            : []),
+          "Suspeita de células imaturas/blásticas",
+          "Não classificar como campo limitado simples",
+          "Necessária revisão hematológica especializada",
+        ]),
+      ];
+
+      const blastConclusion =
+        "População mononuclear imatura/atípica suspeita. Não classificar como campo limitado simples. Requer revisão hematológica especializada.";
+
+      locked.mainFinding = blastConclusion;
+      locked.primaryFinding = blastConclusion;
+      locked.finalConclusion = blastConclusion;
+
+      locked.morphologyAnalysis.summary = blastConclusion;
+      locked.morphologyAnalysis.overview =
+        "Campo com predomínio de células mononucleares grandes/atípicas, com suspeita de população imatura/blástica.";
+      locked.morphologyAnalysis.leukocyteReview =
+        "Presença de células mononucleares grandes/atípicas. A hipótese de população imatura/blástica não deve ser descartada pela imagem isolada.";
+      locked.morphologyAnalysis.absentFindings =
+        "Bastonetes de Auer não claramente identificados; ausência global de blastos não pode ser afirmada.";
+
+      locked.whatAISees.leukocytes =
+        "Células mononucleares grandes/atípicas com suspeita de imaturidade.";
+      locked.whatAISees.dominantFinding =
+        "População mononuclear imatura/atípica suspeita.";
+      locked.whatAISees.negativeFindings =
+        "Não afirmar ausência global de blastos pela imagem isolada.";
+
+      locked.clinicalMeaning =
+        "Achado morfológico crítico. Requer correlação com hemograma, revisão microscópica profissional e, se indicado, imunofenotipagem.";
+      locked.interpretiveSynthesis =
+        "Não afirmar ausência de blastos. A imagem contém achados compatíveis com população celular imatura/atípica.";
+
+      locked.structuredReport.conclusion = blastConclusion;
+      locked.structuredReport.hematologicMeaning = locked.clinicalMeaning;
+      locked.structuredReport.recommendation =
+        "Revisão hematológica especializada, hemograma completo e imunofenotipagem se indicada.";
+
+      locked.overallAssessment.requiresHumanReview = true;
+      locked.overallAssessment.riskCategory = "CLASS_4_BLAST_SUSPICION";
+      locked.overallAssessment.mainImpression = blastConclusion;
+
+      return locked;
+    }
+
   if (!isLimited && !parasite.suspected) return result;
 
   const locked = {
