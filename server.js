@@ -6043,6 +6043,79 @@ if (isAtypicalPopulation) {
 
 let finalResult = validation.result;
 
+// =====================================================
+// RAW GPT CRITICAL FINDINGS RESTORE
+// impede normalização apagar achados críticos
+// =====================================================
+
+const rawPositiveFindings =
+  finalResult.rawResponse?.positiveFindings || {};
+
+const rawBlastSuspicion =
+  rawPositiveFindings.blastSuspicion === true ||
+  finalResult.rawResponse?.blastSuspicion === true;
+
+const rawImmatureCells =
+  rawPositiveFindings.immatureCells === true;
+
+const rawMonomorphicPopulation =
+  rawPositiveFindings.monomorphicPopulation === true;
+
+const rawLargeMononuclearCells =
+  rawPositiveFindings.largeMononuclearCells === true;
+
+const rawAtypicalLymphocytes =
+  rawPositiveFindings.atypicalLymphocytes === true;
+
+if (
+  rawBlastSuspicion ||
+  rawImmatureCells ||
+  rawMonomorphicPopulation ||
+  rawLargeMononuclearCells
+) {
+  finalResult.findings = finalResult.findings || {};
+
+  finalResult.findings.blastSuspicion = true;
+  finalResult.findings.immatureCells =
+    rawImmatureCells || finalResult.findings.immatureCells === true;
+  finalResult.findings.monomorphicPopulation =
+    rawMonomorphicPopulation || finalResult.findings.monomorphicPopulation === true;
+  finalResult.findings.largeMononuclearCells =
+    rawLargeMononuclearCells || finalResult.findings.largeMononuclearCells === true;
+  finalResult.findings.atypicalLymphocytes =
+    rawAtypicalLymphocytes || finalResult.findings.atypicalLymphocytes === true;
+
+  finalResult.normalityBlocked = true;
+  finalResult.requiresHumanReview = true;
+
+  finalResult.finalClassification = "CLASS_4_BLAST_SUSPICION";
+  finalResult.morphologicRiskClass = "CLASS_4_BLAST_SUSPICION";
+  finalResult.riskLevel = "Suspeita de população imatura/blástica";
+
+  finalResult.mainFinding =
+    "População mononuclear imatura/atípica suspeita. Não classificar como campo limitado simples.";
+
+  finalResult.primaryFinding = finalResult.mainFinding;
+  finalResult.finalConclusion = finalResult.mainFinding;
+
+  finalResult.morphologyAnalysis = finalResult.morphologyAnalysis || {};
+  finalResult.morphologyAnalysis.summary = finalResult.mainFinding;
+  finalResult.morphologyAnalysis.overview =
+    "Campo com células mononucleares grandes/atípicas, com suspeita de população imatura/blástica. Requer revisão hematológica especializada.";
+
+  finalResult.morphologyAnalysis.leukocyteReview =
+    "Presença de células mononucleares grandes/atípicas. A hipótese de população imatura/blástica não deve ser descartada pela imagem isolada.";
+
+  finalResult.morphologyAnalysis.absentFindings =
+    "Bastonetes de Auer não claramente identificados; ausência global de blastos não pode ser afirmada.";
+
+  finalResult.clinicalMeaning =
+    "Achado morfológico crítico. Requer correlação com hemograma, revisão microscópica profissional e, se indicado, imunofenotipagem.";
+
+  finalResult.interpretiveSynthesis =
+    "Não afirmar ausência de blastos. A imagem contém achados compatíveis com população celular imatura/atípica.";
+}
+
 finalResult.findings = finalResult.findings || {};
 finalResult.morphologyAnalysis = finalResult.morphologyAnalysis || {};
 finalResult.whatAISees = finalResult.whatAISees || {};
@@ -6079,7 +6152,7 @@ const hasCriticalHematologicFinding =
   finalResult.findings?.largeMononuclearCells === true ||
   finalResult.findings?.atypicalLymphocytes === true ||
   finalResult.findings?.parasiteSuspected === true;
-  
+
 const rawFinalText =
   JSON.stringify(finalResult || {})
     .toLowerCase()
