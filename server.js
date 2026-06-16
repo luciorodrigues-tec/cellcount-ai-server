@@ -6072,7 +6072,14 @@ const limitedRecommendation =
   "Recomenda-se análise de múltiplos campos da lâmina, correlação com hemograma completo e revisão por profissional habilitado antes de qualquer conclusão diagnóstica.";
 
 const hasCriticalHematologicFinding =
-
+  finalResult.findings?.blastSuspicion === true ||
+  finalResult.findings?.immatureCells === true ||
+  finalResult.findings?.monomorphicPopulation === true ||
+  finalResult.findings?.plasmablasts === true ||
+  finalResult.findings?.largeMononuclearCells === true ||
+  finalResult.findings?.atypicalLymphocytes === true ||
+  finalResult.findings?.parasiteSuspected === true;
+  
 const rawFinalText =
   JSON.stringify(finalResult || {})
     .toLowerCase()
@@ -6090,13 +6097,7 @@ const textSuggestsBlastPattern =
   rawFinalText.includes("relacao n/c") ||
   rawFinalText.includes("nucleo citoplasma");
 
-  finalResult.findings?.blastSuspicion === true ||
-  finalResult.findings?.immatureCells === true ||
-  finalResult.findings?.monomorphicPopulation === true ||
-  finalResult.findings?.plasmablasts === true ||
-  finalResult.findings?.largeMononuclearCells === true ||
-  finalResult.findings?.atypicalLymphocytes === true ||
-  finalResult.findings?.parasiteSuspected === true;
+
 
 // =====================================================
 // BLAST SAFETY LOCK
