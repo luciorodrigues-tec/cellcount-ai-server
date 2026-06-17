@@ -4,6 +4,9 @@ function validateConsistency(result = {}) {
   result.criticalFlags = Array.isArray(result.criticalFlags)
     ? result.criticalFlags
     : [];
+  result.blockNormalReason = Array.isArray(result.blockNormalReason)
+    ? result.blockNormalReason
+    : [];
 
   const f = result.findings;
 
@@ -13,157 +16,73 @@ function validateConsistency(result = {}) {
     Boolean(f.plasmocytes) ||
     Boolean(f.plasmablasts) ||
     Boolean(f.atypicalLymphocytes) ||
+    Boolean(f.reactiveLymphocytes) ||
+    Boolean(f.downeyLikeCells) ||
+    Boolean(f.mononucleosisSuspicion) ||
     Boolean(f.monomorphicPopulation) ||
     Boolean(f.immatureCells) ||
     Boolean(f.blastSuspicion);
 
-  if (hasAtypia) {
-    result.normalityBlocked = true;
+  if (!hasAtypia) {
+    return result;
+  }
 
-    result.blockNormalReason = Array.isArray(result.blockNormalReason)
-      ? result.blockNormalReason
-      : [];
+  result.normalityBlocked = true;
+  result.overallAssessment.requiresHumanReview = true;
 
-    if (f.largeMononuclearCells) {
-      result.blockNormalReason.push("Células mononucleares grandes");
-    }
+  if (f.largeMononuclearCells) {
+    result.blockNormalReason.push("Células mononucleares grandes");
+  }
 
-    if (f.plasmacytoidCells) {
-      result.blockNormalReason.push("Células plasmocitoides");
-    }
+  if (f.reactiveLymphocytes) {
+    result.blockNormalReason.push("Linfócitos reativos");
+  }
 
-    if (f.plasmocytes) {
-      result.blockNormalReason.push("Plasmócitos visíveis");
-    }
+  if (f.atypicalLymphocytes) {
+    result.blockNormalReason.push("Linfócitos atípicos");
+  }
 
-    if (f.plasmablasts) {
-      result.blockNormalReason.push("Plasmoblastos suspeitos");
-    }
+  if (f.downeyLikeCells || f.mononucleosisSuspicion) {
+    result.blockNormalReason.push("Padrão linfoide reacional/Downey");
+  }
 
-    if (f.atypicalLymphocytes) {
-      result.blockNormalReason.push("Linfócitos atípicos");
-    }
+  if (f.plasmacytoidCells) {
+    result.blockNormalReason.push("Células plasmocitoides");
+  }
 
-    if (f.monomorphicPopulation) {
-      result.blockNormalReason.push("População monomórfica");
-    }
+  if (f.plasmocytes) {
+    result.blockNormalReason.push("Plasmócitos visíveis");
+  }
 
-    if (f.immatureCells) {
-      result.blockNormalReason.push("Células imaturas");
-    }
+  if (f.plasmablasts) {
+    result.blockNormalReason.push("Plasmoblastos suspeitos");
+  }
 
-    if (f.blastSuspicion) {
-      result.blockNormalReason.push("Suspeita blástica");
-    }
+  if (f.monomorphicPopulation) {
+    result.blockNormalReason.push("População monomórfica");
+  }
 
-    if (f.monomorphicPopulation) {
-      result.normalityBlocked = true;
+  if (f.immatureCells) {
+    result.blockNormalReason.push("Células imaturas");
+  }
 
-      result.overallAssessment.requiresHumanReview = true;
+  if (f.blastSuspicion) {
+    result.blockNormalReason.push("Suspeita blástica");
+  }
 
-      result.blockNormalReason.push(
-        "Monomorfismo celular"
-      );
-    }
-
-    result.blockNormalReason = [...new Set(result.blockNormalReason)];
-
-    result.overallAssessment.requiresHumanReview = true;
-
-    if (
-      !result.morphologicRiskClass ||
-      result.morphologicRiskClass === "CLASS_0_NORMAL"
-    ) {
-      result.morphologicRiskClass = "CLASS_2_ATYPICAL_POPULATION";
-    }
-
-    result.overallAssessment.safetyMessage =
-      "Há achados morfológicos que impedem classificação como normalidade morfológica. Recomenda-se revisão por profissional habilitado.";
-
-   if (
-     (
-       f.plasmablasts ||
-       f.plasmacytoidCells
-     ) &&
-     f.monomorphicPopulation
-   ) {
-
-     result.morphologicRiskClass =
-       "CLASS_5_HIGH_NEOPLASTIC_SUSPICION";
-
-     result.riskLevel =
-       "RISCO MORFOLÓGICO ALTO";
-
-     result.overallAssessment.requiresHumanReview =
-       true;
-
-     result.normalityBlocked =
-       true;
-
-     result.blockNormalReason.push(
-       "População plasmocitoide/plasmoblástica monomórfica"
-     );
-
-     result.overallAssessment.safetyMessage =
-       "População plasmocitoide/plasmoblástica monomórfica impede classificação como baixo risco. Recomenda-se revisão microscópica profissional e correlação hematológica especializada.";
-   }
+  result.blockNormalReason = [...new Set(result.blockNormalReason)];
 
   if (
-    f.largeMononuclearCells &&
-    f.monomorphicPopulation &&
-    !f.reactiveLymphocytes &&
-    !f.atypicalLymphocytes &&
-    !f.plasmocytes &&
-    !f.plasmacytoidCells
+    !result.morphologicRiskClass ||
+    result.morphologicRiskClass === "CLASS_0_NORMAL"
   ) {
-
-    result.morphologicRiskClass =
-      "CLASS_3_ATYPICAL_MONOMORPHIC_POPULATION";
-
-    result.riskLevel =
-      "RISCO MORFOLÓGICO MODERADO";
-
-    result.overallAssessment.requiresHumanReview =
-      true;
-
-    result.normalityBlocked =
-      true;
+    result.morphologicRiskClass = "CLASS_2_ATYPICAL_POPULATION";
   }
 
-    result.riskLevel =
-      "RISCO MORFOLÓGICO MODERADO/ALTO";
+  result.overallAssessment.safetyMessage =
+    "Há achados morfológicos que impedem classificação como normalidade morfológica. Recomenda-se revisão por profissional habilitado.";
 
-    result.overallAssessment.requiresHumanReview =
-      true;
+  return result;
+}
 
-    result.normalityBlocked =
-      true;
-
-    result.blockNormalReason.push(
-      "População monomórfica de células grandes"
-    );
-
-    result.overallAssessment.safetyMessage =
-      "População monomórfica de células grandes impede classificação como baixo risco. Recomenda-se revisão microscópica profissional.";
-  }
-
-   if (
-     result.morphologicRiskClass ===
-       "CLASS_4_BLAST_SUSPICION" ||
-
-     result.morphologicRiskClass ===
-       "CLASS_5_HIGH_NEOPLASTIC_SUSPICION"
-   ) {
-     result.overallAssessment.requiresHumanReview =
-       true;
-
-     result.normalityBlocked =
-       true;
-   }
-
-   } // FECHA if (hasAtypia)
-
-   return result;
-   }
-
-   export default validateConsistency;
+export default validateConsistency;

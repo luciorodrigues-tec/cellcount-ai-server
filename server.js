@@ -3,6 +3,9 @@
 // CELLCOUNT HEMATOLOGY ENTERPRISE SERVER V6 SAFE HYBRID
 // ============================================================================
 
+import applyFinalClinicalGovernor
+  from "./ai/finalClinicalGovernor.js";
+
 import validateConsistency
   from "./utils/validateConsistency.js";
 
@@ -6195,10 +6198,23 @@ if (isAtypicalPopulation) {
       console.log("================================");
 
 // ============================================================================
-// FINAL CONSISTENCY LOCK — evita contradição entre cards do Flutter
+// FINAL CLINICAL GOVERNOR — única autoridade final
 // ============================================================================
 
-let finalResult = validation.result;
+let finalResult =
+  applyFinalClinicalGovernor(
+    validation.result,
+  );
+
+finalResult =
+  sanitizeNarrativeRepetition(
+    finalResult,
+  );
+
+finalResult =
+  sanitizeHematologyLanguage(
+    finalResult,
+  );
 
 // =====================================================
 // RAW POSITIVE FINDINGS FINAL RESTORE — V47
