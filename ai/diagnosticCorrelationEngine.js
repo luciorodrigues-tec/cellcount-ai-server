@@ -276,6 +276,15 @@ if (
   // SAFE LANGUAGE FILTER
   // ==========================================================================
 
+  if (
+    reactiveLymphocytes ||
+    atypicalLymphocytes
+  ) {
+
+    summary =
+      "Padrão linfocitário reacional identificado, compatível com ativação imunológica e exigindo correlação clínico-laboratorial.";
+  }
+
   summary = sanitizeMedicalLanguage(
     summary,
   );

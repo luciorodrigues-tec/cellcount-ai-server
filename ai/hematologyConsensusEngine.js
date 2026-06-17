@@ -218,7 +218,7 @@ export function buildHematologyConsensus({
     consensus.finalClassification =
       "proliferative_pattern";
 
-    consensus.clinicalPriority =
+      consensus.clinicalPriority =
       "urgent";
 
     consensus.overallRiskScore =
@@ -248,6 +248,44 @@ export function buildHematologyConsensus({
 
     consensus.supportingFindings.push(
       "Presença de células imaturas.",
+    );
+  }
+
+  const reactivePattern =
+    analysis?.findings?.reactiveLymphocytes === true ||
+    analysis?.findings?.atypicalLymphocytes === true;
+
+  const atypicalPopulation =
+    analysis?.findings?.largeMononuclearCells === true ||
+    analysis?.findings?.plasmacytoidCells === true ||
+    analysis?.findings?.plasmablasts === true;
+
+  const monomorphicPopulation =
+    analysis?.findings?.monomorphicPopulation === true;
+
+  if (
+    reactivePattern ||
+    atypicalPopulation ||
+    monomorphicPopulation
+  ) {
+
+    consensus.finalClassification =
+      "reactive_or_atypical_population";
+
+    consensus.clinicalPriority =
+      "review";
+
+    consensus.requiresHumanReview =
+      true;
+
+    consensus.overallRiskScore =
+      Math.max(
+        consensus.overallRiskScore,
+        55,
+      );
+
+    consensus.supportingFindings.push(
+      "População celular reacional/atípica identificada."
     );
   }
 

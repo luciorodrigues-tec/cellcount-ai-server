@@ -676,6 +676,16 @@ export function analyzeLeukocytes(
           : primaryPattern,
 
       reactivePatternDetected: strongReactivePattern,
+
+      reactiveLymphocytes:
+        strongReactivePattern,
+
+      atypicalLymphocytes:
+        strongReactivePattern,
+
+      mononucleosisSuspicion:
+        strongReactivePattern,
+
       immatureFeaturesDetected,
       leukocyteScores: scores,
       blastRisk,
@@ -923,6 +933,7 @@ function detectPatterns(
     scores.leftShift <= 0 &&
     scores.toxicChanges <= 0 &&
     scores.hypersegmentation <= 0 &&
+    scores.reactivePattern <= 0 &&
     scores.dysplasia <= 0
   ) {
     return {

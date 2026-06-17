@@ -721,7 +721,7 @@ function applyLimitedFieldFinalLock(result = {}) {
     locked.morphologyAnalysis.erythrocyteReview =
       "Hemácias visíveis no campo, com avaliação global limitada. A presença de estrutura incomum exige exclusão de hemoparasita ou artefato.";
     locked.morphologyAnalysis.leukocyteReview =
-      "Poucos leucócitos maduros visíveis. Não há evidência inequívoca de blastos neste campo.";
+      "Avaliação leucocitária limitada pela representatividade do campo. A imagem isolada não permite caracterização populacional confiável nem exclusão global de células imaturas.";
     locked.morphologyAnalysis.plateletReview =
       "Plaquetas podem ser visualizadas, porém a avaliação quantitativa global permanece limitada pela imagem isolada.";
     locked.morphologyAnalysis.biologicalInterpretation =
@@ -734,8 +734,7 @@ function applyLimitedFieldFinalLock(result = {}) {
     locked.whatAISees.imageLimitations =
       "Imagem/campo isolado; não permite diagnóstico definitivo, identificação de espécie ou quantificação parasitária.";
     locked.whatAISees.freeNarrative =
-      `Observa-se campo microscópico limitado, com hemácias ao fundo e poucos leucócitos maduros. ${parasite.label}. Não há blastos inequívocos neste campo. A interpretação requer avaliação de múltiplos campos e confirmação laboratorial.`;
-
+      "Avaliação leucocitária limitada pela representatividade do campo. A imagem isolada não permite caracterização populacional confiável nem exclusão global de células imaturas."
     locked.patternRecognition.overallPattern =
       "Estrutura hemoparasitária suspeita em campo limitado";
     locked.patternRecognition.artifactPattern =
@@ -783,7 +782,7 @@ function applyLimitedFieldFinalLock(result = {}) {
   locked.riskLevel = "Campo limitado";
 
   locked.mainFinding =
-    "Campo microscópico limitado contendo poucos leucócitos maduros. Não há evidência inequívoca de blastos ou células imaturas críticas.";
+    "Campo microscópico limitado e insuficiente para avaliação populacional confiável. A imagem isolada não permite afirmar normalidade global nem excluir alterações críticas com segurança.";
 
   locked.primaryFinding = locked.mainFinding;
   locked.finalConclusion = locked.mainFinding;
@@ -796,8 +795,7 @@ function applyLimitedFieldFinalLock(result = {}) {
     "Campo limitado. A imagem isolada não permite afirmar estado hematológico normal ou morfologia preservada global. Recomenda-se correlação com hemograma completo, dados clínicos e revisão microscópica profissional.";
 
   locked.interpretiveSynthesis =
-    "A baixa representatividade celular limita a interpretação. O campo analisado não demonstra blastos inequívocos ou células imaturas críticas, porém não permite conclusão global sobre normalidade hematológica.";
-
+    "A baixa representatividade celular limita a interpretação. A imagem isolada não permite afirmar normalidade global nem excluir alterações críticas com segurança. Recomenda-se avaliação de múltiplos campos e correlação com hemograma.";
   locked.overallAssessment.requiresHumanReview = true;
   locked.overallAssessment.riskCategory = "CLASS_1_LIMITED_FIELD";
   locked.overallAssessment.mainImpression = locked.mainFinding;
@@ -4757,6 +4755,67 @@ Responda SOMENTE JSON válido em português do Brasil.
         mergedAnalysis,
       );
 
+// =====================================================
+// RESTORE RAW ATYPICAL MONONUCLEAR FINDINGS
+// impede fieldAdequacy/normalizer apagar achados positivos
+// =====================================================
+
+const rawPositive =
+  parsed?.positiveFindings || {};
+
+if (
+  rawPositive.largeMononuclearCells === true ||
+  rawPositive.atypicalLymphocytes === true ||
+  rawPositive.reactiveLymphocytes === true ||
+  rawPositive.monomorphicPopulation === true ||
+  rawPositive.downeyLikeCells === true
+) {
+  mergedAnalysis.findings = mergedAnalysis.findings || {};
+
+  mergedAnalysis.findings.largeMononuclearCells =
+    rawPositive.largeMononuclearCells === true;
+
+  mergedAnalysis.findings.atypicalLymphocytes =
+    rawPositive.atypicalLymphocytes === true;
+
+  mergedAnalysis.findings.reactiveLymphocytes =
+    rawPositive.reactiveLymphocytes === true;
+
+  mergedAnalysis.findings.monomorphicPopulation =
+    rawPositive.monomorphicPopulation === true;
+
+  mergedAnalysis.findings.downeyLikeCells =
+    rawPositive.downeyLikeCells === true;
+
+  mergedAnalysis.findings.downeyType =
+    rawPositive.downeyType || mergedAnalysis.findings.downeyType || "III";
+
+  mergedAnalysis.findings.atypicalLymphocyteSubtype =
+    rawPositive.atypicalLymphocyteSubtype ||
+    mergedAnalysis.findings.atypicalLymphocyteSubtype ||
+    "DOWNEY_TYPE_III_IMMUNOBLASTOID";
+
+  mergedAnalysis.normalityBlocked = true;
+  mergedAnalysis.requiresHumanReview = true;
+
+  mergedAnalysis.morphologicRiskClass =
+    "CLASS_2_ATYPICAL_POPULATION";
+
+  mergedAnalysis.riskLevel =
+    "População mononuclear atípica";
+
+  mergedAnalysis.blockNormalReason = [
+    ...new Set([
+      ...(Array.isArray(mergedAnalysis.blockNormalReason)
+        ? mergedAnalysis.blockNormalReason
+        : []),
+      "Células mononucleares grandes/atípicas",
+      "População mononuclear predominante",
+      "Não classificar como campo limitado simples",
+    ]),
+  ];
+}
+
     mergedAnalysis =
       sanitizeNarrativeRepetition(
         mergedAnalysis,
@@ -5001,35 +5060,33 @@ const rawFindings =
 
 const safeSemanticFindings = {
   largeMononuclearCells:
-    rawFindings.largeMononuclearCells === true &&
-    mergedAnalysis.fieldAdequacy?.visibleLeukocytes >= 8,
+    rawFindings.largeMononuclearCells === true,
 
   reactiveLymphocytes:
-    rawFindings.reactiveLymphocytes === true &&
-    mergedAnalysis.fieldAdequacy?.visibleLeukocytes >= 4,
+    rawFindings.reactiveLymphocytes === true,
 
   atypicalLymphocytes:
-    rawFindings.atypicalLymphocytes === true &&
-    mergedAnalysis.fieldAdequacy?.visibleLeukocytes >= 4,
+    rawFindings.atypicalLymphocytes === true,
 
   plasmacytoidCells:
-    rawFindings.plasmacytoidCells === true &&
-    mergedAnalysis.fieldAdequacy?.visibleLeukocytes >= 8,
+    rawFindings.plasmacytoidCells === true,
 
   plasmocytes:
-    rawFindings.plasmocytes === true &&
-    mergedAnalysis.fieldAdequacy?.visibleLeukocytes >= 8,
+    rawFindings.plasmocytes === true,
 
   plasmablasts:
     rawFindings.plasmablasts === true &&
-    rawFindings.blastSuspicion === true,
+    (
+      rawFindings.blastSuspicion === true ||
+      rawFindings.monomorphicPopulation === true
+    ),
 
   monomorphicPopulation:
-    rawFindings.monomorphicPopulation === true &&
-    mergedAnalysis.fieldAdequacy?.adequateForPopulationAssessment === true,
+    rawFindings.monomorphicPopulation === true,
 
   blastSuspicion:
-    rawFindings.blastSuspicion === true,
+    rawFindings.blastSuspicion === true ||
+    rawFindings.immatureCells === true,
 };
 
 console.log(
@@ -5830,6 +5887,18 @@ app.post(
 const visibleLeukocytes =
   validation.result.fieldAdequacy?.visibleLeukocytes || 0;
 
+const currentRiskClass =
+  validation.result.morphologicRiskClass || "";
+
+const reactivePattern =
+  currentRiskClass ===
+    "CLASS_2_ATYPICAL_REACTIVE_PATTERN" ||
+  currentRiskClass ===
+    "CLASS_2_REACTIVE_MONONUCLEOSIS_PATTERN" ||
+  validation.result.findings?.reactiveLymphocytes === true ||
+  validation.result.findings?.mononucleosisSuspicion === true ||
+  validation.result.findings?.downeyLikeCells === true;
+
 const hasAtypicalPopulationSignal =
   finalFindings.largeMononuclearCells === true ||
   finalFindings.atypicalLymphocytes === true ||
@@ -5841,6 +5910,7 @@ const hasAtypicalPopulationSignal =
 if (
   hasAtypicalPopulationSignal === true &&
   visibleLeukocytes >= 8 &&
+  !reactivePattern &&
   validation.result.morphologicRiskClass !== "CLASS_4_BLAST_SUSPICION" &&
   validation.result.morphologicRiskClass !== "CLASS_5_HIGH_NEOPLASTIC_SUSPICION"
 ) {
@@ -5877,9 +5947,6 @@ if (
 // RISK COHERENCE OVERRIDE — FIELD-AWARE
 // ====================================================================
 
-const currentRiskClass =
-  validation.result.morphologicRiskClass || "";
-
 const visibleLeukocytesRisk =
   validation.result.fieldAdequacy?.visibleLeukocytes || 0;
 
@@ -5889,6 +5956,7 @@ const adequatePopulationRisk =
 const hasAtypicalPopulation =
   adequatePopulationRisk === true &&
   visibleLeukocytesRisk >= 8 &&
+  !reactivePattern &&
   (
     currentRiskClass === "CLASS_2_ATYPICAL_POPULATION" ||
     currentRiskClass === "CLASS_2_ATYPICAL_REACTIVE_PATTERN" ||
@@ -6078,7 +6146,7 @@ if (isAtypicalPopulation) {
     "Alteração morfológica mononuclear observada em campo representativo. A classificação exige correlação com múltiplos campos e hemograma.";
 
   validation.result.morphologyAnalysis.leukocyteReview =
-    "Há alteração leucocitária/mononuclear em campo com representatividade suficiente. Não há evidência inequívoca de blastos ou bastonetes de Auer.";
+    "Há alteração leucocitária/mononuclear em campo com representatividade suficiente. A ausência global de blastos não pode ser afirmada apenas pela imagem isolada.";
 }
 
       validation.result =
@@ -6131,6 +6199,102 @@ if (isAtypicalPopulation) {
 // ============================================================================
 
 let finalResult = validation.result;
+
+// =====================================================
+// RAW POSITIVE FINDINGS FINAL RESTORE — V47
+// =====================================================
+
+const rawPositiveFinal =
+  finalResult.rawResponse?.positiveFindings || {};
+
+const rawHasAtypicalMononuclearPopulation =
+  rawPositiveFinal.largeMononuclearCells === true ||
+  rawPositiveFinal.atypicalLymphocytes === true ||
+  rawPositiveFinal.reactiveLymphocytes === true ||
+  rawPositiveFinal.monomorphicPopulation === true ||
+  rawPositiveFinal.immatureCells === true;
+
+if (rawHasAtypicalMononuclearPopulation) {
+  finalResult.findings = finalResult.findings || {};
+  finalResult.morphologyAnalysis = finalResult.morphologyAnalysis || {};
+  finalResult.structuredReport = finalResult.structuredReport || {};
+  finalResult.overallAssessment = finalResult.overallAssessment || {};
+  finalResult.hematologicReasoning = finalResult.hematologicReasoning || {};
+  finalResult.whatAISees = finalResult.whatAISees || {};
+
+  finalResult.findings.largeMononuclearCells =
+    rawPositiveFinal.largeMononuclearCells === true;
+
+  finalResult.findings.atypicalLymphocytes =
+    rawPositiveFinal.atypicalLymphocytes === true;
+
+  finalResult.findings.reactiveLymphocytes =
+    rawPositiveFinal.reactiveLymphocytes === true;
+
+  finalResult.findings.monomorphicPopulation =
+    rawPositiveFinal.monomorphicPopulation === true;
+
+  finalResult.findings.immatureCells =
+    rawPositiveFinal.immatureCells === true;
+
+  finalResult.findings.blastSuspicion =
+    rawPositiveFinal.blastSuspicion === true;
+
+  finalResult.normalityBlocked = true;
+  finalResult.requiresHumanReview = true;
+
+  finalResult.finalClassification =
+    rawPositiveFinal.blastSuspicion === true
+      ? "CLASS_4_BLAST_SUSPICION"
+      : rawPositiveFinal.monomorphicPopulation === true
+        ? "CLASS_3_POSSIBLE_CLONALITY"
+        : "CLASS_2_ATYPICAL_POPULATION";
+
+  finalResult.morphologicRiskClass =
+    finalResult.finalClassification;
+
+  finalResult.riskLevel =
+    rawPositiveFinal.blastSuspicion === true
+      ? "Suspeita de população imatura/blástica"
+      : rawPositiveFinal.monomorphicPopulation === true
+        ? "População mononuclear atípica/monomórfica"
+        : "População mononuclear atípica";
+
+  const restoredSummary =
+    "Campo com predomínio de células mononucleares grandes/atípicas. A imagem não deve ser classificada como campo limitado simples. Requer revisão hematológica especializada e correlação com hemograma.";
+
+  finalResult.mainFinding = restoredSummary;
+  finalResult.primaryFinding = restoredSummary;
+  finalResult.finalConclusion = restoredSummary;
+
+  finalResult.morphologyAnalysis.overview = restoredSummary;
+  finalResult.morphologyAnalysis.summary = restoredSummary;
+  finalResult.morphologyAnalysis.leukocyteReview =
+    "Presença de células mononucleares grandes/atípicas, com padrão populacional relevante. Não afirmar ausência global de blastos pela imagem isolada.";
+  finalResult.morphologyAnalysis.absentFindings =
+    "Bastonetes de Auer não claramente identificados; ausência global de blastos não pode ser afirmada pela imagem isolada.";
+
+  finalResult.structuredReport.conclusion = restoredSummary;
+  finalResult.overallAssessment.mainImpression = restoredSummary;
+  finalResult.overallAssessment.riskCategory =
+    finalResult.finalClassification;
+
+  finalResult.whatAISees.leukocytes =
+    "Células mononucleares grandes/atípicas.";
+  finalResult.whatAISees.dominantFinding =
+    "População mononuclear atípica.";
+  finalResult.whatAISees.negativeFindings =
+    "Não afirmar ausência global de blastos pela imagem isolada.";
+
+  finalResult.hematologicReasoning.finalInterpretation =
+    restoredSummary;
+
+  finalResult.clinicalMeaning =
+    "Achado morfológico relevante. Requer correlação com hemograma, revisão microscópica profissional e, se indicado, imunofenotipagem.";
+
+  finalResult.interpretiveSynthesis =
+    restoredSummary;
+}
 
 // =====================================================
 // RAW GPT CRITICAL FINDINGS RESTORE
@@ -6428,8 +6592,7 @@ if (
     "Avaliação eritrocitária limitada ao campo enviado. Hemácias são visíveis, porém não é adequado afirmar normocitose, normocromia ou preservação global da série eritrocitária apenas por este campo isolado.";
 
   finalResult.morphologyAnalysis.leukocyteReview =
-    "Avaliação leucocitária limitada por baixa representatividade celular. Observam-se poucos leucócitos maduros, sem evidência inequívoca de blastos ou células imaturas críticas. Não é possível inferir padrão reacional, clonal ou populacional sustentado.";
-
+    "Avaliação leucocitária limitada pela representatividade do campo. A imagem isolada não permite caracterização populacional confiável nem exclusão global de células imaturas."
   finalResult.morphologyAnalysis.plateletReview =
     "Avaliação plaquetária limitada ao campo enviado. A imagem isolada não permite conclusão quantitativa ou morfológica global confiável da série plaquetária.";
 
@@ -6439,8 +6602,7 @@ if (
   finalResult.morphologyAnalysis.differentialDiagnosis = "";
 
   finalResult.morphologyAnalysis.absentFindings =
-    "No campo analisado, não há evidência inequívoca de blastos, bastonetes de Auer ou células imaturas críticas. A representatividade limitada não permite exclusão diagnóstica global.";
-
+    "Avaliação leucocitária limitada pela representatividade do campo. A imagem isolada não permite caracterização populacional confiável nem exclusão global de células imaturas."
   finalResult.whatAISees.globalField =
     "Campo microscópico limitado para avaliação global.";
 
@@ -6451,8 +6613,7 @@ if (
     "Hemácias visíveis no campo, porém sem base suficiente para afirmar preservação global da série.";
 
   finalResult.whatAISees.leukocytes =
-    "Poucos leucócitos maduros visíveis. Não há evidência inequívoca de blastos ou células imaturas críticas.";
-
+   "Avaliação leucocitária limitada pela representatividade do campo. A imagem isolada não permite caracterização populacional confiável nem exclusão global de células imaturas."
   finalResult.whatAISees.platelets =
     "Avaliação plaquetária limitada pela representatividade do campo.";
 
@@ -6469,7 +6630,7 @@ if (
     "Campo único/limitado; não permite conclusão hematológica global.";
 
   finalResult.whatAISees.freeNarrative =
-    "Observa-se campo microscópico limitado, com baixa representatividade leucocitária para análise populacional confiável. Não há evidência inequívoca de blastos ou células imaturas críticas neste campo. A interpretação deve ser correlacionada com hemograma completo, múltiplos campos da lâmina e revisão microscópica profissional.";
+    "Avaliação leucocitária limitada pela representatividade do campo. A imagem isolada não permite caracterização populacional confiável nem exclusão global de células imaturas.";
 
   finalResult.clinicalMeaning =
     "Campo limitado. A imagem isolada não permite afirmar estado hematológico normal ou morfologia preservada global. Recomenda-se correlação com hemograma completo, dados clínicos e revisão microscópica profissional.";
@@ -6479,12 +6640,16 @@ if (
 
   finalResult.hematologicReasoning = {
     whatISee:
-      "Campo microscópico com poucos leucócitos maduros visíveis e fundo eritrocitário predominante.",
+      "Avaliação leucocitária limitada pela representatividade do campo. A imagem isolada não permite caracterização populacional confiável nem exclusão global de células imaturas.",
+
     whatItResembles:
       "Campo limitado para avaliação populacional, sem base suficiente para inferir padrão normal, reacional ou clonal sustentado.",
+
     whatICannotConfirm:
       "Não é possível confirmar normalidade global, morfologia preservada, clonalidade, malignidade, parasitemia ou diagnóstico definitivo pela imagem isolada.",
-    finalInterpretation: limitedConclusion,
+
+    finalInterpretation:
+      limitedConclusion,
   };
 
   finalResult.structuredReport.conclusion = limitedConclusion;
@@ -6546,6 +6711,178 @@ console.log("================================");
 
   finalResult = applyLimitedFieldFinalLock(finalResult);
 
+// =====================================================
+// FINAL BLAST / ATYPICAL TEXT OVERRIDE — LAST GATE
+// =====================================================
+
+const rawPositiveFinalSafe =
+  finalResult.rawResponse?.positiveFindings || {};
+
+const visualFinalSafe =
+  finalResult.rawResponse?.visualEvidence ||
+  finalResult.visualEvidence ||
+  {};
+
+const hasStrongBlastVisualEvidence =
+  visualFinalSafe.prominentNucleolus === true ||
+  visualFinalSafe.cellSizeIncrease === true ||
+  visualFinalSafe.abundantBasophilicCytoplasm === true ||
+  /nucl[eé]olo|alta rela[cç][aã]o n\/c|cromatina frouxa|blasto/i.test(
+    JSON.stringify(finalResult.rawResponse || {})
+  );
+
+const shouldClassifyAsBlast =
+  rawPositiveFinalSafe.blastSuspicion === true &&
+  rawPositiveFinalSafe.immatureCells === true &&
+  hasStrongBlastVisualEvidence === true;
+
+const hasAtypicalMonomorphicPopulation =
+  rawPositiveFinalSafe.largeMononuclearCells === true ||
+  rawPositiveFinalSafe.atypicalLymphocytes === true ||
+  rawPositiveFinalSafe.monomorphicPopulation === true ||
+  rawPositiveFinalSafe.downeyLikeCells === true;
+
+if (
+  hasAtypicalMonomorphicPopulation &&
+  shouldClassifyAsBlast !== true
+) {
+  finalResult.finalClassification =
+    rawPositiveFinalSafe.monomorphicPopulation === true
+      ? "CLASS_3_POSSIBLE_CLONALITY"
+      : "CLASS_2_ATYPICAL_POPULATION";
+
+  finalResult.morphologicRiskClass =
+    finalResult.finalClassification;
+
+  finalResult.riskLevel =
+    rawPositiveFinalSafe.monomorphicPopulation === true
+      ? "População mononuclear atípica/monomórfica"
+      : "População mononuclear atípica";
+
+  finalResult.findings = finalResult.findings || {};
+  finalResult.findings.blastSuspicion = false;
+  finalResult.findings.immatureCells =
+    rawPositiveFinalSafe.immatureCells === true;
+  finalResult.findings.largeMononuclearCells =
+    rawPositiveFinalSafe.largeMononuclearCells === true;
+  finalResult.findings.atypicalLymphocytes =
+    rawPositiveFinalSafe.atypicalLymphocytes === true;
+  finalResult.findings.monomorphicPopulation =
+    rawPositiveFinalSafe.monomorphicPopulation === true;
+
+  const safeAtypicalText =
+    "População mononuclear grande e atípica, com padrão relativamente monomórfico. Não há sustentação visual suficiente para classificar como suspeita blástica inequívoca pela imagem isolada. Requer revisão hematológica especializada e correlação com hemograma.";
+
+  finalResult.mainFinding = safeAtypicalText;
+  finalResult.primaryFinding = safeAtypicalText;
+  finalResult.finalConclusion = safeAtypicalText;
+
+  finalResult.morphologyAnalysis = finalResult.morphologyAnalysis || {};
+  finalResult.morphologyAnalysis.summary = safeAtypicalText;
+  finalResult.morphologyAnalysis.overview =
+    "Campo com predomínio de células mononucleares grandes/atípicas, sem critérios visuais suficientes para afirmar blasto inequívoco.";
+  finalResult.morphologyAnalysis.leukocyteReview =
+    "Células mononucleares grandes/atípicas em padrão relativamente monomórfico. A hipótese blástica não deve ser afirmada sem maior sustentação morfológica.";
+  finalResult.morphologyAnalysis.absentFindings =
+    "Bastonetes de Auer não claramente identificados; blastos inequívocos não podem ser confirmados pela imagem isolada.";
+
+  finalResult.structuredReport = finalResult.structuredReport || {};
+  finalResult.structuredReport.conclusion = safeAtypicalText;
+
+  finalResult.overallAssessment = finalResult.overallAssessment || {};
+  finalResult.overallAssessment.mainImpression = safeAtypicalText;
+  finalResult.overallAssessment.requiresHumanReview = true;
+  finalResult.overallAssessment.riskCategory =
+    finalResult.finalClassification;
+
+  finalResult.clinicalMeaning =
+    "Achado morfológico relevante. Pode representar processo reacional exuberante ou população linfoide atípica/monomórfica. Requer correlação com hemograma, revisão microscópica profissional e, se indicado, imunofenotipagem.";
+
+  finalResult.interpretiveSynthesis = safeAtypicalText;
+}
+
+if (
+  shouldClassifyAsBlast === true &&
+  (
+    finalResult.finalClassification === "CLASS_4_BLAST_SUSPICION" ||
+    finalResult.morphologicRiskClass === "CLASS_4_BLAST_SUSPICION" ||
+    finalResult.findings?.blastSuspicion === true ||
+    finalResult.rawResponse?.positiveFindings?.blastSuspicion === true
+  )
+) {
+  const finalCriticalText =
+    "População mononuclear imatura/atípica suspeita. Não classificar como campo limitado simples. Requer revisão hematológica especializada, correlação com hemograma e, se indicado, imunofenotipagem.";
+
+  finalResult.finalClassification = "CLASS_4_BLAST_SUSPICION";
+  finalResult.morphologicRiskClass = "CLASS_4_BLAST_SUSPICION";
+  finalResult.riskLevel = "Suspeita de população imatura/blástica";
+  finalResult.normalityBlocked = true;
+  finalResult.requiresHumanReview = true;
+
+  finalResult.findings = finalResult.findings || {};
+  finalResult.findings.blastSuspicion = true;
+  finalResult.findings.immatureCells = true;
+  finalResult.findings.monomorphicPopulation =
+    finalResult.rawResponse?.positiveFindings?.monomorphicPopulation === true ||
+    finalResult.findings.monomorphicPopulation === true;
+
+  finalResult.mainFinding = finalCriticalText;
+  finalResult.primaryFinding = finalCriticalText;
+  finalResult.finalConclusion = finalCriticalText;
+
+  finalResult.morphologyAnalysis = finalResult.morphologyAnalysis || {};
+  finalResult.morphologyAnalysis.overview =
+    "Campo com predomínio de células mononucleares grandes/atípicas, com suspeita de população imatura/blástica.";
+  finalResult.morphologyAnalysis.summary = finalCriticalText;
+  finalResult.morphologyAnalysis.leukocyteReview =
+    "Presença de células mononucleares grandes/atípicas. A hipótese de população imatura/blástica não deve ser descartada pela imagem isolada.";
+  finalResult.morphologyAnalysis.absentFindings =
+    "Bastonetes de Auer não claramente identificados; ausência global de blastos não pode ser afirmada pela imagem isolada.";
+
+  finalResult.structuredReport = finalResult.structuredReport || {};
+  finalResult.structuredReport.conclusion = finalCriticalText;
+  finalResult.structuredReport.hematologicMeaning =
+    "Achado morfológico crítico/relevante. A imagem não deve ser interpretada como campo limitado simples.";
+  finalResult.structuredReport.recommendation =
+    "Revisão hematológica especializada, hemograma completo e imunofenotipagem se indicada.";
+
+  finalResult.overallAssessment = finalResult.overallAssessment || {};
+  finalResult.overallAssessment.requiresHumanReview = true;
+  finalResult.overallAssessment.riskCategory = "CLASS_4_BLAST_SUSPICION";
+  finalResult.overallAssessment.mainImpression = finalCriticalText;
+
+  finalResult.hematologicReasoning = finalResult.hematologicReasoning || {};
+  finalResult.hematologicReasoning.whatISee =
+    "Células mononucleares grandes/atípicas com padrão populacional relevante.";
+  finalResult.hematologicReasoning.whatItResembles =
+    "População imatura/blástica ou atípica; requer confirmação por revisão profissional.";
+  finalResult.hematologicReasoning.whatICannotConfirm =
+    "Não é possível confirmar linhagem, clonalidade ou diagnóstico definitivo apenas pela imagem isolada.";
+  finalResult.hematologicReasoning.finalInterpretation = finalCriticalText;
+
+  finalResult.whatAISees = finalResult.whatAISees || {};
+  finalResult.whatAISees.leukocytes =
+    "Células mononucleares grandes/atípicas.";
+  finalResult.whatAISees.dominantFinding =
+    "População mononuclear imatura/atípica suspeita.";
+  finalResult.whatAISees.negativeFindings =
+    "Não afirmar ausência global de blastos pela imagem isolada.";
+
+  finalResult.clinicalMeaning =
+    "Achado morfológico crítico. Requer correlação com hemograma, revisão microscópica profissional e, se indicado, imunofenotipagem.";
+
+  finalResult.interpretiveSynthesis = finalCriticalText;
+
+  finalResult.confidenceAnalysis = finalResult.confidenceAnalysis || {};
+  finalResult.confidenceAnalysis.hematologicRisk = {
+    level: "high",
+    score: 90,
+    label: "ALTO RISCO MORFOLÓGICO",
+  };
+  finalResult.confidenceAnalysis.summary =
+    "Achado crítico/atípico detectado. A confiança não deve ser interpretada como baixo risco.";
+}
+
   console.log("🦠 PARASITE FINAL CHECK");
   console.log(
     JSON.stringify(
@@ -6594,6 +6931,45 @@ finalResult.clinicalCorrelationNeeds = [];
 
 finalResult.hideEducationalHypotheses = true;
 finalResult.hideClinicalCorrelations = true;
+
+finalResult =
+  applyNarrativeConsistencyLock(
+    finalResult
+  );
+
+if (
+  finalResult.finalClassification === "CLASS_4_BLAST_SUSPICION" ||
+  finalResult.morphologicRiskClass === "CLASS_4_BLAST_SUSPICION"
+) {
+  const criticalText =
+    "População mononuclear imatura/atípica suspeita. Não classificar como campo limitado simples. Requer revisão hematológica especializada, correlação com hemograma e, se indicado, imunofenotipagem.";
+
+  finalResult.mainFinding = criticalText;
+  finalResult.primaryFinding = criticalText;
+  finalResult.finalConclusion = criticalText;
+
+  finalResult.morphologyAnalysis = finalResult.morphologyAnalysis || {};
+  finalResult.morphologyAnalysis.summary = criticalText;
+  finalResult.morphologyAnalysis.overview =
+    "Campo com predomínio de células mononucleares grandes/atípicas, com suspeita de população imatura/blástica.";
+  finalResult.morphologyAnalysis.leukocyteReview =
+    "Presença de células mononucleares grandes/atípicas. A hipótese de população imatura/blástica não deve ser descartada pela imagem isolada.";
+  finalResult.morphologyAnalysis.absentFindings =
+    "Bastonetes de Auer não claramente identificados; ausência global de blastos não pode ser afirmada pela imagem isolada.";
+
+  finalResult.structuredReport = finalResult.structuredReport || {};
+  finalResult.structuredReport.conclusion = criticalText;
+
+  finalResult.overallAssessment = finalResult.overallAssessment || {};
+  finalResult.overallAssessment.mainImpression = criticalText;
+  finalResult.overallAssessment.requiresHumanReview = true;
+  finalResult.overallAssessment.riskCategory = "CLASS_4_BLAST_SUSPICION";
+
+  finalResult.clinicalMeaning =
+    "Achado morfológico crítico. Requer correlação com hemograma, revisão microscópica profissional e, se indicado, imunofenotipagem.";
+
+  finalResult.interpretiveSynthesis = criticalText;
+}
 
 return res.json({
 
@@ -7153,3 +7529,121 @@ app.listen(
     );
   },
 );
+
+// ============================================================================
+// NARRATIVE CONSISTENCY LOCK
+// ============================================================================
+
+function applyNarrativeConsistencyLock(
+  analysis = {}
+) {
+
+  const findings =
+    analysis.findings || {};
+
+  const morph =
+    analysis.morphologyAnalysis || {};
+
+  const raw =
+    JSON.stringify(analysis)
+      .toLowerCase();
+
+  const atypicalPopulation =
+    findings.atypicalLymphocytes === true ||
+    findings.largeMononuclearCells === true ||
+    findings.reactiveLymphocytes === true ||
+    findings.plasmacytoidCells === true ||
+    findings.plasmocytes === true ||
+    findings.plasmablasts === true ||
+    findings.monomorphicPopulation === true;
+
+  if (!atypicalPopulation)
+    return analysis;
+
+  const forbiddenExpressions = [
+
+    "sem alterações",
+    "sem alteracoes",
+
+    "morfologia preservada",
+
+    "normalidade hematológica",
+    "normalidade hematologica",
+
+    "ausência de blastos",
+    "ausencia de blastos",
+
+    "sem blastos",
+
+    "sem evidência de blastos",
+    "sem evidencia de blastos",
+
+    "estado hematológico estável",
+    "estado hematologico estavel"
+  ];
+
+  const cleanText = (text) => {
+
+    if (!text)
+      return text;
+
+    let result = text;
+
+    forbiddenExpressions.forEach(exp => {
+
+      const regex =
+        new RegExp(exp, "gi");
+
+      result =
+        result.replace(regex, "");
+    });
+
+    return result
+      .replace(/\s+/g, " ")
+      .trim();
+  };
+
+  morph.overview =
+    cleanText(morph.overview);
+
+  morph.summary =
+    cleanText(morph.summary);
+
+  morph.leukocyteReview =
+    cleanText(morph.leukocyteReview);
+
+  morph.biologicalInterpretation =
+    cleanText(
+      morph.biologicalInterpretation
+    );
+
+  analysis.clinicalMeaning =
+    cleanText(
+      analysis.clinicalMeaning
+    );
+
+  analysis.interpretiveSynthesis =
+    cleanText(
+      analysis.interpretiveSynthesis
+    );
+
+  if (
+    atypicalPopulation &&
+    !morph.summary?.includes(
+      "população linfoide reacional"
+    )
+  ) {
+
+    morph.summary =
+      `
+Foram identificadas células mononucleares atípicas compatíveis com ativação linfoide reacional.
+
+Os achados não permitem classificação definitiva apenas por imagem isolada e requerem correlação com hemograma, contexto clínico e avaliação microscópica completa.
+      `.trim();
+  }
+
+  analysis.morphologyAnalysis =
+    morph;
+
+  return analysis;
+}

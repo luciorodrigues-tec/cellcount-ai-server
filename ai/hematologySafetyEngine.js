@@ -219,15 +219,16 @@ export function validateHematologyAnalysis({
     );
   }
 
-  const diagnosticReliability = calculateDiagnosticReliability({
-    visualEvidenceScore,
-    morphologyCoherence,
-    artifactProbability,
-    quality,
-    blastMorphologySignal,
-    evidenceProfile,
-    confidenceAnalysis,
-  });
+    const diagnosticReliability = calculateDiagnosticReliability({
+      visualEvidenceScore,
+      morphologyCoherence,
+      artifactProbability,
+      quality,
+      blastMorphologySignal,
+      evidenceProfile,
+      confidenceAnalysis,
+      analysis: correctedAnalysis,
+    });
 
   correctedAnalysis.meta.diagnosticReliability = diagnosticReliability;
   correctedAnalysis.meta.blastMorphologySignal = blastMorphologySignal;
@@ -946,7 +947,9 @@ function calculateDiagnosticReliability({
   blastMorphologySignal = {},
   evidenceProfile = {},
   confidenceAnalysis = {},
+  analysis = {},
 }) {
+
   let score =
     (
       visualEvidenceScore +
@@ -966,6 +969,21 @@ function calculateDiagnosticReliability({
     Number(confidenceAnalysis?.globalConfidenceScore || 0);
 
   if (globalConfidence >= 50) score += 5;
+
+    const findings =
+      analysis?.findings || {};
+
+    if (
+      findings.monomorphicPopulation ||
+      findings.largeMononuclearCells ||
+      findings.atypicalLymphocytes ||
+      findings.reactiveLymphocytes ||
+      findings.plasmacytoidCells ||
+      findings.plasmocytes ||
+      findings.plasmablasts
+    ) {
+      score += 15;
+    }
 
   return normalize(score);
 }

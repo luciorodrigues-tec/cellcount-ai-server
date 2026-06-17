@@ -175,7 +175,34 @@ export function applyFieldAdequacyRules(analysis = {}) {
       "Confirmar por revisão microscópica profissional, múltiplos campos, gota espessa/esfregaço seriado e métodos complementares conforme protocolo.";
   }
 
-  if (!fieldAdequacy.limitedField) return analysis;
+  const atypicalPopulation =
+    analysis?.findings?.monomorphicPopulation === true ||
+    analysis?.findings?.largeMononuclearCells === true ||
+    analysis?.findings?.atypicalLymphocytes === true ||
+    analysis?.findings?.reactiveLymphocytes === true ||
+    analysis?.findings?.plasmacytoidCells === true ||
+    analysis?.findings?.plasmablasts === true;
+
+  if (
+    fieldAdequacy.limitedField &&
+    atypicalPopulation
+  ) {
+
+    analysis.normalityBlocked = true;
+
+    analysis.requiresHumanReview = true;
+
+    analysis.blockNormalReason = [
+      ...(analysis.blockNormalReason || []),
+      "Campo limitado contendo população atípica/reacional.",
+    ];
+
+    return analysis;
+  }
+
+  if (!fieldAdequacy.limitedField) {
+    return analysis;
+  }
 
   analysis.normalityBlocked = true;
   analysis.requiresHumanReview = true;
@@ -199,9 +226,19 @@ export function applyFieldAdequacyRules(analysis = {}) {
 
   analysis.findings = {
     ...(analysis.findings || {}),
-    immatureCells: false,
-    blastSuspicion: false,
   };
+
+  if (
+    analysis.findings.immatureCells !== true
+  ) {
+    analysis.findings.immatureCells = false;
+  }
+
+  if (
+    analysis.findings.blastSuspicion !== true
+  ) {
+    analysis.findings.blastSuspicion = false;
+  }
 
   analysis.morphologyAnalysis = {
     ...(analysis.morphologyAnalysis || {}),
@@ -210,7 +247,7 @@ export function applyFieldAdequacyRules(analysis = {}) {
     erythrocyteReview:
       "Hemácias visíveis no campo, porém a imagem isolada não permite afirmar normocitose, normocromia ou preservação eritrocitária global.",
     leukocyteReview:
-      "Poucos leucócitos maduros visíveis. Não há evidência inequívoca de blastos ou células imaturas críticas neste campo analisado.",
+      "Avaliação leucocitária limitada pela representatividade do campo. A imagem isolada não permite caracterização populacional confiável nem exclusão global de células imaturas.",
     plateletReview:
       "Plaquetas podem ser visualizadas no campo, porém a imagem isolada não permite afirmar número adequado, preservação global ou ausência de alteração plaquetária.",
     biologicalInterpretation:
@@ -224,7 +261,7 @@ export function applyFieldAdequacyRules(analysis = {}) {
     summary:
       fieldAdequacy.parasiteSignal || fieldAdequacy.unusualStructureSignal
         ? "Campo microscópico limitado com estrutura incomum/hemoparasita suspeito. Recomenda-se revisão de múltiplos campos e confirmação laboratorial."
-        : "Campo microscópico limitado contendo poucos leucócitos maduros. Não há evidência inequívoca de blastos ou células imaturas críticas. Recomenda-se avaliação de múltiplos campos e correlação com hemograma.",
+        : "Avaliação leucocitária limitada pela representatividade do campo. A imagem isolada não permite caracterização populacional confiável nem exclusão global de células imaturas.",
     absentFindings:
       "Blastos inequívocos, bastonetes de Auer e células imaturas críticas não evidenciados neste campo; a baixa representatividade não permite exclusão global.",
   };
@@ -252,7 +289,7 @@ export function applyFieldAdequacyRules(analysis = {}) {
     erythrocytes:
       "Hemácias visíveis, sem base para afirmar padrão eritrocitário global.",
     leukocytes:
-      "Poucos leucócitos maduros visíveis; sem blastos inequívocos.",
+      "Avaliação leucocitária limitada pela representatividade do campo. A imagem isolada não permite caracterização populacional confiável nem exclusão global de células imaturas.",
     platelets:
       "Plaquetas visíveis, porém com avaliação quantitativa limitada.",
     dominantFinding:
@@ -286,8 +323,8 @@ export function applyFieldAdequacyRules(analysis = {}) {
   analysis.hematologicReasoning = {
     whatISee:
       fieldAdequacy.parasiteSignal || fieldAdequacy.unusualStructureSignal
-        ? "Campo microscópico limitado com estrutura incomum/hemoparasitária suspeita e poucos leucócitos maduros visíveis."
-        : "Campo microscópico com poucos leucócitos maduros visíveis e fundo eritrocitário predominante.",
+        ? "Avaliação leucocitária limitada pela representatividade do campo. A imagem isolada não permite caracterização populacional confiável nem exclusão global de células imaturas."
+        : "Avaliação leucocitária limitada pela representatividade do campo. A imagem isolada não permite caracterização populacional confiável nem exclusão global de células imaturas.",
     whatItResembles:
       fieldAdequacy.parasiteSignal || fieldAdequacy.unusualStructureSignal
         ? "Estrutura incomum que pode corresponder a hemoparasita extracelular/intraeritrocitário ou artefato."
@@ -297,7 +334,7 @@ export function applyFieldAdequacyRules(analysis = {}) {
     finalInterpretation:
       fieldAdequacy.parasiteSignal || fieldAdequacy.unusualStructureSignal
         ? "Campo limitado com estrutura incomum/hemoparasita suspeito; requer confirmação laboratorial e revisão microscópica profissional."
-        : "Campo microscópico limitado contendo poucos leucócitos maduros. Não há evidência inequívoca de blastos ou células imaturas críticas.",
+        : "Avaliação leucocitária limitada pela representatividade do campo. A imagem isolada não permite caracterização populacional confiável nem exclusão global de células imaturas."
   };
 
   analysis.overallAssessment = {
@@ -310,19 +347,22 @@ export function applyFieldAdequacyRules(analysis = {}) {
     mainImpression:
       fieldAdequacy.parasiteSignal || fieldAdequacy.unusualStructureSignal
         ? "Campo microscópico limitado com estrutura incomum/hemoparasita suspeito. Recomenda-se avaliação de múltiplos campos, confirmação laboratorial e revisão microscópica profissional."
-        : "Campo microscópico limitado contendo poucos leucócitos maduros. Não há evidência inequívoca de blastos ou células imaturas críticas. Recomenda-se avaliação de múltiplos campos e correlação com hemograma.",
+        : "Avaliação leucocitária limitada pela representatividade do campo. A imagem isolada não permite caracterização populacional confiável nem exclusão global de células imaturas."
   };
 
   analysis.structuredReport = {
     ...(analysis.structuredReport || {}),
+
     conclusion:
       fieldAdequacy.parasiteSignal || fieldAdequacy.unusualStructureSignal
         ? "Campo microscópico limitado com estrutura incomum/hemoparasita suspeito."
-        : "Campo microscópico limitado contendo poucos leucócitos maduros. Não há evidência inequívoca de blastos ou células imaturas críticas.",
+        : "Avaliação leucocitária limitada pela representatividade do campo. A imagem isolada não permite caracterização populacional confiável nem exclusão global de células imaturas.",
+
     hematologicMeaning:
       fieldAdequacy.parasiteSignal || fieldAdequacy.unusualStructureSignal
         ? "A imagem isolada não permite identificação definitiva da estrutura, espécie parasitária ou relevância clínica."
         : "A imagem isolada não permite afirmar estado hematológico normal ou morfologia preservada global.",
+
     recommendation:
       fieldAdequacy.parasiteSignal || fieldAdequacy.unusualStructureSignal
         ? "Correlacionar com hemograma completo, gota espessa/esfregaço seriado, métodos complementares conforme protocolo e revisão microscópica profissional."

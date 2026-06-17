@@ -19,6 +19,11 @@ export function analyzeGlobalPattern(result = {}) {
     visualEvidence.repetitiveMononuclearCells === true ||
     visualEvidence.uniformAtypicalCells === true;
 
+  const reactivePattern =
+    findings.reactiveLymphocytes === true ||
+    findings.mononucleosisSuspicion === true ||
+    findings.downeyLikeCells === true;
+
   const atypical =
     findings.atypicalLymphocytes === true ||
     findings.largeMononuclearCells === true ||
@@ -55,13 +60,15 @@ export function analyzeGlobalPattern(result = {}) {
 
   let dominantPattern = "GLOBAL_UNREMARKABLE_PATTERN";
 
-  if (monomorphic) {
-    dominantPattern = "MONOMORPHIC_MONONUCLEAR_POPULATION";
-  } else if (atypical) {
-    dominantPattern = "ATYPICAL_MONONUCLEAR_PATTERN";
-  } else if (blastLike) {
-    dominantPattern = "IMMATURE_OR_BLAST_LIKE_PATTERN";
-  }
+    if (reactivePattern) {
+      dominantPattern = "REACTIVE_LYMPHOID_PATTERN";
+    } else if (monomorphic) {
+      dominantPattern = "MONOMORPHIC_MONONUCLEAR_POPULATION";
+    } else if (atypical) {
+      dominantPattern = "ATYPICAL_MONONUCLEAR_PATTERN";
+    } else if (blastLike) {
+      dominantPattern = "IMMATURE_OR_BLAST_LIKE_PATTERN";
+    }
 
   return {
     dominantPattern,

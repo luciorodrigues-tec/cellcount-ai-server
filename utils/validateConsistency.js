@@ -110,11 +110,25 @@ function validateConsistency(result = {}) {
 
   if (
     f.largeMononuclearCells &&
-    f.monomorphicPopulation
+    f.monomorphicPopulation &&
+    !f.reactiveLymphocytes &&
+    !f.atypicalLymphocytes &&
+    !f.plasmocytes &&
+    !f.plasmacytoidCells
   ) {
 
     result.morphologicRiskClass =
-      "CLASS_4_BLAST_SUSPICION";
+      "CLASS_3_ATYPICAL_MONOMORPHIC_POPULATION";
+
+    result.riskLevel =
+      "RISCO MORFOLÓGICO MODERADO";
+
+    result.overallAssessment.requiresHumanReview =
+      true;
+
+    result.normalityBlocked =
+      true;
+  }
 
     result.riskLevel =
       "RISCO MORFOLÓGICO MODERADO/ALTO";

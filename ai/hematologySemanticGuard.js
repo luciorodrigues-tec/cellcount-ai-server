@@ -32,7 +32,10 @@ export function sanitizeHematologyLanguage(result = {}) {
     visualEvidence.cellSizeIncrease === true &&
     fieldAdequacy.adequateForBlastScreening === true;
 
-  if (limitedField) {
+  if (
+    limitedField &&
+    !hasPopulationSignal
+  ) {
     result.normalityBlocked = true;
     result.requiresHumanReview = true;
     result.morphologicRiskClass = "CLASS_1_LIMITED_FIELD";
@@ -59,14 +62,13 @@ export function sanitizeHematologyLanguage(result = {}) {
       "Avaliação eritrocitária limitada ao campo enviado. Não afirmar normocitose, normocromia ou preservação eritrocitária global pela imagem isolada.";
 
     result.morphologyAnalysis.leukocyteReview =
-      "Poucos leucócitos maduros visíveis. Sem evidência inequívoca de blastos ou células imaturas críticas neste campo analisado.";
+      "Avaliação leucocitária limitada pela representatividade do campo. A imagem isolada não permite caracterização populacional confiável nem exclusão global de células imaturas.";
 
     result.morphologyAnalysis.plateletReview =
       "Avaliação plaquetária limitada pela representatividade do campo. Não afirmar número adequado ou preservação plaquetária global.";
 
     result.morphologyAnalysis.summary =
-      "Campo microscópico limitado contendo poucos leucócitos maduros. Não há evidência inequívoca de blastos ou células imaturas críticas. Recomenda-se avaliação de múltiplos campos e correlação com hemograma.";
-
+      "Avaliação leucocitária limitada pela representatividade do campo. A imagem isolada não permite caracterização populacional confiável nem exclusão global de células imaturas."
     result.interpretiveSynthesis =
       "A baixa representatividade celular limita a interpretação. O campo analisado não demonstra blastos inequívocos ou células imaturas críticas, porém não permite conclusão global sobre normalidade hematológica.";
 
@@ -75,13 +77,13 @@ export function sanitizeHematologyLanguage(result = {}) {
 
     result.hematologicReasoning = {
       whatISee:
-        "Campo microscópico com poucos leucócitos maduros visíveis e fundo eritrocitário predominante.",
+        "Avaliação leucocitária limitada pela representatividade do campo. A imagem isolada não permite caracterização populacional confiável nem exclusão global de células imaturas.",
       whatItResembles:
         "Campo limitado para avaliação populacional. Não há base suficiente para afirmar padrão normal, reacional ou clonal sustentado.",
       whatICannotConfirm:
         "Não é possível confirmar normalidade global, morfologia preservada, estado hematológico normal, clonalidade, malignidade ou diagnóstico definitivo pela imagem isolada.",
       finalInterpretation:
-        "Campo microscópico limitado contendo poucos leucócitos maduros. Não há evidência inequívoca de blastos ou células imaturas críticas.",
+        "Avaliação leucocitária limitada pela representatividade do campo. A imagem isolada não permite caracterização populacional confiável nem exclusão global de células imaturas."
     };
 
     result.overallAssessment.requiresHumanReview = true;
