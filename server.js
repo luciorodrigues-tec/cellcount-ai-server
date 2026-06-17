@@ -6302,16 +6302,29 @@ if (rawHasAtypicalMononuclearPopulation) {
   finalResult.whatAISees.negativeFindings =
     "Não afirmar ausência global de blastos pela imagem isolada.";
 
-  finalResult.hematologicReasoning.finalInterpretation =
-    restoredSummary;
+  if (
+    typeof finalResult.hematologicReasoning !== "object" ||
+    finalResult.hematologicReasoning === null
+  ) {
+    finalResult.hematologicReasoning = {
+      whatISee: "",
+      whatItResembles: "",
+      whatICannotConfirm: "",
+      finalInterpretation: "",
+    };
+  }
 
-  finalResult.clinicalMeaning =
-    "Achado morfológico relevante. Requer correlação com hemograma, revisão microscópica profissional e, se indicado, imunofenotipagem.";
+    finalResult.interpretiveSynthesis =
+      restoredSummary;
 
-  finalResult.interpretiveSynthesis =
-    restoredSummary;
-}
+    finalResult.hematologicReasoning.finalInterpretation =
+      finalResult.interpretiveSynthesis ||
+      finalResult.mainFinding ||
+      "";
 
+    finalResult.clinicalMeaning =
+      "Achado morfológico relevante. Requer correlação com hemograma, revisão microscópica profissional e, se indicado, imunofenotipagem.";
+  }
 // =====================================================
 // RAW GPT CRITICAL FINDINGS RESTORE
 // impede normalização apagar achados críticos
