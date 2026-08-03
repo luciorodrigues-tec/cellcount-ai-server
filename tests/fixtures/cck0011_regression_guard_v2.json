@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 2,
+  "serverFile": "server.js",
+  "promptLength": 14880,
+  "promptHash": "72a9d9b629a54890304182fd417f762af44dfd29eec7a0582e307949bcf58086",
+  "signatureHash": "4f90976842d08e3d1aaae360c671f4dc44acd7c371852f8f2e8b95b3208e3e06",
+  "normalizedServerHash": "3006f1888b62028329538ac8a005b74f1d6fac2cbb4591f8874ec9042c66ff4d",
+  "signatureIds": [
+    "hospital_prompt",
+    "final_differential_engine_import",
+    "final_differential_engine_bootstrap",
+    "final_clinical_governor",
+    "consistency_validation",
+    "clinical_safety_governor",
+    "hematology_safety_engine",
+    "hematology_consensus_engine",
+    "final_differential_engine_log"
+  ]
+}

@@ -1,0 +1,1734 @@
+{
+  "suite": "CI-001B.2 End-to-End Specimen Validation",
+  "version": "1.0.0",
+  "executedAt": "2026-07-27T00:17:11.613Z",
+  "baseUrl": "http://localhost:3000",
+  "passed": true,
+  "summary": {
+    "total": 2,
+    "passed": 2,
+    "failed": 0,
+    "warnings": 0
+  },
+  "cases": [
+    {
+      "name": "Sangue periférico",
+      "image": "C:\\Users\\ubuntu\\Desktop\\sangue_periferico.jpeg",
+      "passed": true,
+      "elapsedMs": 8966,
+      "classification": {
+        "predictedType": "PERIPHERAL_BLOOD",
+        "confidence": 0.85,
+        "alternativeType": "HEMODILUTED_BONE_MARROW",
+        "alternativeConfidence": 0.15,
+        "modelVersion": "specimen-classifier-v1",
+        "evidence": [
+          {
+            "kind": "cellularity",
+            "description": "Predominância de células maduras e forte predomínio eritrocitário.",
+            "supports": "PERIPHERAL_BLOOD",
+            "weight": 0.7,
+            "confidence": 0.85
+          },
+          {
+            "kind": "distribution",
+            "description": "Distribuição típica de esfregaço periférico.",
+            "supports": "PERIPHERAL_BLOOD",
+            "weight": 0.3,
+            "confidence": 0.85
+          }
+        ]
+      },
+      "specimenRouting": {
+        "analysisType": "peripheral_blood",
+        "reviewRequired": false,
+        "version": "CI-001B-v1"
+      },
+      "specimenType": "PERIPHERAL_BLOOD",
+      "validation": {
+        "failures": [],
+        "warnings": []
+      },
+      "analysis": {
+        "normalityBlocked": true,
+        "blockNormalReason": [
+          "Baixa representatividade celular",
+          "Campo insuficiente para afirmar normalidade global",
+          "Campo microscópico limitado",
+          "Não afirmar normalidade global pela imagem isolada",
+          "Não afirmar normalidade global",
+          "Campo microscópico limitado para conclusão populacional confiável. Recomenda-se avaliação de múltiplos campos.",
+          "Suspeita de células imaturas/blásticas",
+          "Necessária revisão hematológica especializada"
+        ],
+        "morphologicRiskClass": "CLASS_1_LIMITED_FIELD",
+        "reactiveLymphoidPattern": false,
+        "mononucleosisSuspicion": false,
+        "downeyCellSuspicion": false,
+        "summary": "",
+        "riskLevel": "Campo limitado",
+        "observations": "",
+        "alerts": [],
+        "morphologies": [],
+        "counts": {},
+        "findings": {
+          "reactiveLymphocytes": false,
+          "largeMononuclearCells": false,
+          "plasmacytoidCells": false,
+          "plasmocytes": false,
+          "plasmablasts": false,
+          "atypicalLymphocytes": false,
+          "atypicalLymphocyteSubtype": "none",
+          "downeyLikeCells": false,
+          "downeyType": "none",
+          "monocytoidAtypicalLymphocytes": false,
+          "lymphocytoidAtypicalLymphocytes": false,
+          "immunoblastoidCells": false,
+          "monomorphicPopulation": false,
+          "immatureCells": false,
+          "blastSuspicion": false
+        },
+        "morphologyAnalysis": {
+          "visualMorphologyDescription": {
+            "globalView": "Campo microscópico limitado para avaliação global.",
+            "dominantPopulation": "Baixa representatividade celular.",
+            "cellularity": "Baixa representatividade leucocitária para análise populacional confiável.",
+            "nuclearFeatures": "",
+            "cytoplasmicFeatures": "",
+            "populationHeterogeneity": "",
+            "erythrocyteBackground": "Hemácias visíveis, sem base para afirmar padrão eritrocitário global.",
+            "plateletBackground": "Plaquetas visíveis, porém com avaliação quantitativa limitada.",
+            "criticalNegativeFindings": "Blastos inequívocos e bastonetes de Auer não evidenciados neste campo.",
+            "overallImpression": "Campo microscópico limitado. A imagem permite triagem morfológica inicial, mas não permite afirmar morfologia global não confirmada, estado hematológico global não confirmado ou padrão populacional sustentado."
+          },
+          "cellMorphology": {},
+          "populationPatternAnalysis": {},
+          "negativeFindings": [],
+          "overview": "Campo microscópico limitado para conclusão morfológica global. A baixa representatividade celular impede afirmar morfologia preservada, estado hematológico normal ou padrão populacional sustentado.",
+          "erythrocyteReview": "Avaliação eritrocitária limitada ao campo enviado. Hemácias são visíveis, porém não é adequado afirmar normocitose, normocromia ou preservação global da série eritrocitária apenas por este campo isolado.",
+          "leukocyteReview": "Avaliação leucocitária limitada pela representatividade do campo. A imagem isolada não permite caracterização populacional confiável nem exclusão global de células imaturas.",
+          "plateletReview": "Avaliação plaquetária limitada ao campo enviado. A imagem isolada não permite conclusão quantitativa ou morfológica global confiável da série plaquetária.",
+          "absentFindings": "Avaliação leucocitária limitada pela representatividade do campo. A imagem isolada não permite caracterização populacional confiável nem exclusão global de células imaturas.",
+          "biologicalInterpretation": "A baixa representatividade do campo impede conclusão hematológica global. Os achados devem ser interpretados de forma conservadora e correlacionados com hemograma completo e revisão de múltiplos campos.",
+          "differentialDiagnosis": "",
+          "summary": "Campo microscópico limitado e insuficiente para avaliação populacional confiável. A imagem isolada não permite afirmar normalidade global nem excluir alterações críticas com segurança."
+        },
+        "educationalPearls": [],
+        "heatmapRegions": [],
+        "imageQuality": {},
+        "visualEvidence": {
+          "cellSizeIncrease": false,
+          "abundantBasophilicCytoplasm": false,
+          "erythrocyteMolding": false,
+          "irregularCellBorders": false,
+          "eccentricNucleus": false,
+          "prominentNucleolus": false
+        },
+        "positiveFindings": [],
+        "negativeFindingsStructured": [
+          "Blastos inequívocos não evidenciados",
+          "Células imaturas críticas não evidenciadas",
+          "Bastonetes de Auer não evidenciados",
+          "Agregados plaquetários não evidenciados"
+        ],
+        "executiveSummary": {
+          "mainFinding": "Achado principal não definido.",
+          "riskLevel": "Risco não definido.",
+          "confidence": "0%",
+          "pattern": "Padrão morfológico não definido.",
+          "humanReview": "Revisão humana conforme contexto clínico"
+        },
+        "whatAISees": {
+          "globalField": "Campo microscópico limitado para avaliação global.",
+          "cellularity": "Baixa representatividade leucocitária para análise populacional confiável.",
+          "erythrocytes": "Hemácias visíveis no campo, porém sem base suficiente para afirmar preservação global da série.",
+          "leukocytes": "Avaliação leucocitária limitada pela representatividade do campo. A imagem isolada não permite caracterização populacional confiável nem exclusão global de células imaturas.",
+          "platelets": "Avaliação plaquetária limitada pela representatividade do campo.",
+          "dominantFinding": "Campo microscópico limitado.",
+          "unusualStructures": "",
+          "negativeFindings": "Blastos inequívocos, bastonetes de Auer e células imaturas críticas não evidenciados neste campo.",
+          "imageLimitations": "Campo único/limitado; não permite conclusão hematológica global.",
+          "freeNarrative": "Avaliação leucocitária limitada pela representatividade do campo. A imagem isolada não permite caracterização populacional confiável nem exclusão global de células imaturas.",
+          "positiveFindings": [],
+          "negativeFindingsStructured": [
+            "Blastos inequívocos não evidenciados",
+            "Células imaturas críticas não evidenciadas",
+            "Bastonetes de Auer não evidenciados",
+            "Agregados plaquetários não evidenciados"
+          ]
+        },
+        "patternRecognition": {
+          "erythrocytePattern": "Avaliação limitada",
+          "leukocytePattern": "Baixa representatividade leucocitária",
+          "plateletPattern": "Avaliação limitada",
+          "artifactPattern": "Não definido",
+          "overallPattern": "Campo limitado para conclusão populacional"
+        },
+        "interpretiveSynthesis": "A baixa representatividade celular limita a interpretação. A imagem isolada não permite afirmar normalidade global nem excluir alterações críticas com segurança. Recomenda-se avaliação de múltiplos campos e correlação com hemograma.",
+        "clinicalMeaning": "Campo limitado. A imagem isolada não permite afirmar estado hematológico normal ou morfologia preservada global. Recomenda-se correlação com hemograma completo, dados clínicos e revisão microscópica profissional.",
+        "hematologicReasoning": {
+          "whatISee": "Avaliação leucocitária limitada pela representatividade do campo. A imagem isolada não permite caracterização populacional confiável nem exclusão global de células imaturas.",
+          "whatItResembles": "Campo limitado para avaliação populacional, sem base suficiente para inferir padrão normal, reacional ou clonal sustentado.",
+          "whatICannotConfirm": "Não é possível confirmar normalidade global, morfologia preservada, clonalidade, malignidade, parasitemia ou diagnóstico definitivo pela imagem isolada.",
+          "finalInterpretation": "Campo microscópico limitado e insuficiente para avaliação populacional confiável. A ausência de alterações críticas não pode ser afirmada com segurança a partir deste campo isolado."
+        },
+        "educationalImpact": "",
+        "erythrocyteFindings": {},
+        "leukocyteFindings": {},
+        "plateletFindings": {},
+        "blastSuspicion": {},
+        "overallAssessment": {
+          "requiresHumanReview": true,
+          "riskCategory": "CLASS_1_LIMITED_FIELD",
+          "mainImpression": "Campo microscópico limitado e insuficiente para avaliação populacional confiável. A imagem isolada não permite afirmar normalidade global nem excluir alterações críticas com segurança."
+        },
+        "structuredReport": {
+          "conclusion": "Campo microscópico limitado e insuficiente para avaliação populacional confiável. A imagem isolada não permite afirmar normalidade global nem excluir alterações críticas com segurança.",
+          "hematologicMeaning": "Campo limitado. A imagem isolada não permite afirmar estado hematológico normal ou morfologia preservada global. Recomenda-se correlação com hemograma completo, dados clínicos e revisão microscópica profissional.",
+          "recommendation": "Correlacionar com hemograma completo, dados clínicos e revisão microscópica profissional.",
+          "resumoMorfologico": "Campo microscópico limitado; não emitir conclusão global de normalidade ou preservação.",
+          "interpretacaoEducacional": "A baixa representatividade celular impede afirmar morfologia preservada, normocitose, normocromia, número plaquetário adequado ou estado hematológico normal.",
+          "limitacoes": "Campo limitado. Necessária avaliação de múltiplos campos, hemograma completo e revisão microscópica profissional."
+        },
+        "differentialDiagnosis": [],
+        "criticalFlags": [],
+        "analysisSource": "ai_visual",
+        "manualCounts": {},
+        "aiDetectedCounts": {},
+        "hybridValidation": {},
+        "rawResponse": {
+          "visualEvidence": {
+            "cellSizeIncrease": false,
+            "abundantBasophilicCytoplasm": false,
+            "erythrocyteMolding": false,
+            "irregularCellBorders": false,
+            "eccentricNucleus": false,
+            "prominentNucleolus": false
+          },
+          "heatmapRegions": [],
+          "analysisSource": "ai_visual",
+          "manualCounts": {},
+          "manualMetadata": {
+            "analysisSource": "ai_visual",
+            "manualMode": false,
+            "hybridMode": false,
+            "aiVisualMode": true,
+            "hasManualData": false
+          }
+        },
+        "fieldAdequacy": {
+          "visibleLeukocytes": 0,
+          "singleCellConcern": true,
+          "parasiteSignal": false,
+          "unusualStructureSignal": false,
+          "adequateForLeukocyteAnalysis": true,
+          "adequateForBlastScreening": true,
+          "adequateForPopulationAssessment": false,
+          "limitedField": true,
+          "limitationReason": "Campo com baixa representatividade celular; não permite conclusão morfológica global."
+        },
+        "requiresHumanReview": true,
+        "finalClassification": "CLASS_1_LIMITED_FIELD",
+        "globalPattern": {
+          "dominantPattern": "GLOBAL_UNREMARKABLE_PATTERN",
+          "populationDistribution": "SCATTERED_OR_NOT_DEFINED",
+          "physiologicAppearance": false,
+          "normalityBlocked": true,
+          "normalityReason": [],
+          "globalSummary": "A avaliação global identifica padrão morfológico não plenamente fisiológico, com necessidade de correlação microscópica, hematimétrica e clínica.",
+          "globalInterpretation": "Campo microscópico limitado para conclusão morfológica global. A baixa representatividade celular impede afirmar morfologia global não confirmada, estado hematológico global não confirmado ou padrão populacional sustentado.",
+          "ruleVersion": "GLOBAL_PATTERN_ENGINE_V1"
+        },
+        "possibleClinicalCorrelations": [],
+        "associatedEducationalHypotheses": [],
+        "clinicalCorrelationNeeds": [],
+        "confidenceAnalysis": {
+          "globalConfidenceScore": 35,
+          "hematologicRisk": {
+            "level": "indeterminate",
+            "score": 0,
+            "label": "CLASSIFICAÇÃO MORFOLÓGICA INDETERMINADA"
+          },
+          "microscopyQuality": {
+            "score": 55,
+            "classification": "Moderada"
+          },
+          "confidenceMatrix": {
+            "blastConfidence": 0,
+            "schistocyteConfidence": 0,
+            "erythrocyteConfidence": 0,
+            "plateletConfidence": 0,
+            "inflammatoryPatternConfidence": 0,
+            "dysplasiaConfidence": 0,
+            "diagnosticCoherenceConfidence": 0
+          },
+          "confidenceHierarchy": {
+            "cellLevel": 25,
+            "morphologyLevel": 25,
+            "diagnosticLevel": 0,
+            "global": 35
+          },
+          "calibration": {
+            "version": "V4_LIMITED_FIELD_LOCK",
+            "strategy": "limited_field_no_global_normality",
+            "safetyAware": true,
+            "limitedFieldLock": true
+          },
+          "safetySignals": {
+            "visualEvidenceScore": 0,
+            "diagnosticReliability": 0,
+            "morphologyCoherence": 0,
+            "artifactProbability": 0,
+            "falsePositiveRisk": 0,
+            "safeDiagnosticGate": false
+          },
+          "summary": "Campo microscópico limitado. A confiança global não deve ser interpretada como normalidade hematológica.",
+          "riskClassification": "Campo limitado — revisão de múltiplos campos recomendada"
+        },
+        "mainFinding": "Campo microscópico limitado e insuficiente para avaliação populacional confiável. A imagem isolada não permite afirmar normalidade global nem excluir alterações críticas com segurança.",
+        "primaryFinding": "Campo microscópico limitado e insuficiente para avaliação populacional confiável. A imagem isolada não permite afirmar normalidade global nem excluir alterações críticas com segurança.",
+        "finalConclusion": "Campo microscópico limitado e insuficiente para avaliação populacional confiável. A imagem isolada não permite afirmar normalidade global nem excluir alterações críticas com segurança.",
+        "reactiveLymphocyteAnalysis": {
+          "reactiveScore": 0,
+          "reactiveConfidence": "IMPROVAVEL",
+          "supportsReactivePattern": false,
+          "requiresCautionForBlastMimic": false,
+          "reasoning": []
+        },
+        "blastMimicAnalysis": {
+          "blastMimicScore": 0,
+          "blastMimicRisk": "SEM_MIMETISMO_RELEVANTE",
+          "requiresBlastDifferentiation": false,
+          "favorsReactiveOverBlast": false,
+          "reasoning": [],
+          "ruleVersion": "BLAST_MIMIC_ENGINE_V1"
+        },
+        "antiOvercallingAnalysis": {
+          "adjustedFindings": {
+            "reactiveLymphocytes": false,
+            "largeMononuclearCells": false,
+            "plasmacytoidCells": false,
+            "plasmocytes": false,
+            "plasmablasts": false,
+            "atypicalLymphocytes": false,
+            "atypicalLymphocyteSubtype": "none",
+            "downeyLikeCells": false,
+            "downeyType": "none",
+            "monocytoidAtypicalLymphocytes": false,
+            "lymphocytoidAtypicalLymphocytes": false,
+            "immunoblastoidCells": false,
+            "monomorphicPopulation": false,
+            "immatureCells": false,
+            "blastSuspicion": false
+          },
+          "antiOvercallingApplied": false,
+          "adjustments": [],
+          "warnings": [],
+          "ruleVersion": "ANTI_OVERCALLING_V1_REACTIVE_VS_BLAST"
+        },
+        "lymphoidPatternAnalysis": {
+          "lymphoidPattern": "LYMPHOID_REACTIVE_OR_UNREMARKABLE",
+          "riskCeiling": "CLASS_1_LIMITED_FIELD_ATYPICAL_CELL",
+          "allowHighSuspicion": false,
+          "forceDowngrade": false,
+          "reasoning": [
+            "Campo limitado: não permite concluir população linfoide monomórfica sustentada."
+          ],
+          "ruleVersion": "LYMPHOID_PATTERN_ENGINE_V2"
+        },
+        "manualMetadata": {
+          "analysisSource": "ai_visual",
+          "manualMode": false,
+          "hybridMode": false,
+          "aiVisualMode": true,
+          "hasManualData": false
+        },
+        "extractedText": "campo limitado campo microscopico limitado e insuficiente para avaliacao populacional confiavel a imagem isolada nao permite afirmar normalidade global nem excluir alteracoes criticas com seguranca visualevidence cellsizeincrease false abundantbasophiliccytoplasm false erythrocytemolding false irregularcellborders false eccentricnucleus false prominentnucleolus false heatmapregions analysissource ai visual manualcounts manualmetadata analysissource ai visual manualmode false hybridmode false aivisualmode true hasmanualdata false",
+        "erythrocyteAnalysis": {
+          "erythrocyteFindings": [],
+          "erythrocyteAlerts": [],
+          "erythrocyteCorrelations": [],
+          "erythrocyteReasoning": [],
+          "contradictionFlags": [],
+          "erythrocyteSummary": "Sem alterações eritrocitárias significativas.",
+          "dominantMorphology": "normal_pattern",
+          "morphologyScores": {
+            "schistocyte": 0,
+            "acanthocyte": 0,
+            "echinocyte": 0,
+            "targetCell": 0,
+            "sickleCell": 0,
+            "rouleaux": 0,
+            "anisocytosis": 0,
+            "poikilocytosis": 0,
+            "polychromasia": 0,
+            "membraneDisorder": 0,
+            "hemolyticPattern": 0,
+            "regenerativePattern": 0,
+            "artifactPattern": 0,
+            "coherenceScore": 0
+          },
+          "morphologicRisk": "low"
+        },
+        "leukocyteAnalysis": {
+          "leukocyteFindings": [],
+          "leukocyteAlerts": [],
+          "leukocyteCorrelations": [],
+          "leukocyteReasoning": [],
+          "contradictionFlags": [],
+          "leukocyteSummary": "Sem alterações leucocitárias significativas.",
+          "primaryPattern": "normal_pattern",
+          "secondaryPattern": null,
+          "dominantPattern": "normal_pattern",
+          "reactivePatternDetected": false,
+          "reactiveLymphocytes": false,
+          "atypicalLymphocytes": false,
+          "mononucleosisSuspicion": false,
+          "immatureFeaturesDetected": false,
+          "leukocyteScores": {
+            "blast": 0,
+            "leftShift": 0,
+            "hypersegmentation": 0,
+            "toxicChanges": 0,
+            "reactivePattern": 0,
+            "neoplasticPattern": 0,
+            "maturationCoherence": 0,
+            "immatureFeatures": 0,
+            "inflammatoryActivation": 0,
+            "dysplasia": 0,
+            "artifactPattern": 0,
+            "coherenceScore": 0
+          },
+          "blastRisk": "low"
+        },
+        "plateletAnalysis": {
+          "plateletFindings": [],
+          "plateletAlerts": [],
+          "plateletCorrelations": [],
+          "plateletReasoning": [],
+          "contradictionFlags": [],
+          "plateletSummary": "Avaliação plaquetária sem alteração específica detectada pelo motor plaquetário; interpretar conforme representatividade do campo.",
+          "dominantPlateletPattern": "normal_platelet_pattern",
+          "plateletScores": {
+            "giantPlatelets": 0,
+            "plateletAggregation": 0,
+            "thrombocytopenia": 0,
+            "consumptivePattern": 0,
+            "pseudothrombocytopenia": 0,
+            "artifactPattern": 0,
+            "coherenceScore": 0
+          },
+          "emergencyLevel": "low"
+        },
+        "diagnosticCorrelation": {
+          "summary": "Análise hematológica automatizada realizada.",
+          "findings": [],
+          "recommendations": [
+            "Interpretação limitada por segurança clínica.",
+            "Baixa qualidade de imagem pode limitar interpretação."
+          ],
+          "differentialDiagnosis": [],
+          "requiresClinicalCorrelation": true,
+          "safeClinicalMode": true,
+          "requiresHumanReview": false,
+          "manualMode": false,
+          "hybridMode": false,
+          "aiVisualMode": true,
+          "confidenceLevel": "moderate",
+          "engineVersion": "DIAGNOSTIC_CORRELATION_V6_SAFE_HYBRID"
+        },
+        "consensusAnalysis": {
+          "analysisSource": "ai_visual",
+          "finalClassification": "indeterminate",
+          "clinicalPriority": "routine",
+          "overallRiskScore": 0,
+          "requiresHumanReview": true,
+          "safeClinicalMode": true,
+          "confidenceLevel": "low",
+          "summary": "Achados hematológicos inespecíficos. Correlação clínica recomendada.",
+          "alerts": [
+            "Baixa evidência visual automatizada."
+          ],
+          "recommendations": [
+            "Revisão microscópica recomendada."
+          ],
+          "diagnosticSuggestions": [],
+          "supportingFindings": [],
+          "rejectedFindings": [],
+          "visualEvidenceScore": 10,
+          "manualMode": false,
+          "hybridMode": false,
+          "aiVisualMode": true
+        },
+        "safetyValidation": {
+          "valid": true,
+          "severity": "low",
+          "safeDiagnosticGate": true,
+          "visualEvidenceScore": 64,
+          "morphologyCoherence": 92,
+          "artifactProbability": 10,
+          "falsePositiveRisk": 20,
+          "diagnosticReliability": 68,
+          "blastMorphologySignal": {
+            "present": false,
+            "confidence": 0,
+            "criteria": {
+              "suspectedBlast": false,
+              "immatureCells": false,
+              "nucleoli": false,
+              "fineChromatin": false,
+              "highNC": false,
+              "absentSegmentation": false
+            },
+            "criteriaCount": 0,
+            "level": "low"
+          },
+          "alerts": [],
+          "contradictionFlags": [],
+          "coherenceAdjustments": [
+            "Blast confidence recalibrado pelo safety engine V8.3."
+          ],
+          "correctedAnalysis": {
+            "modifiedFields": [
+              "blastAssessment.confidence",
+              "schistocyteAssessment.confidence",
+              "heatmapRegions"
+            ],
+            "adjustments": [
+              "Blast confidence recalibrado pelo safety engine V8.3."
+            ],
+            "meta": {
+              "analysisSource": "ai_visual",
+              "manualDifferential": false,
+              "visualAnalysis": true,
+              "hybridAnalysis": false,
+              "visualEvidenceScore": 64,
+              "artifactProbability": 10,
+              "morphologyCoherence": 92,
+              "falsePositiveRisk": 20,
+              "diagnosticReliability": 68,
+              "blastMorphologySignal": {
+                "present": false,
+                "confidence": 0,
+                "criteria": {
+                  "suspectedBlast": false,
+                  "immatureCells": false,
+                  "nucleoli": false,
+                  "fineChromatin": false,
+                  "highNC": false,
+                  "absentSegmentation": false
+                },
+                "criteriaCount": 0,
+                "level": "low"
+              },
+              "evidenceProfile": {
+                "hasRbcEvidence": true,
+                "hasPlateletEvidence": true,
+                "hasLeukocyteEvidence": true,
+                "hasAbnormalMorphology": true,
+                "normalPattern": false,
+                "observedCells": {
+                  "erythrocytes": true,
+                  "leukocytes": true,
+                  "neutrophils": false,
+                  "lymphocytes": true,
+                  "monocytes": false,
+                  "eosinophils": false,
+                  "basophils": false,
+                  "platelets": true
+                }
+              }
+            }
+          }
+        },
+        "pipeline": {
+          "version": "V8_TURBO_ENTERPRISE",
+          "source": "ai_visual",
+          "multiStagePipeline": true,
+          "turboSingleOpenAICall": true,
+          "visualExtraction": true,
+          "morphologyValidation": true,
+          "evidenceEngine": true,
+          "safetyGate": true,
+          "consensusValidation": true,
+          "clinicalCorrelation": true,
+          "safeClinicalMode": true,
+          "manualMode": false,
+          "hybridMode": false,
+          "aiVisualMode": true
+        },
+        "metadata": {
+          "requestId": "4006873b-8a5f-43a5-a5db-af67e86f4bac",
+          "model": "gpt-4o",
+          "pipelineVersion": "V8_TURBO_ENTERPRISE",
+          "architecture": "turbo_semantic_hematology_engine",
+          "hospitalGrade": true,
+          "educationalMode": true,
+          "images": 1,
+          "imageMetadata": [
+            {
+              "originalWidth": 1599,
+              "originalHeight": 1200
+            }
+          ],
+          "visualEvidenceScore": 64,
+          "morphologyCoherence": 92,
+          "falsePositiveRisk": 20,
+          "diagnosticReliability": 68,
+          "artifactProbability": 10,
+          "safeDiagnosticGate": true,
+          "analysisSource": "ai_visual",
+          "performance": {
+            "imageTiming": 446,
+            "visualTiming": 3089,
+            "engineTiming": 7,
+            "safetyTiming": 15,
+            "consensusTiming": 2,
+            "confidenceTiming": 1,
+            "totalPipelineTime": 3580
+          }
+        },
+        "specimenType": "PERIPHERAL_BLOOD",
+        "specimenDecision": {
+          "status": "accepted",
+          "effectiveType": "PERIPHERAL_BLOOD",
+          "classification": {
+            "predictedType": "PERIPHERAL_BLOOD",
+            "confidence": 0.85,
+            "alternativeType": "HEMODILUTED_BONE_MARROW",
+            "alternativeConfidence": 0.15,
+            "modelVersion": "specimen-classifier-v1",
+            "evidence": [
+              {
+                "kind": "cellularity",
+                "description": "Predominância de células maduras e forte predomínio eritrocitário.",
+                "supports": "PERIPHERAL_BLOOD",
+                "weight": 0.7,
+                "confidence": 0.85
+              },
+              {
+                "kind": "distribution",
+                "description": "Distribuição típica de esfregaço periférico.",
+                "supports": "PERIPHERAL_BLOOD",
+                "weight": 0.3,
+                "confidence": 0.85
+              }
+            ]
+          },
+          "conflict": {
+            "severity": "none",
+            "declaredType": null,
+            "predictedType": "PERIPHERAL_BLOOD",
+            "message": null
+          },
+          "messages": []
+        },
+        "specimenClassification": {
+          "predictedType": "PERIPHERAL_BLOOD",
+          "confidence": 0.85,
+          "alternativeType": "HEMODILUTED_BONE_MARROW",
+          "alternativeConfidence": 0.15,
+          "modelVersion": "specimen-classifier-v1",
+          "evidence": [
+            {
+              "kind": "cellularity",
+              "description": "Predominância de células maduras e forte predomínio eritrocitário.",
+              "supports": "PERIPHERAL_BLOOD",
+              "weight": 0.7,
+              "confidence": 0.85
+            },
+            {
+              "kind": "distribution",
+              "description": "Distribuição típica de esfregaço periférico.",
+              "supports": "PERIPHERAL_BLOOD",
+              "weight": 0.3,
+              "confidence": 0.85
+            }
+          ]
+        },
+        "specimenRouting": {
+          "analysisType": "peripheral_blood",
+          "reviewRequired": false,
+          "version": "CI-001B-v1"
+        },
+        "dualPipelineValidation": {
+          "version": "CI-001C-v1",
+          "passed": true,
+          "deliveryAllowed": true,
+          "pipeline": "peripheral_blood",
+          "isolationPassed": true,
+          "leakedFields": []
+        },
+        "showRadar": false,
+        "hideAISeeingCard": true,
+        "hideEducationalHypotheses": true,
+        "hideClinicalCorrelations": true,
+        "hideDifferentialDiagnosis": true,
+        "hidePopulationAnalysis": true,
+        "finalRecommendation": "Recomenda-se análise de múltiplos campos da lâmina, correlação com hemograma completo e revisão por profissional habilitado antes de qualquer conclusão diagnóstica.",
+        "educationalHypotheses": [],
+        "clinicalCorrelations": []
+      }
+    },
+    {
+      "name": "Medula óssea",
+      "image": "C:\\Users\\ubuntu\\Desktop\\medula_ossea.jpeg",
+      "passed": true,
+      "elapsedMs": 12252,
+      "classification": {
+        "predictedType": "BONE_MARROW_ASPIRATE",
+        "confidence": 0.9,
+        "alternativeType": "HEMODILUTED_BONE_MARROW",
+        "alternativeConfidence": 0.1,
+        "modelVersion": "specimen-classifier-v1",
+        "evidence": [
+          {
+            "kind": "cellularity",
+            "description": "Alta densidade de células nucleadas e diversidade maturativa.",
+            "supports": "BONE_MARROW_ASPIRATE",
+            "weight": 0.7,
+            "confidence": 0.9
+          },
+          {
+            "kind": "other",
+            "description": "Presença de precursores hematopoéticos.",
+            "supports": "BONE_MARROW_ASPIRATE",
+            "weight": 0.3,
+            "confidence": 0.8
+          }
+        ]
+      },
+      "specimenRouting": {
+        "analysisType": "bone_marrow",
+        "reviewRequired": false,
+        "version": "CI-001B-v1"
+      },
+      "specimenType": "BONE_MARROW_ASPIRATE",
+      "validation": {
+        "failures": [],
+        "warnings": []
+      },
+      "analysis": {
+        "normalityBlocked": true,
+        "blockNormalReason": [
+          "Baixa representatividade celular",
+          "Campo insuficiente para afirmar normalidade global",
+          "Campo microscópico limitado",
+          "Não afirmar normalidade global pela imagem isolada",
+          "Material medular exige avaliação de representatividade e revisão especializada.",
+          "Material medular não deve ser classificado globalmente como normal por imagem isolada.",
+          "Adequação ou representatividade insuficiente para conclusão global.",
+          "Suspeita de população imatura/blástica.",
+          "Sinal possível de infiltração ou população anormal.",
+          "Não afirmar normalidade global",
+          "Campo microscópico limitado para conclusão populacional confiável. Recomenda-se avaliação de múltiplos campos.",
+          "Suspeita de células imaturas/blásticas",
+          "Necessária revisão hematológica especializada"
+        ],
+        "morphologicRiskClass": "CLASS_1_LIMITED_FIELD",
+        "reactiveLymphoidPattern": false,
+        "mononucleosisSuspicion": false,
+        "downeyCellSuspicion": false,
+        "summary": "",
+        "riskLevel": "Campo limitado",
+        "observations": "",
+        "alerts": [],
+        "morphologies": [],
+        "counts": {},
+        "findings": {
+          "reactiveLymphocytes": false,
+          "largeMononuclearCells": false,
+          "plasmacytoidCells": false,
+          "plasmocytes": false,
+          "plasmablasts": false,
+          "atypicalLymphocytes": false,
+          "atypicalLymphocyteSubtype": "none",
+          "downeyLikeCells": false,
+          "downeyType": "none",
+          "monocytoidAtypicalLymphocytes": false,
+          "lymphocytoidAtypicalLymphocytes": false,
+          "immunoblastoidCells": false,
+          "monomorphicPopulation": false,
+          "immatureCells": false,
+          "blastSuspicion": false
+        },
+        "morphologyAnalysis": {
+          "visualMorphologyDescription": {
+            "globalView": "Campo microscópico limitado para avaliação global.",
+            "dominantPopulation": "Baixa representatividade celular.",
+            "cellularity": "Baixa representatividade leucocitária para análise populacional confiável.",
+            "nuclearFeatures": "",
+            "cytoplasmicFeatures": "",
+            "populationHeterogeneity": "",
+            "erythrocyteBackground": "Hemácias visíveis, sem base para afirmar padrão eritrocitário global.",
+            "plateletBackground": "Plaquetas visíveis, porém com avaliação quantitativa limitada.",
+            "criticalNegativeFindings": "Blastos inequívocos e bastonetes de Auer não evidenciados neste campo.",
+            "overallImpression": "Campo microscópico limitado. A imagem permite triagem morfológica inicial, mas não permite afirmar morfologia global não confirmada, estado hematológico global não confirmado ou padrão populacional sustentado."
+          },
+          "cellMorphology": {},
+          "populationPatternAnalysis": {},
+          "negativeFindings": [],
+          "overview": "Campo microscópico limitado para conclusão morfológica global. A baixa representatividade celular impede afirmar morfologia preservada, estado hematológico normal ou padrão populacional sustentado.",
+          "erythrocyteReview": "Avaliação eritrocitária limitada ao campo enviado. Hemácias são visíveis, porém não é adequado afirmar normocitose, normocromia ou preservação global da série eritrocitária apenas por este campo isolado.",
+          "leukocyteReview": "Avaliação leucocitária limitada pela representatividade do campo. A imagem isolada não permite caracterização populacional confiável nem exclusão global de células imaturas.",
+          "plateletReview": "Avaliação plaquetária limitada ao campo enviado. A imagem isolada não permite conclusão quantitativa ou morfológica global confiável da série plaquetária.",
+          "absentFindings": "Avaliação leucocitária limitada pela representatividade do campo. A imagem isolada não permite caracterização populacional confiável nem exclusão global de células imaturas.",
+          "biologicalInterpretation": "A baixa representatividade do campo impede conclusão hematológica global. Os achados devem ser interpretados de forma conservadora e correlacionados com hemograma completo e revisão de múltiplos campos.",
+          "differentialDiagnosis": "",
+          "summary": "Campo microscópico limitado e insuficiente para avaliação populacional confiável. A imagem isolada não permite afirmar normalidade global nem excluir alterações críticas com segurança."
+        },
+        "educationalPearls": [],
+        "heatmapRegions": [],
+        "imageQuality": {},
+        "visualEvidence": {
+          "cellSizeIncrease": false,
+          "abundantBasophilicCytoplasm": false,
+          "erythrocyteMolding": false,
+          "irregularCellBorders": false,
+          "eccentricNucleus": false,
+          "prominentNucleolus": false
+        },
+        "positiveFindings": [],
+        "negativeFindingsStructured": [
+          "Blastos inequívocos não evidenciados",
+          "Células imaturas críticas não evidenciadas",
+          "Bastonetes de Auer não evidenciados",
+          "Agregados plaquetários não evidenciados"
+        ],
+        "executiveSummary": {
+          "mainFinding": "Achado principal não definido.",
+          "riskLevel": "Risco não definido.",
+          "confidence": "0%",
+          "pattern": "Padrão morfológico não definido.",
+          "humanReview": "Revisão humana conforme contexto clínico"
+        },
+        "whatAISees": {
+          "globalField": "Campo microscópico limitado para avaliação global.",
+          "cellularity": "Baixa representatividade leucocitária para análise populacional confiável.",
+          "erythrocytes": "Hemácias visíveis no campo, porém sem base suficiente para afirmar preservação global da série.",
+          "leukocytes": "Avaliação leucocitária limitada pela representatividade do campo. A imagem isolada não permite caracterização populacional confiável nem exclusão global de células imaturas.",
+          "platelets": "Avaliação plaquetária limitada pela representatividade do campo.",
+          "dominantFinding": "Campo microscópico limitado.",
+          "unusualStructures": "",
+          "negativeFindings": "Blastos inequívocos, bastonetes de Auer e células imaturas críticas não evidenciados neste campo.",
+          "imageLimitations": "Campo único/limitado; não permite conclusão hematológica global.",
+          "freeNarrative": "Avaliação leucocitária limitada pela representatividade do campo. A imagem isolada não permite caracterização populacional confiável nem exclusão global de células imaturas.",
+          "positiveFindings": [],
+          "negativeFindingsStructured": [
+            "Blastos inequívocos não evidenciados",
+            "Células imaturas críticas não evidenciadas",
+            "Bastonetes de Auer não evidenciados",
+            "Agregados plaquetários não evidenciados"
+          ]
+        },
+        "patternRecognition": {
+          "erythrocytePattern": "Avaliação limitada",
+          "leukocytePattern": "Baixa representatividade leucocitária",
+          "plateletPattern": "Avaliação limitada",
+          "artifactPattern": "Não definido",
+          "overallPattern": "Campo limitado para conclusão populacional"
+        },
+        "interpretiveSynthesis": "A baixa representatividade celular limita a interpretação. A imagem isolada não permite afirmar normalidade global nem excluir alterações críticas com segurança. Recomenda-se avaliação de múltiplos campos e correlação com hemograma.",
+        "clinicalMeaning": "Campo limitado. A imagem isolada não permite afirmar estado hematológico normal ou morfologia preservada global. Recomenda-se correlação com hemograma completo, dados clínicos e revisão microscópica profissional.",
+        "hematologicReasoning": {
+          "whatISee": "Avaliação leucocitária limitada pela representatividade do campo. A imagem isolada não permite caracterização populacional confiável nem exclusão global de células imaturas.",
+          "whatItResembles": "Campo limitado para avaliação populacional, sem base suficiente para inferir padrão normal, reacional ou clonal sustentado.",
+          "whatICannotConfirm": "Não é possível confirmar normalidade global, morfologia preservada, clonalidade, malignidade, parasitemia ou diagnóstico definitivo pela imagem isolada.",
+          "finalInterpretation": "Campo microscópico limitado e insuficiente para avaliação populacional confiável. A ausência de alterações críticas não pode ser afirmada com segurança a partir deste campo isolado."
+        },
+        "educationalImpact": "",
+        "erythrocyteFindings": {},
+        "leukocyteFindings": {},
+        "plateletFindings": {},
+        "blastSuspicion": {},
+        "overallAssessment": {
+          "requiresHumanReview": true,
+          "riskCategory": "CLASS_1_LIMITED_FIELD",
+          "mainImpression": "Campo microscópico limitado e insuficiente para avaliação populacional confiável. A imagem isolada não permite afirmar normalidade global nem excluir alterações críticas com segurança.",
+          "specimenSpecificReview": "bone_marrow"
+        },
+        "structuredReport": {
+          "conclusion": "Campo microscópico limitado e insuficiente para avaliação populacional confiável. A imagem isolada não permite afirmar normalidade global nem excluir alterações críticas com segurança.",
+          "hematologicMeaning": "Campo limitado. A imagem isolada não permite afirmar estado hematológico normal ou morfologia preservada global. Recomenda-se correlação com hemograma completo, dados clínicos e revisão microscópica profissional.",
+          "recommendation": "Correlacionar com hemograma completo, dados clínicos e revisão microscópica profissional.",
+          "resumoMorfologico": "Campo microscópico limitado; não emitir conclusão global de normalidade ou preservação.",
+          "interpretacaoEducacional": "A baixa representatividade celular impede afirmar morfologia preservada, normocitose, normocromia, número plaquetário adequado ou estado hematológico normal.",
+          "limitacoes": "Campo limitado. Necessária avaliação de múltiplos campos, hemograma completo e revisão microscópica profissional."
+        },
+        "differentialDiagnosis": [],
+        "criticalFlags": [],
+        "analysisSource": "ai_visual",
+        "manualCounts": {},
+        "aiDetectedCounts": {},
+        "hybridValidation": {},
+        "rawResponse": {
+          "specimenAssessment": {
+            "status": "present",
+            "summary": "Bone marrow aspirate specimen observed.",
+            "specimenType": "bone_marrow_aspirate"
+          },
+          "marrowAdequacy": {
+            "status": "notAssessable",
+            "technicalQuality": "Adequate staining and preservation.",
+            "representativity": "Single field limits global assessment.",
+            "summary": "Technical quality is adequate, but representativity is limited."
+          },
+          "spiculeAssessment": {
+            "status": "notObserved",
+            "observed": false,
+            "summary": "No spicules observed in the provided field."
+          },
+          "hemodilutionAssessment": {
+            "status": "indeterminate",
+            "suspected": null,
+            "summary": "Cannot determine hemodilution from the provided field."
+          },
+          "cellularityAssessment": {
+            "status": "notAssessable",
+            "scope": "field_limited",
+            "globalEstimateAllowed": false,
+            "estimate": null,
+            "summary": "Cellularity cannot be globally estimated from a single field."
+          },
+          "myeloidSeries": {
+            "status": "present",
+            "maturation": "Appears normal in observed cells.",
+            "dysplasia": "No dysplasia observed.",
+            "summary": "Myeloid series present with normal maturation."
+          },
+          "erythroidSeries": {
+            "status": "notAssessable",
+            "maturation": "",
+            "dysplasia": "",
+            "summary": "Erythroid series not assessable in the provided field."
+          },
+          "megakaryocyticSeries": {
+            "status": "notAssessable",
+            "maturation": "",
+            "dysplasia": "",
+            "summary": "Megakaryocytic series not assessable in the provided field."
+          },
+          "plasmaCellAssessment": {
+            "status": "present",
+            "estimatedPercentage": null,
+            "summary": "Plasma cells observed, but percentage not estimable."
+          },
+          "blastAssessment": {
+            "status": "present",
+            "observed": true,
+            "estimatedPercentage": null,
+            "globalAbsenceAllowed": false,
+            "summary": "Blasts observed, but percentage not estimable."
+          },
+          "dysplasiaAssessment": {
+            "status": "notObserved",
+            "globalExclusionAllowed": false,
+            "summary": "No dysplasia observed in the provided field."
+          },
+          "infiltrationAssessment": {
+            "status": "notAssessable",
+            "globalExclusionAllowed": false,
+            "summary": "Infiltration not assessable in the provided field."
+          },
+          "marrowLimitations": [
+            "Single field limits comprehensive assessment.",
+            "Absence of spicules limits representativity."
+          ],
+          "visualEvidence": {
+            "cellSizeIncrease": false,
+            "abundantBasophilicCytoplasm": false,
+            "erythrocyteMolding": false,
+            "irregularCellBorders": false,
+            "eccentricNucleus": false,
+            "prominentNucleolus": false
+          },
+          "heatmapRegions": [],
+          "analysisSource": "ai_visual",
+          "manualCounts": {},
+          "manualMetadata": {
+            "analysisSource": "ai_visual",
+            "manualMode": false,
+            "hybridMode": false,
+            "aiVisualMode": true,
+            "hasManualData": false
+          }
+        },
+        "fieldAdequacy": {
+          "visibleLeukocytes": 0,
+          "singleCellConcern": true,
+          "parasiteSignal": false,
+          "unusualStructureSignal": false,
+          "adequateForLeukocyteAnalysis": true,
+          "adequateForBlastScreening": true,
+          "adequateForPopulationAssessment": false,
+          "limitedField": true,
+          "limitationReason": "Campo com baixa representatividade celular; não permite conclusão morfológica global."
+        },
+        "requiresHumanReview": true,
+        "finalClassification": "CLASS_1_LIMITED_FIELD",
+        "globalPattern": {
+          "dominantPattern": "GLOBAL_UNREMARKABLE_PATTERN",
+          "populationDistribution": "SCATTERED_OR_NOT_DEFINED",
+          "physiologicAppearance": false,
+          "normalityBlocked": true,
+          "normalityReason": [],
+          "globalSummary": "A avaliação global identifica padrão morfológico não plenamente fisiológico, com necessidade de correlação microscópica, hematimétrica e clínica.",
+          "globalInterpretation": "Campo microscópico limitado para conclusão morfológica global. A baixa representatividade celular impede afirmar morfologia global não confirmada, estado hematológico global não confirmado ou padrão populacional sustentado.",
+          "ruleVersion": "GLOBAL_PATTERN_ENGINE_V1"
+        },
+        "possibleClinicalCorrelations": [],
+        "associatedEducationalHypotheses": [],
+        "clinicalCorrelationNeeds": [],
+        "confidenceAnalysis": {
+          "globalConfidenceScore": 35,
+          "hematologicRisk": {
+            "level": "indeterminate",
+            "score": 0,
+            "label": "CLASSIFICAÇÃO MORFOLÓGICA INDETERMINADA"
+          },
+          "microscopyQuality": {
+            "score": 55,
+            "classification": "Moderada"
+          },
+          "confidenceMatrix": {
+            "blastConfidence": 0,
+            "schistocyteConfidence": 0,
+            "erythrocyteConfidence": 0,
+            "plateletConfidence": 0,
+            "inflammatoryPatternConfidence": 0,
+            "dysplasiaConfidence": 0,
+            "diagnosticCoherenceConfidence": 0
+          },
+          "confidenceHierarchy": {
+            "cellLevel": 25,
+            "morphologyLevel": 25,
+            "diagnosticLevel": 0,
+            "global": 35
+          },
+          "calibration": {
+            "version": "V4_LIMITED_FIELD_LOCK",
+            "strategy": "limited_field_no_global_normality",
+            "safetyAware": true,
+            "limitedFieldLock": true
+          },
+          "safetySignals": {
+            "visualEvidenceScore": 0,
+            "diagnosticReliability": 0,
+            "morphologyCoherence": 0,
+            "artifactProbability": 0,
+            "falsePositiveRisk": 0,
+            "safeDiagnosticGate": false
+          },
+          "summary": "Campo microscópico limitado. A confiança global não deve ser interpretada como normalidade hematológica.",
+          "riskClassification": "Campo limitado — revisão de múltiplos campos recomendada"
+        },
+        "mainFinding": "Campo microscópico limitado e insuficiente para avaliação populacional confiável. A imagem isolada não permite afirmar normalidade global nem excluir alterações críticas com segurança.",
+        "primaryFinding": "Campo microscópico limitado e insuficiente para avaliação populacional confiável. A imagem isolada não permite afirmar normalidade global nem excluir alterações críticas com segurança.",
+        "finalConclusion": "Campo microscópico limitado e insuficiente para avaliação populacional confiável. A imagem isolada não permite afirmar normalidade global nem excluir alterações críticas com segurança.",
+        "reactiveLymphocyteAnalysis": {
+          "reactiveScore": 0,
+          "reactiveConfidence": "IMPROVAVEL",
+          "supportsReactivePattern": false,
+          "requiresCautionForBlastMimic": false,
+          "reasoning": []
+        },
+        "blastMimicAnalysis": {
+          "blastMimicScore": 0,
+          "blastMimicRisk": "SEM_MIMETISMO_RELEVANTE",
+          "requiresBlastDifferentiation": false,
+          "favorsReactiveOverBlast": false,
+          "reasoning": [],
+          "ruleVersion": "BLAST_MIMIC_ENGINE_V1"
+        },
+        "antiOvercallingAnalysis": {
+          "adjustedFindings": {
+            "reactiveLymphocytes": false,
+            "largeMononuclearCells": false,
+            "plasmacytoidCells": false,
+            "plasmocytes": false,
+            "plasmablasts": false,
+            "atypicalLymphocytes": false,
+            "atypicalLymphocyteSubtype": "none",
+            "downeyLikeCells": false,
+            "downeyType": "none",
+            "monocytoidAtypicalLymphocytes": false,
+            "lymphocytoidAtypicalLymphocytes": false,
+            "immunoblastoidCells": false,
+            "monomorphicPopulation": false,
+            "immatureCells": false,
+            "blastSuspicion": false
+          },
+          "antiOvercallingApplied": false,
+          "adjustments": [],
+          "warnings": [],
+          "ruleVersion": "ANTI_OVERCALLING_V1_REACTIVE_VS_BLAST"
+        },
+        "lymphoidPatternAnalysis": {
+          "lymphoidPattern": "LYMPHOID_REACTIVE_OR_UNREMARKABLE",
+          "riskCeiling": "CLASS_1_LIMITED_FIELD_ATYPICAL_CELL",
+          "allowHighSuspicion": false,
+          "forceDowngrade": false,
+          "reasoning": [
+            "Campo limitado: não permite concluir população linfoide monomórfica sustentada."
+          ],
+          "ruleVersion": "LYMPHOID_PATTERN_ENGINE_V2"
+        },
+        "manualMetadata": {
+          "analysisSource": "ai_visual",
+          "manualMode": false,
+          "hybridMode": false,
+          "aiVisualMode": true,
+          "hasManualData": false
+        },
+        "extractedText": "campo limitado campo microscopico limitado e insuficiente para avaliacao populacional confiavel a imagem isolada nao permite afirmar normalidade global nem excluir alteracoes criticas com seguranca specimenassessment status present summary bone marrow aspirate specimen observed specimentype bone marrow aspirate marrowadequacy status notassessable technicalquality adequate staining and preservation representativity single field limits global assessment summary technical quality is adequate but representativity is limited spiculeassessment status notobserved observed false summary no spicules observed in the provided field hemodilutionassessment status indeterminate suspected null summary cannot determine hemodilution from the provided field cellularityassessment status notassessable scope field limited globalestimateallowed false estimate null summary cellularity cannot be globally estimated from a single field myeloidseries status present maturation appears normal in observed cells dysplasia no dysplasia observed summary myeloid series present with normal maturation erythroidseries status notassessable maturation dysplasia summary erythroid series not assessable in the provided field megakaryocyticseries status notassessable maturation dysplasia summary megakaryocytic series not assessable in the provided field plasmacellassessment status present estimatedpercentage null summary plasma cells observed but percentage not estimable blastassessment status present observed true estimatedpercentage null globalabsenceallowed false summary blasts observed but percentage not estimable dysplasiaassessment status notobserved globalexclusionallowed false summary no dysplasia observed in the provided field infiltrationassessment status notassessable globalexclusionallowed false summary infiltration not assessable in the provided field marrowlimitations single field limits comprehensive assessment absence of spicules limits representativity visualevidence cellsizeincrease false abundantbasophiliccytoplasm false erythrocytemolding false irregularcellborders false eccentricnucleus false prominentnucleolus false heatmapregions analysissource ai visual manualcounts manualmetadata analysissource ai visual manualmode false hybridmode false aivisualmode true hasmanualdata false",
+        "erythrocyteAnalysis": {
+          "erythrocyteFindings": [],
+          "erythrocyteAlerts": [],
+          "erythrocyteCorrelations": [],
+          "erythrocyteReasoning": [],
+          "contradictionFlags": [],
+          "erythrocyteSummary": "Sem alterações eritrocitárias significativas.",
+          "dominantMorphology": "normal_pattern",
+          "morphologyScores": {
+            "schistocyte": 0,
+            "acanthocyte": 0,
+            "echinocyte": 0,
+            "targetCell": 0,
+            "sickleCell": 0,
+            "rouleaux": 0,
+            "anisocytosis": 0,
+            "poikilocytosis": 0,
+            "polychromasia": 0,
+            "membraneDisorder": 0,
+            "hemolyticPattern": 0,
+            "regenerativePattern": 0,
+            "artifactPattern": 0,
+            "coherenceScore": 0
+          },
+          "morphologicRisk": "low"
+        },
+        "leukocyteAnalysis": {
+          "leukocyteFindings": [],
+          "leukocyteAlerts": [],
+          "leukocyteCorrelations": [
+            "Myelodysplastic syndrome",
+            "Dysplastic hematopoiesis"
+          ],
+          "leukocyteReasoning": [
+            "Características sugestivas de displasia leucocitária identificadas."
+          ],
+          "contradictionFlags": [],
+          "leukocyteSummary": "Sem alterações leucocitárias significativas.",
+          "primaryPattern": "dysplasia",
+          "secondaryPattern": null,
+          "dominantPattern": "dysplasia",
+          "reactivePatternDetected": false,
+          "reactiveLymphocytes": false,
+          "atypicalLymphocytes": false,
+          "mononucleosisSuspicion": false,
+          "immatureFeaturesDetected": false,
+          "leukocyteScores": {
+            "blast": 0,
+            "leftShift": 0,
+            "hypersegmentation": 0,
+            "toxicChanges": 0,
+            "reactivePattern": 0,
+            "neoplasticPattern": 0,
+            "maturationCoherence": 0,
+            "immatureFeatures": 0,
+            "inflammatoryActivation": 0,
+            "dysplasia": 12,
+            "artifactPattern": 0,
+            "coherenceScore": 0
+          },
+          "blastRisk": "low"
+        },
+        "plateletAnalysis": {
+          "plateletFindings": [],
+          "plateletAlerts": [],
+          "plateletCorrelations": [],
+          "plateletReasoning": [],
+          "contradictionFlags": [],
+          "plateletSummary": "Avaliação plaquetária sem alteração específica detectada pelo motor plaquetário; interpretar conforme representatividade do campo.",
+          "dominantPlateletPattern": "normal_platelet_pattern",
+          "plateletScores": {
+            "giantPlatelets": 0,
+            "plateletAggregation": 0,
+            "thrombocytopenia": 0,
+            "consumptivePattern": 0,
+            "pseudothrombocytopenia": 0,
+            "artifactPattern": 0,
+            "coherenceScore": 0
+          },
+          "emergencyLevel": "low"
+        },
+        "diagnosticCorrelation": {
+          "summary": "Análise hematológica automatizada realizada.",
+          "findings": [],
+          "recommendations": [
+            "Interpretação limitada por segurança clínica.",
+            "Baixa qualidade de imagem pode limitar interpretação."
+          ],
+          "differentialDiagnosis": [],
+          "requiresClinicalCorrelation": true,
+          "safeClinicalMode": true,
+          "requiresHumanReview": false,
+          "manualMode": false,
+          "hybridMode": false,
+          "aiVisualMode": true,
+          "confidenceLevel": "moderate",
+          "engineVersion": "DIAGNOSTIC_CORRELATION_V6_SAFE_HYBRID"
+        },
+        "consensusAnalysis": {
+          "analysisSource": "ai_visual",
+          "finalClassification": "indeterminate",
+          "clinicalPriority": "routine",
+          "overallRiskScore": 0,
+          "requiresHumanReview": true,
+          "safeClinicalMode": true,
+          "confidenceLevel": "low",
+          "summary": "Achados hematológicos inespecíficos. Correlação clínica recomendada.",
+          "alerts": [
+            "Baixa evidência visual automatizada."
+          ],
+          "recommendations": [
+            "Revisão microscópica recomendada."
+          ],
+          "diagnosticSuggestions": [],
+          "supportingFindings": [],
+          "rejectedFindings": [],
+          "visualEvidenceScore": 10,
+          "manualMode": false,
+          "hybridMode": false,
+          "aiVisualMode": true
+        },
+        "safetyValidation": {
+          "valid": true,
+          "severity": "low",
+          "safeDiagnosticGate": true,
+          "visualEvidenceScore": 64,
+          "morphologyCoherence": 92,
+          "artifactProbability": 10,
+          "falsePositiveRisk": 20,
+          "diagnosticReliability": 68,
+          "blastMorphologySignal": {
+            "present": false,
+            "confidence": 0,
+            "criteria": {
+              "suspectedBlast": false,
+              "immatureCells": false,
+              "nucleoli": false,
+              "fineChromatin": false,
+              "highNC": false,
+              "absentSegmentation": false
+            },
+            "criteriaCount": 0,
+            "level": "low"
+          },
+          "alerts": [],
+          "contradictionFlags": [],
+          "coherenceAdjustments": [
+            "Blast confidence recalibrado pelo safety engine V8.3."
+          ],
+          "correctedAnalysis": {
+            "modifiedFields": [
+              "blastAssessment.confidence",
+              "schistocyteAssessment.confidence",
+              "heatmapRegions"
+            ],
+            "adjustments": [
+              "Blast confidence recalibrado pelo safety engine V8.3."
+            ],
+            "meta": {
+              "analysisSource": "ai_visual",
+              "manualDifferential": false,
+              "visualAnalysis": true,
+              "hybridAnalysis": false,
+              "visualEvidenceScore": 64,
+              "artifactProbability": 10,
+              "morphologyCoherence": 92,
+              "falsePositiveRisk": 20,
+              "diagnosticReliability": 68,
+              "blastMorphologySignal": {
+                "present": false,
+                "confidence": 0,
+                "criteria": {
+                  "suspectedBlast": false,
+                  "immatureCells": false,
+                  "nucleoli": false,
+                  "fineChromatin": false,
+                  "highNC": false,
+                  "absentSegmentation": false
+                },
+                "criteriaCount": 0,
+                "level": "low"
+              },
+              "evidenceProfile": {
+                "hasRbcEvidence": true,
+                "hasPlateletEvidence": true,
+                "hasLeukocyteEvidence": true,
+                "hasAbnormalMorphology": true,
+                "normalPattern": false,
+                "observedCells": {
+                  "erythrocytes": true,
+                  "leukocytes": true,
+                  "neutrophils": false,
+                  "lymphocytes": true,
+                  "monocytes": false,
+                  "eosinophils": false,
+                  "basophils": false,
+                  "platelets": true
+                }
+              }
+            }
+          }
+        },
+        "pipeline": {
+          "version": "V8_TURBO_ENTERPRISE",
+          "source": "ai_visual",
+          "multiStagePipeline": true,
+          "turboSingleOpenAICall": true,
+          "visualExtraction": true,
+          "morphologyValidation": true,
+          "evidenceEngine": true,
+          "safetyGate": true,
+          "consensusValidation": true,
+          "clinicalCorrelation": true,
+          "safeClinicalMode": true,
+          "manualMode": false,
+          "hybridMode": false,
+          "aiVisualMode": true
+        },
+        "metadata": {
+          "requestId": "adc73e1b-79a3-44cd-9300-3522ba622c8a",
+          "model": "gpt-4o",
+          "pipelineVersion": "V8_TURBO_ENTERPRISE",
+          "architecture": "turbo_semantic_hematology_engine",
+          "hospitalGrade": true,
+          "educationalMode": true,
+          "images": 1,
+          "imageMetadata": [
+            {
+              "originalWidth": 500,
+              "originalHeight": 375
+            }
+          ],
+          "visualEvidenceScore": 64,
+          "morphologyCoherence": 92,
+          "falsePositiveRisk": 20,
+          "diagnosticReliability": 68,
+          "artifactProbability": 10,
+          "safeDiagnosticGate": true,
+          "analysisSource": "ai_visual",
+          "performance": {
+            "imageTiming": 378,
+            "visualTiming": 7136,
+            "engineTiming": 3,
+            "safetyTiming": 11,
+            "consensusTiming": 1,
+            "confidenceTiming": 0,
+            "totalPipelineTime": 7544
+          }
+        },
+        "specimenType": "BONE_MARROW_ASPIRATE",
+        "specimenDecision": {
+          "status": "accepted",
+          "effectiveType": "BONE_MARROW_ASPIRATE",
+          "classification": {
+            "predictedType": "BONE_MARROW_ASPIRATE",
+            "confidence": 0.9,
+            "alternativeType": "HEMODILUTED_BONE_MARROW",
+            "alternativeConfidence": 0.1,
+            "modelVersion": "specimen-classifier-v1",
+            "evidence": [
+              {
+                "kind": "cellularity",
+                "description": "Alta densidade de células nucleadas e diversidade maturativa.",
+                "supports": "BONE_MARROW_ASPIRATE",
+                "weight": 0.7,
+                "confidence": 0.9
+              },
+              {
+                "kind": "other",
+                "description": "Presença de precursores hematopoéticos.",
+                "supports": "BONE_MARROW_ASPIRATE",
+                "weight": 0.3,
+                "confidence": 0.8
+              }
+            ]
+          },
+          "conflict": {
+            "severity": "none",
+            "declaredType": null,
+            "predictedType": "BONE_MARROW_ASPIRATE",
+            "message": null
+          },
+          "messages": []
+        },
+        "specimenClassification": {
+          "predictedType": "BONE_MARROW_ASPIRATE",
+          "confidence": 0.9,
+          "alternativeType": "HEMODILUTED_BONE_MARROW",
+          "alternativeConfidence": 0.1,
+          "modelVersion": "specimen-classifier-v1",
+          "evidence": [
+            {
+              "kind": "cellularity",
+              "description": "Alta densidade de células nucleadas e diversidade maturativa.",
+              "supports": "BONE_MARROW_ASPIRATE",
+              "weight": 0.7,
+              "confidence": 0.9
+            },
+            {
+              "kind": "other",
+              "description": "Presença de precursores hematopoéticos.",
+              "supports": "BONE_MARROW_ASPIRATE",
+              "weight": 0.3,
+              "confidence": 0.8
+            }
+          ]
+        },
+        "specimenRouting": {
+          "analysisType": "bone_marrow",
+          "reviewRequired": false,
+          "version": "CI-001B-v1"
+        },
+        "specimenAssessment": {
+          "status": "present",
+          "summary": "Bone marrow aspirate specimen observed.",
+          "specimenType": "BONE_MARROW_ASPIRATE",
+          "material": "Aspirado de medula óssea"
+        },
+        "marrowAdequacy": {
+          "status": "notAssessable",
+          "technicalQuality": "Adequate staining and preservation.",
+          "representativity": "Single field limits global assessment.",
+          "summary": "Technical quality is adequate, but representativity is limited."
+        },
+        "spiculeAssessment": {
+          "status": "notObserved",
+          "observed": false,
+          "summary": "No spicules observed in the provided field."
+        },
+        "hemodilutionAssessment": {
+          "status": "notAssessable",
+          "suspected": false,
+          "summary": "Cannot determine hemodilution from the provided field."
+        },
+        "cellularityAssessment": {
+          "status": "notAssessable",
+          "scope": "field_limited",
+          "globalEstimateAllowed": false,
+          "estimate": null,
+          "summary": "Cellularity cannot be globally estimated from a single field."
+        },
+        "myeloidSeries": {
+          "status": "present",
+          "maturation": "Appears normal in observed cells.",
+          "dysplasia": "No dysplasia observed.",
+          "summary": "Myeloid series present with normal maturation.",
+          "assessable": true,
+          "lineage": "Série mieloide"
+        },
+        "erythroidSeries": {
+          "status": "notAssessable",
+          "maturation": "Não avaliável com segurança no campo fornecido.",
+          "dysplasia": "Não avaliável com segurança no campo fornecido.",
+          "summary": "Erythroid series not assessable in the provided field.",
+          "assessable": false,
+          "lineage": "Série eritroide"
+        },
+        "megakaryocyticSeries": {
+          "status": "notAssessable",
+          "maturation": "Não avaliável com segurança no campo fornecido.",
+          "dysplasia": "Não avaliável com segurança no campo fornecido.",
+          "summary": "Megakaryocytic series not assessable in the provided field.",
+          "assessable": false,
+          "lineage": "Série megacariocítica"
+        },
+        "plasmaCellAssessment": {
+          "status": "present",
+          "estimatedPercentage": null,
+          "summary": "Plasma cells observed, but percentage not estimable."
+        },
+        "blastAssessment": {
+          "status": "present",
+          "observed": true,
+          "estimatedPercentage": null,
+          "globalAbsenceAllowed": false,
+          "summary": "Blasts observed, but percentage not estimable."
+        },
+        "dysplasiaAssessment": {
+          "status": "notObserved",
+          "globalExclusionAllowed": false,
+          "summary": "No dysplasia observed in the provided field."
+        },
+        "infiltrationAssessment": {
+          "status": "notAssessable",
+          "globalExclusionAllowed": false,
+          "summary": "Infiltration not assessable in the provided field."
+        },
+        "marrowLimitations": [
+          "Single field limits comprehensive assessment.",
+          "Absence of spicules limits representativity.",
+          "A interpretação está limitada às imagens e aos campos fornecidos.",
+          "Ausência de achado no campo não equivale à ausência global na medula óssea.",
+          "A adequação global da amostra não pode ser estabelecida com segurança.",
+          "Espículas não foram observadas no campo enviado; isso não exclui origem medular.",
+          "Não converter celularidade aparente do campo em celularidade global da medula.",
+          "A O campo medular não permite conclusão global; o achado deve ser interpretado conforme representatividade e limitações da amostra. no campo não permite exclusão global.",
+          "Estimativa percentual exige contagem representativa em múltiplos campos.",
+          "A distribuição plasmocitária pode ser focal.",
+          "Percentual confiável exige contagem representativa e correlação clínico-laboratorial.",
+          "A avaliação de displasia exige número adequado de células por linhagem.",
+          "Artefatos de preparação e hemodiluição podem simular ou ocultar alterações.",
+          "Padrões infiltrativos podem ser focais.",
+          "Imagem isolada não permite excluir infiltração medular.",
+          "A A ausência global de blastos não pode ser afirmada; há sinal que exige revisão especializada. no campo não permite exclusão global."
+        ],
+        "boneMarrowOutputContract": {
+          "version": "CI-001B.3-v1",
+          "complete": true,
+          "triState": [
+            "present",
+            "notObserved",
+            "notAssessable",
+            "indeterminate"
+          ],
+          "requiredFields": [
+            "specimenAssessment",
+            "marrowAdequacy",
+            "spiculeAssessment",
+            "hemodilutionAssessment",
+            "cellularityAssessment",
+            "myeloidSeries",
+            "erythroidSeries",
+            "megakaryocyticSeries",
+            "plasmaCellAssessment",
+            "blastAssessment",
+            "dysplasiaAssessment",
+            "infiltrationAssessment",
+            "marrowLimitations"
+          ]
+        },
+        "boneMarrowClinicalReasoning": {
+          "version": "CI-001B.4-v1",
+          "contractVersion": "CI-001B.3-v1",
+          "specimenType": "BONE_MARROW_ASPIRATE",
+          "adequacy": {
+            "assessable": false,
+            "status": "limited_or_indeterminate",
+            "supportingEvidence": [],
+            "limitations": [
+              "A adequação global da amostra não pode ser estabelecida com segurança.",
+              "Espículas não foram observadas no campo enviado; isso não exclui origem medular."
+            ],
+            "interpretation": "A representatividade é limitada ou indeterminada; conclusões globais sobre a medula exigem revisão de múltiplos campos e correlação técnica."
+          },
+          "cellularity": {
+            "status": "notAssessable",
+            "estimate": null,
+            "fieldLevelDescription": "Cellularity cannot be globally estimated from a single field.",
+            "globalEstimateAllowed": false,
+            "interpretation": "A celularidade global não pode ser estimada com segurança a partir do campo isolado ou não representativo.",
+            "limitations": [
+              "Não converter celularidade aparente do campo em celularidade global da medula."
+            ]
+          },
+          "lineages": {
+            "myeloid": {
+              "lineage": "Série mieloide",
+              "status": "present",
+              "assessable": true,
+              "maturation": "Appears normal in observed cells.",
+              "dysplasia": "No dysplasia observed.",
+              "summary": "Myeloid series present with normal maturation.",
+              "interpretation": "Série mieloide contém elementos avaliáveis no campo, sem permitir extrapolação automática para toda a medula.",
+              "globalPreservationAllowed": false
+            },
+            "erythroid": {
+              "lineage": "Série eritroide",
+              "status": "notAssessable",
+              "assessable": false,
+              "maturation": "Não avaliável com segurança no campo fornecido.",
+              "dysplasia": "Não avaliável com segurança no campo fornecido.",
+              "summary": "Erythroid series not assessable in the provided field.",
+              "interpretation": "Série eritroide não é avaliável com segurança no material fornecido.",
+              "globalPreservationAllowed": false
+            },
+            "megakaryocytic": {
+              "lineage": "Série megacariocítica",
+              "status": "notAssessable",
+              "assessable": false,
+              "maturation": "Não avaliável com segurança no campo fornecido.",
+              "dysplasia": "Não avaliável com segurança no campo fornecido.",
+              "summary": "Megakaryocytic series not assessable in the provided field.",
+              "interpretation": "Série megacariocítica não é avaliável com segurança no material fornecido.",
+              "globalPreservationAllowed": false
+            }
+          },
+          "blast": {
+            "status": "present",
+            "observed": true,
+            "estimatedPercentage": 0,
+            "concern": true,
+            "confidence": "moderate_or_indeterminate",
+            "supportingEvidence": [
+              "Há sinal morfológico ou estruturado que exige revisão para células imaturas/blásticas."
+            ],
+            "limitations": [
+              "A A ausência global de blastos não pode ser afirmada; há sinal que exige revisão especializada. no campo não permite exclusão global.",
+              "Estimativa percentual exige contagem representativa em múltiplos campos."
+            ],
+            "interpretation": "Há suspeita morfológica de células imaturas/blásticas; requer revisão hematológica especializada e correlação com métodos complementares.",
+            "globalAbsenceAllowed": false
+          },
+          "plasmaCells": {
+            "status": "present",
+            "detected": true,
+            "estimatedPercentage": 0,
+            "concern": false,
+            "interpretation": "Plasmócitos foram descritos no material; quantidade, distribuição e atipia devem ser confirmadas em avaliação representativa.",
+            "limitations": [
+              "A distribuição plasmocitária pode ser focal.",
+              "Percentual confiável exige contagem representativa e correlação clínico-laboratorial."
+            ]
+          },
+          "dysplasia": {
+            "status": "notObserved",
+            "suspected": false,
+            "lineageSignals": {
+              "myeloid": false,
+              "erythroid": false,
+              "megakaryocytic": false
+            },
+            "interpretation": "Displasia não foi confirmada no campo, porém não pode ser excluída globalmente.",
+            "limitations": [
+              "A avaliação de displasia exige número adequado de células por linhagem.",
+              "Artefatos de preparação e hemodiluição podem simular ou ocultar alterações."
+            ],
+            "globalExclusionAllowed": false
+          },
+          "infiltration": {
+            "status": "notAssessable",
+            "suspected": true,
+            "interpretation": "Há sinal morfológico que pode representar padrão infiltrativo ou população anormal; requer revisão especializada e métodos complementares.",
+            "limitations": [
+              "Padrões infiltrativos podem ser focais.",
+              "Imagem isolada não permite excluir infiltração medular."
+            ],
+            "globalExclusionAllowed": false
+          },
+          "integratedConcern": {
+            "level": "high_review_priority",
+            "category": "MARROW_IMMATURE_OR_BLAST_SUSPICION",
+            "label": "Suspeita de população imatura/blástica"
+          },
+          "limitations": [
+            "Single field limits comprehensive assessment.",
+            "Absence of spicules limits representativity.",
+            "A interpretação está limitada às imagens e aos campos fornecidos.",
+            "Ausência de achado no campo não equivale à ausência global na medula óssea.",
+            "A adequação global da amostra não pode ser estabelecida com segurança.",
+            "Espículas não foram observadas no campo enviado; isso não exclui origem medular.",
+            "Não converter celularidade aparente do campo em celularidade global da medula.",
+            "A O campo medular não permite conclusão global; o achado deve ser interpretado conforme representatividade e limitações da amostra. no campo não permite exclusão global.",
+            "Estimativa percentual exige contagem representativa em múltiplos campos.",
+            "A distribuição plasmocitária pode ser focal.",
+            "Percentual confiável exige contagem representativa e correlação clínico-laboratorial.",
+            "A avaliação de displasia exige número adequado de células por linhagem.",
+            "Artefatos de preparação e hemodiluição podem simular ou ocultar alterações.",
+            "Padrões infiltrativos podem ser focais.",
+            "Imagem isolada não permite excluir infiltração medular.",
+            "A A ausência global de blastos não pode ser afirmada; há sinal que exige revisão especializada. no campo não permite exclusão global."
+          ],
+          "explainability": {
+            "observed": [
+              "Há sinal morfológico ou estruturado que exige revisão para células imaturas/blásticas.",
+              "Myeloid series present with normal maturation.",
+              "Erythroid series not assessable in the provided field.",
+              "Megakaryocytic series not assessable in the provided field."
+            ],
+            "inferred": [
+              "A representatividade é limitada ou indeterminada; conclusões globais sobre a medula exigem revisão de múltiplos campos e correlação técnica.",
+              "A celularidade global não pode ser estimada com segurança a partir do campo isolado ou não representativo.",
+              "Há suspeita morfológica de células imaturas/blásticas; requer revisão hematológica especializada e correlação com métodos complementares.",
+              "Plasmócitos foram descritos no material; quantidade, distribuição e atipia devem ser confirmadas em avaliação representativa.",
+              "Displasia não foi confirmada no campo, porém não pode ser excluída globalmente.",
+              "Há sinal morfológico que pode representar padrão infiltrativo ou população anormal; requer revisão especializada e métodos complementares."
+            ],
+            "cannotConfirm": [
+              "Celularidade global da medula por campo isolado.",
+              "Ausência global de blastos.",
+              "Ausência global de displasia.",
+              "Ausência global de infiltração.",
+              "Relação mieloide/eritroide sem contagem representativa."
+            ]
+          },
+          "finalInterpretation": "Suspeita de população imatura/blástica. A interpretação é educacional, limitada aos campos enviados e exige correlação com revisão microscópica profissional, dados clínicos e exames complementares."
+        },
+        "marrowReasoningVersion": "CI-001B.4-v1",
+        "marrowClinicalCategory": "MARROW_IMMATURE_OR_BLAST_SUSPICION",
+        "marrowClinicalPriority": "high_review_priority",
+        "marrowSafetyValidation": {
+          "version": "CI-001B.5-v1",
+          "passed": true,
+          "deliveryAllowed": true,
+          "score": 82,
+          "severity": "critical",
+          "rulesExecuted": 10,
+          "rulesTriggered": 1,
+          "triggeredRules": [
+            {
+              "rule": "BM-001",
+              "severity": "critical"
+            }
+          ],
+          "corrected": [],
+          "blockedStatements": [
+            "BM-001"
+          ],
+          "forcedChanges": [],
+          "auditTrail": [
+            {
+              "rule": "BM-001",
+              "severity": "critical",
+              "field": "structuredReport.conclusion",
+              "before": "Suspeita de população imatura/blástica. A interpretação é educacional, limitada aos campos enviados e exige correlação com revisão microscópica profissional, dados clínicos e exames complementares.",
+              "after": "Suspeita de população imatura/blástica. A interpretação é educacional, limitada aos campos enviados e exige correlação com revisão microscópica profissional, dados clínicos e exames complementares.",
+              "reason": "boneMarrowClinicalReasoning.blast.concern=true",
+              "action": "correct",
+              "timestamp": "2026-07-27T00:17:11.586Z"
+            }
+          ]
+        },
+        "clinicalSafety": {
+          "specimen": "bone_marrow",
+          "version": "CI-001B.5-v1",
+          "passed": true,
+          "score": 82,
+          "severity": "critical"
+        },
+        "dualPipelineValidation": {
+          "version": "CI-001C-v1",
+          "passed": true,
+          "deliveryAllowed": true,
+          "pipeline": "bone_marrow",
+          "isolationPassed": true,
+          "completenessPassed": true,
+          "marrowSafetyPassed": true,
+          "missingFields": []
+        },
+        "showRadar": false,
+        "hideAISeeingCard": true,
+        "hideEducationalHypotheses": true,
+        "hideClinicalCorrelations": true,
+        "hideDifferentialDiagnosis": true,
+        "hidePopulationAnalysis": true,
+        "finalRecommendation": "Recomenda-se análise de múltiplos campos da lâmina, correlação com hemograma completo e revisão por profissional habilitado antes de qualquer conclusão diagnóstica.",
+        "educationalHypotheses": [],
+        "clinicalCorrelations": []
+      }
+    }
+  ]
+}

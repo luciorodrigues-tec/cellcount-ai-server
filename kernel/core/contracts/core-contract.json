@@ -1,0 +1,26 @@
+{
+  "contractId": "CCK-001.1-CORE",
+  "contractVersion": "1.0.0",
+  "moduleId": "CCK-001.1",
+  "moduleVersion": "CCK-001.1-v1",
+  "publicExports": [
+    "MODULE_ID",
+    "MODULE_VERSION",
+    "Identifier",
+    "Entity",
+    "ValueObject",
+    "DomainEvent",
+    "AggregateRoot",
+    "DomainResult",
+    "DomainError",
+    "ValidationError",
+    "BusinessRuleError",
+    "InfrastructureError",
+    "DomainException"
+  ],
+  "runtime": {
+    "moduleSystem": "ESM",
+    "minimumNodeMajor": 20,
+    "externalDependencies": []
+  }
+}

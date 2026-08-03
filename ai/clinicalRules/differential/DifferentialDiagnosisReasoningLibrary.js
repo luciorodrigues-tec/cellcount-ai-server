@@ -1,0 +1,3 @@
+import { DifferentialDiagnosisReasoningEngine } from "./application/DifferentialDiagnosisReasoningEngine.js";
+import { DifferentialCandidateRepository } from "./repository/DifferentialCandidateRepository.js";
+export function createDifferentialDiagnosisReasoningLibrary({candidates=[],policy={}}={}) { const candidateRepository=new DifferentialCandidateRepository(); for(const candidate of candidates) candidateRepository.register(candidate); return Object.freeze({candidateRepository,engine:new DifferentialDiagnosisReasoningEngine({candidateRepository,policy}),candidates:candidateRepository.list()}); }

@@ -1,0 +1,61 @@
+{
+  "packId": "CRR-000017",
+  "packVersion": "1.0.0",
+  "scope": "BIBLIOGRAPHIC_AND_CLASSIFICATION_ROOTS_ONLY",
+  "clinicalCriteriaIncluded": false,
+  "sources": [
+    {
+      "sourceId": "WHO-HAEM5-V11-2024",
+      "title": "WHO Classification of Tumours: Haematolymphoid Tumours",
+      "publisher": "International Agency for Research on Cancer",
+      "publicationYear": 2024,
+      "classificationFamily": "WHO",
+      "version": "5th-edition-volume-11",
+      "sourceType": "OFFICIAL_CLASSIFICATION",
+      "uri": "https://publications.iarc.who.int/Book-And-Report-Series/Who-Classification-Of-Tumours/Haematolymphoid-Tumours-2024",
+      "approvalStatus": "REFERENCE_ONLY",
+      "reviewedBy": [],
+      "notes": "Bibliographic metadata and classification root only. No copyrighted diagnostic tables or criteria are embedded."
+    },
+    {
+      "sourceId": "ICC-MYELOID-2022",
+      "title": "International Consensus Classification of Myeloid Neoplasms and Acute Leukemias: integrating morphologic, clinical, and genomic data",
+      "publisher": "Blood",
+      "publicationYear": 2022,
+      "classificationFamily": "ICC",
+      "version": "2022",
+      "sourceType": "OFFICIAL_CLASSIFICATION",
+      "uri": "https://ashpublications.org/blood/article/140/11/1200/485730/International-Consensus-Classification-of-Myeloid",
+      "doi": "10.1182/blood.2022015850",
+      "approvalStatus": "REFERENCE_ONLY",
+      "reviewedBy": [],
+      "notes": "Bibliographic metadata and classification root only."
+    },
+    {
+      "sourceId": "ICC-LYMPHOID-2022",
+      "title": "The International Consensus Classification of Mature Lymphoid Neoplasms: a report from the Clinical Advisory Committee",
+      "publisher": "Blood",
+      "publicationYear": 2022,
+      "classificationFamily": "ICC",
+      "version": "2022",
+      "sourceType": "OFFICIAL_CLASSIFICATION",
+      "uri": "https://ashpublications.org/blood/article/140/11/1229/485458/The-International-Consensus-Classification-of",
+      "approvalStatus": "REFERENCE_ONLY",
+      "reviewedBy": [],
+      "notes": "Bibliographic metadata and classification root only."
+    },
+    {
+      "sourceId": "ELN-AML-2022",
+      "title": "Diagnosis and management of AML in adults: 2022 recommendations from an international expert panel on behalf of the ELN",
+      "publisher": "Blood / European LeukemiaNet",
+      "publicationYear": 2022,
+      "classificationFamily": "ELN",
+      "version": "2022",
+      "sourceType": "OFFICIAL_CLASSIFICATION",
+      "uri": "https://www.leukemia-net.org/sites/leukemia-net/content/e58/e480/e481/e11514/Doehner_H.etal_Blood2022.DiagnosisandmanagementofAMLinadults-2022recommendationsfromaninternationalexpertpanelonbehalfoftheELN.pdf",
+      "approvalStatus": "REFERENCE_ONLY",
+      "reviewedBy": [],
+      "notes": "Bibliographic metadata and recommendation root only. No risk table or treatment recommendation content is embedded."
+    }
+  ]
+}

@@ -1,0 +1,134 @@
+[
+  {
+    "command": "node --check engineering/scripts/engineeringConfig.js",
+    "returncode": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "command": "node --check engineering/scripts/benchmarkFoundation.mjs",
+    "returncode": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "command": "node --check engineering/scripts/generateModule.mjs",
+    "returncode": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "command": "node --check engineering/scripts/checkArchitecture.mjs",
+    "returncode": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "command": "node --check engineering/scripts/runEnterpriseTests.mjs",
+    "returncode": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "command": "node --check engineering/scripts/validateFoundation.mjs",
+    "returncode": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "command": "node --check engineering/test-helpers/temporaryDirectory.js",
+    "returncode": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "command": "node --check tests/cck0001_config_test.mjs",
+    "returncode": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "command": "node --check tests/cck0001_template_contract_test.mjs",
+    "returncode": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "command": "node --check tests/cck0001_generator_test.mjs",
+    "returncode": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "command": "node --check tests/cck0001_architecture_test.mjs",
+    "returncode": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "command": "node --check tests/cck0001_foundation_validation_test.mjs",
+    "returncode": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "command": "node --check tests/cck0001_regression_test.mjs",
+    "returncode": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "command": "node engineering/scripts/validateFoundation.mjs",
+    "returncode": 0,
+    "stdout": "CCK-000.1 engineering foundation validation passed.\n",
+    "stderr": ""
+  },
+  {
+    "command": "node engineering/scripts/checkArchitecture.mjs",
+    "returncode": 0,
+    "stdout": "CCK-000.1 architecture rules passed.\n",
+    "stderr": ""
+  },
+  {
+    "command": "node tests/cck0001_config_test.mjs",
+    "returncode": 0,
+    "stdout": "CCK-000.1 configuration passed.\n",
+    "stderr": ""
+  },
+  {
+    "command": "node tests/cck0001_template_contract_test.mjs",
+    "returncode": 0,
+    "stdout": "CCK-000.1 template contract passed.\n",
+    "stderr": ""
+  },
+  {
+    "command": "node tests/cck0001_generator_test.mjs",
+    "returncode": 0,
+    "stdout": "CCK-000.1 module generator passed.\n",
+    "stderr": ""
+  },
+  {
+    "command": "node tests/cck0001_architecture_test.mjs",
+    "returncode": 0,
+    "stdout": "CCK-000.1 architecture enforcement passed.\n",
+    "stderr": ""
+  },
+  {
+    "command": "node tests/cck0001_foundation_validation_test.mjs",
+    "returncode": 0,
+    "stdout": "CCK-000.1 foundation validation passed.\n",
+    "stderr": ""
+  },
+  {
+    "command": "node tests/cck0001_regression_test.mjs",
+    "returncode": 0,
+    "stdout": "CCK-000.1 backend regression guard passed.\n",
+    "stderr": ""
+  },
+  {
+    "command": "node engineering/scripts/benchmarkFoundation.mjs",
+    "returncode": 0,
+    "stdout": "{\"benchmark\":\"CCK-000.1 config loading\",\"iterations\":10000,\"elapsedMs\":149.7,\"averageMicroseconds\":14.97}\n",
+    "stderr": ""
+  }
+]

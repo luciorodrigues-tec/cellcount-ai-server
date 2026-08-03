@@ -1,0 +1,31 @@
+export function createScoreContribution({
+  cellId,
+  featureId,
+  role,
+  matched,
+  confidence = 0,
+  similarity = 0,
+  weight = 0,
+  rawContribution = 0,
+  appliedContribution = 0,
+  penalty = 0,
+  sourceCriterionId = "",
+  label = "",
+  reason = "",
+} = {}) {
+  return Object.freeze({
+    cellId,
+    featureId,
+    role,
+    matched: matched === true,
+    confidence,
+    similarity,
+    weight,
+    rawContribution,
+    appliedContribution,
+    penalty,
+    sourceCriterionId,
+    label,
+    reason,
+  });
+}

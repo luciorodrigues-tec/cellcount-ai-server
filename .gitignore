@@ -1,2 +1,16 @@
 node_modules
 .env
+
+# ==========================================
+# LOCAL DEVELOPMENT / SURGICAL BACKUPS
+# ==========================================
+
+# Surgical backups
+_surgical_backups/
+archives/
+
+# Legacy backups
+server_backup_*.js
+
+# macOS
+.DS_Store

@@ -1,0 +1,63 @@
+export function createFinalDiagnosisResult({
+  version,
+  pipelineVersion,
+  specimenType,
+  primaryDiagnosis,
+  alternativeDiagnoses,
+  ranking,
+  confidence,
+  evidence,
+  exclusiveFeatures,
+  conflicts,
+  recommendations,
+  consistency,
+  confidenceFusion,
+  executiveSummary,
+  safetyValidation,
+  statistics,
+  metadata,
+} = {}) {
+  return Object.freeze({
+    version,
+    pipelineVersion,
+    specimenType,
+    primaryDiagnosis:
+      Object.freeze({
+        ...primaryDiagnosis,
+      }),
+    alternativeDiagnoses:
+      Object.freeze([
+        ...alternativeDiagnoses,
+      ]),
+    ranking,
+    confidence,
+    evidence:
+      Object.freeze([...evidence]),
+    exclusiveFeatures:
+      Object.freeze([...exclusiveFeatures]),
+    conflicts:
+      Object.freeze([...conflicts]),
+    recommendations:
+      Object.freeze([...recommendations]),
+    overallConfidence:
+      confidenceFusion.overallConfidence,
+    overallConsistency:
+      consistency.overallConsistency,
+    agreementIndex:
+      consistency.agreementIndex,
+    conflictIndex:
+      consistency.conflictIndex,
+    consistency,
+    confidenceFusion,
+    executiveSummary,
+    safetyValidation,
+    statistics:
+      Object.freeze({
+        ...statistics,
+      }),
+    metadata:
+      Object.freeze({
+        ...(metadata || {}),
+      }),
+  });
+}

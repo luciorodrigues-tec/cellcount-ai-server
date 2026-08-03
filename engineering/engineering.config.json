@@ -1,0 +1,58 @@
+{
+  "schemaVersion": "1.0.0",
+  "foundationVersion": "CCK-000.1-v1",
+  "project": "CellCount Hematology AI Enterprise",
+  "runtime": {
+    "language": "JavaScript",
+    "moduleSystem": "ESM",
+    "minimumNodeMajor": 20
+  },
+  "sourceRoots": [
+    "ai",
+    "engineering"
+  ],
+  "testRoot": "tests",
+  "documentationRoot": "docs",
+  "publicEntryFile": "index.js",
+  "requiredModuleDocuments": [
+    "README.md",
+    "SPEC.md",
+    "ARCHITECTURE.md",
+    "CHANGELOG.md"
+  ],
+  "requiredModuleDirectories": [
+    "src",
+    "tests",
+    "contracts",
+    "examples"
+  ],
+  "naming": {
+    "moduleDirectories": "camelCase",
+    "classes": "PascalCase",
+    "functions": "camelCase",
+    "constants": "SCREAMING_SNAKE_CASE",
+    "testSuffix": "_test.mjs"
+  },
+  "architecture": {
+    "forbiddenImports": [
+      {
+        "from": "kernel",
+        "to": "ai",
+        "reason": "The generic Kernel must not depend on scientific domain code."
+      },
+      {
+        "from": "engineering",
+        "to": "ai",
+        "reason": "Engineering infrastructure must remain domain-independent."
+      }
+    ],
+    "forbiddenTermsInKernel": [
+      "blast",
+      "plasmablast",
+      "leukemia",
+      "lymphocyte",
+      "hematology",
+      "patient"
+    ]
+  }
+}

@@ -3,6 +3,87 @@
 // CELLCOUNT HEMATOLOGY ENTERPRISE SERVER V6 SAFE HYBRID
 // ============================================================================
 
+import {
+  enforceBoneMarrowOutputContract,
+} from "./ai/boneMarrow/boneMarrowOutputContract.js";
+
+import {
+  applyBoneMarrowClinicalReasoning,
+} from "./ai/boneMarrow/boneMarrowClinicalReasoningEngine.js";
+
+import {
+  applyClinicalSafetyGovernor,
+} from "./ai/clinicalSafety/index.js";
+
+import {
+  stabilizeDualPipelineResult,
+} from "./ai/dualPipeline/index.js";
+
+import {
+  createCellKnowledgeRegistry,
+  createCriteriaEngineRegistry,
+} from "./ai/knowledge/morphology/index.js";
+
+import {
+  createFeatureMatcher,
+} from "./ai/matching/featureMatcher/index.js";
+
+import {
+  createMorphologyScoringEngine,
+} from "./ai/scoring/morphologyScore/index.js";
+
+import {
+  createMorphologyCandidateEngine,
+} from "./ai/candidate/morphologyCandidate/index.js";
+
+import {
+  createMorphologyRankingEngine,
+} from "./ai/ranking/morphologyRanking/index.js";
+
+import {
+  createMorphologyConfidenceEngine,
+} from "./ai/confidence/morphologyConfidence/index.js";
+
+import {
+  createMorphologyExplanationEngine,
+} from "./ai/explanation/morphologyExplanation/index.js";
+
+import {
+  createMorphologyEvidenceGraphEngine,
+} from "./ai/graph/morphologyEvidence/index.js";
+
+import {
+  createDifferentialRuleLibrary,
+} from "./ai/differentialDiagnosis/ruleLibrary/index.js";
+
+import {
+  createDifferentialPairBuilderEngine,
+} from "./ai/differentialDiagnosis/pairBuilder/index.js";
+
+import {
+  createDifferentialSimilarityEngine,
+} from "./ai/differentialDiagnosis/similarityCalculator/index.js";
+
+import {
+  createDifferentialEvidenceEngine,
+} from "./ai/differentialDiagnosis/evidenceEngine/index.js";
+
+import {
+  createExclusiveFeatureEngine,
+} from "./ai/differentialDiagnosis/exclusiveFeatureEngine/index.js";
+
+import {
+  createDiagnosticConflictEngine,
+} from "./ai/differentialDiagnosis/conflictEngine/index.js";
+
+import {
+  createDifferentialRecommendationEngine,
+} from "./ai/differentialDiagnosis/recommendationEngine/index.js";
+
+import {
+  createFinalDifferentialDiagnosisEngine,
+} from "./ai/differentialDiagnosis/finalDiagnosisEngine/index.js";
+
 import applyFinalClinicalGovernor
   from "./ai/finalClinicalGovernor.js";
 
@@ -13,12 +94,24 @@ import {
   applyFieldAdequacyRules,
 } from "./ai/fieldAdequacyEngine.js";
 
-import express from "express";
-import cors from "cors";
-import multer from "multer";
-import dotenv from "dotenv";
 import OpenAI from "openai";
 import crypto from "crypto";
+
+import {
+  bootstrapRuntime,
+} from "./bootstrap/runtimeBootstrap.js";
+
+import {
+  createHttpFoundation,
+} from "./bootstrap/httpFoundation.js";
+
+import {
+  registerSystemRoutes,
+} from "./routes/systemRoutes.js";
+
+import {
+  registerOperationalStatusRoutes,
+} from "./routes/operationalStatusRoutes.js";
 
 import {
   performance,
@@ -93,117 +186,190 @@ import {
 } from "./ai/imageEnhancer.js";
 
 // ============================================================================
-// ENV
+// RUNTIME + HTTP COMPOSITION
 // ============================================================================
 
-dotenv.config();
+const runtime =
+  bootstrapRuntime();
 
-console.log(
-  "🔑 OpenAI API:",
-  process.env.OPENAI_API_KEY
-    ? "CONFIGURADA"
-    : "NÃO CONFIGURADA",
-);
+const {
+  port: PORT,
+  openAIApiKey,
+  openAIModel: OPENAI_MODEL,
+  securityConfig,
+} = runtime;
 
-console.log(
-  "🧠 Modelo:",
-  process.env.OPENAI_MODEL || "gpt-4.1",
-);
-
-// ============================================================================
-// APP
-// ============================================================================
-
-const app = express();
-
-// ============================================================================
-// CONFIG
-// ============================================================================
-
-const PORT =
-  process.env.PORT || 3000;
-
-const API_TOKEN =
-  process.env.API_TOKEN ||
-  "cellcount_enterprise_2026_secure_ai_v4";
-
-const OPENAI_MODEL =
-  process.env.OPENAI_MODEL ||
-  "gpt-4.1";
+const {
+  app,
+  auth,
+  jsonBodyParser,
+  upload,
+} = createHttpFoundation({
+  securityConfig,
+});
 
 // ============================================================================
 // OPENAI
 // ============================================================================
 
 const openai = new OpenAI({
-
-  apiKey:
-    process.env.OPENAI_API_KEY,
+  apiKey: openAIApiKey,
 });
 
-// ============================================================================
-// CORS
-// ============================================================================
 
-app.use(
+const morphologyKnowledgeRegistry =
+  createCellKnowledgeRegistry();
 
-  cors({
-
-    origin: "*",
-
-    methods: [
-
-      "GET",
-      "POST",
-      "PUT",
-      "DELETE",
-      "OPTIONS",
-    ],
-
-    allowedHeaders: [
-
-      "Content-Type",
-      "Authorization",
-      "x-user-id",
-    ],
-  }),
+console.log(
+  "🧬 MORPHOLOGIC KNOWLEDGE FOUNDATION:",
+  `${morphologyKnowledgeRegistry.snapshot().size} entities`,
 );
 
-app.options("/*", cors());
 
-// ============================================================================
-// EXPRESS
-// ============================================================================
+const morphologyCriteriaEngine =
+  createCriteriaEngineRegistry();
 
-app.use(express.json({
+console.log(
+  "🧩 MORPHOLOGIC CRITERIA ENGINE:",
+  `${morphologyCriteriaEngine.criteriaRegistry.snapshot().size} definitions`,
+  `${morphologyCriteriaEngine.featureCatalog.size} feature references`,
+);
 
-  limit: "50mb",
-}));
 
-app.use(express.urlencoded({
+const morphologyFeatureMatcher =
+  createFeatureMatcher();
 
-  extended: true,
+console.log(
+  "🔎 MORPHOLOGIC FEATURE MATCHER:",
+  `${morphologyFeatureMatcher.criteriaEngine.criteriaRegistry.snapshot().size} candidate definitions`,
+);
 
-  limit: "50mb",
-}));
 
-// ============================================================================
-// MULTER
-// ============================================================================
+const morphologyScoringEngine =
+  createMorphologyScoringEngine();
 
-const upload = multer({
+console.log(
+  "🧮 MORPHOLOGIC SCORE CALCULATOR:",
+  `${morphologyScoringEngine.criteriaEngine.criteriaRegistry.snapshot().size} scorable definitions`,
+);
 
-  storage:
-    multer.memoryStorage(),
 
-  limits: {
+const morphologyCandidateEngine =
+  createMorphologyCandidateEngine();
 
-    fileSize:
-      25 * 1024 * 1024,
+console.log(
+  "🧬 MORPHOLOGIC CANDIDATE GENERATOR:",
+  `${morphologyCandidateEngine.scoringEngine.criteriaEngine.criteriaRegistry.snapshot().size} candidate definitions`,
+);
 
-    files: 4,
-  },
-});
+
+const morphologyRankingEngine =
+  createMorphologyRankingEngine();
+
+console.log(
+  "🏆 MORPHOLOGIC RANKING ENGINE:",
+  `${morphologyRankingEngine.candidateEngine.scoringEngine.criteriaEngine.criteriaRegistry.snapshot().size} rankable definitions`,
+);
+
+
+const morphologyConfidenceEngine =
+  createMorphologyConfidenceEngine();
+
+console.log(
+  "🎯 MORPHOLOGIC CONFIDENCE ENGINE:",
+  `${morphologyConfidenceEngine.rankingEngine.candidateEngine.scoringEngine.criteriaEngine.criteriaRegistry.snapshot().size} confidence-enabled definitions`,
+);
+
+
+const morphologyExplanationEngine =
+  createMorphologyExplanationEngine();
+
+console.log(
+  "🧾 MORPHOLOGIC EXPLANATION ENGINE:",
+  `${morphologyExplanationEngine.confidenceEngine.rankingEngine.candidateEngine.scoringEngine.criteriaEngine.criteriaRegistry.snapshot().size} explainable definitions`,
+);
+
+
+const morphologyEvidenceGraphEngine =
+  createMorphologyEvidenceGraphEngine();
+
+console.log(
+  "🕸️ MORPHOLOGIC EVIDENCE GRAPH:",
+  `${morphologyEvidenceGraphEngine.explanationEngine.confidenceEngine.rankingEngine.candidateEngine.scoringEngine.criteriaEngine.criteriaRegistry.snapshot().size} graph-enabled definitions`,
+);
+
+
+const differentialRuleLibrary =
+  createDifferentialRuleLibrary();
+
+console.log(
+  "🧭 DIFFERENTIAL RULE LIBRARY:",
+  `${differentialRuleLibrary.repository.snapshot().size} differential pairs`,
+);
+
+
+const differentialPairBuilderEngine =
+  createDifferentialPairBuilderEngine();
+
+console.log(
+  "🔗 DIFFERENTIAL PAIR BUILDER:",
+  `${differentialPairBuilderEngine.ruleLibrary.repository.snapshot().size} registered pair rules`,
+);
+
+
+const differentialSimilarityEngine =
+  createDifferentialSimilarityEngine();
+
+console.log(
+  "📐 DIFFERENTIAL SIMILARITY CALCULATOR:",
+  `${differentialSimilarityEngine.pairBuilderEngine.ruleLibrary.repository.snapshot().size} similarity-enabled rules`,
+);
+
+
+const differentialEvidenceEngine =
+  createDifferentialEvidenceEngine();
+
+console.log(
+  "🧩 DIFFERENTIAL EVIDENCE ENGINE:",
+  `${differentialEvidenceEngine.similarityEngine.pairBuilderEngine.ruleLibrary.repository.snapshot().size} evidence-enabled rules`,
+);
+
+
+const exclusiveFeatureEngine =
+  createExclusiveFeatureEngine();
+
+console.log(
+  "🔬 EXCLUSIVE FEATURE ENGINE:",
+  `${exclusiveFeatureEngine.differentialEvidenceEngine.similarityEngine.pairBuilderEngine.ruleLibrary.repository.snapshot().size} discriminative rules`,
+);
+
+
+const diagnosticConflictEngine =
+  createDiagnosticConflictEngine();
+
+console.log(
+  "⚖️ DIAGNOSTIC CONFLICT ENGINE:",
+  `${diagnosticConflictEngine.exclusiveFeaturePipeline.differentialEvidenceEngine.similarityEngine.pairBuilderEngine.ruleLibrary.repository.snapshot().size} conflict-enabled rules`,
+);
+
+
+const differentialRecommendationEngine =
+  createDifferentialRecommendationEngine();
+
+console.log(
+  "🧠 DIFFERENTIAL RECOMMENDATION ENGINE:",
+  `${differentialRecommendationEngine.conflictPipeline.exclusiveFeaturePipeline.differentialEvidenceEngine.similarityEngine.pairBuilderEngine.ruleLibrary.repository.snapshot().size} recommendation-enabled rules`,
+);
+
+
+const finalDifferentialDiagnosisEngine =
+  createFinalDifferentialDiagnosisEngine();
+
+console.log(
+  "🏁 FINAL DIFFERENTIAL DIAGNOSIS ENGINE:",
+  `${finalDifferentialDiagnosisEngine.recommendationPipeline.conflictPipeline.exclusiveFeaturePipeline.differentialEvidenceEngine.similarityEngine.pairBuilderEngine.ruleLibrary.repository.snapshot().size} final-diagnosis rules`,
+);
+
 
 // ============================================================================
 // USERS
@@ -1458,53 +1624,6 @@ function normalizeMedicalResponse(
     rawResponse: data,
   };
 }
-function auth(
-  req,
-  res,
-  next,
-) {
-
-  try {
-
-    const token =
-      req.headers.authorization
-        ?.replace(
-          "Bearer ",
-          "",
-        );
-
-    if (
-
-      !token ||
-
-      token.trim() !==
-        API_TOKEN.trim()
-
-    ) {
-
-      return res.status(401).json({
-
-        success: false,
-
-        error:
-          "Token inválido.",
-      });
-    }
-
-    next();
-
-  } catch (error) {
-
-    return res.status(500).json({
-
-      success: false,
-
-      error:
-        "Erro interno autenticação.",
-    });
-  }
-}
-
 // ============================================================================
 // USER
 // ============================================================================
@@ -1822,1152 +1941,7 @@ UTILIZAR SOMENTE:
 - possível presença
 - baixa evidência visual
 - moderada evidência visual
-- revisão microscópi> start
-                    > node server.js
-                    🔥 RBC ENGINE V5 LOADED
-                    🧬 LEUKOCYTE ENGINE V5 LOADED
-                    ◇ injected env (0) from .env // tip: ⌁ auth for agents [www.vestauth.com]
-                    🔑 OpenAI API: CONFIGURADA
-                    🧠 Modelo: gpt-4o
-                    🔥 CELLCOUNT ELITE HOSPITAL rodando na porta 10000
-                    🧠 Modelo: gpt-4o
-                    🩸 IA hematológica online
-                    🚀 PIPELINE ENTERPRISE V6 SAFE HYBRID ONLINE
-                    ==> Your service is live 🎉
-                    ==>
-                    ==> ///////////////////////////////////////////////////////////
-                    ==>
-                    ==> Available at your primary URL https://api.rodrigueslucio.com + 1 more domain
-                    ==>
-                    ==> ///////////////////////////////////////////////////////////
-                    ==> Deploying...
-                    ==> Setting WEB_CONCURRENCY=1 by default, based on available CPUs in the instance
-                    ==> Running 'npm start'
-                    > start
-                    > node server.js
-                    🔥 RBC ENGINE V5 LOADED
-                    🧬 LEUKOCYTE ENGINE V5 LOADED
-                    ◇ injected env (0) from .env // tip: ⌘ multiple files { path: ['.env.local', '.env'] }
-                    🔑 OpenAI API: CONFIGURADA
-                    🧠 Modelo: gpt-4o
-                    🔥 CELLCOUNT ELITE HOSPITAL rodando na porta 10000
-                    🧠 Modelo: gpt-4o
-                    🩸 IA hematológica online
-                    🚀 PIPELINE ENTERPRISE V6 SAFE HYBRID ONLINE
-                    ==> Your service is live 🎉
-                    ==>
-                    ==> ///////////////////////////////////////////////////////////
-                    ==>
-                    ==> Available at your primary URL https://api.rodrigueslucio.com + 1 more domain
-                    ==>
-                    ==> ///////////////////////////////////////////////////////////
-                    🔬 1 imagens recebidas
-                    🧠 SOURCE: ai_visual
-                    🧠 [bdd4b1ef-f653-437d-8f4b-793d5d7c9741] IMAGE ENHANCEMENT TURBO - 1213ms
-                    ================================
-                    RAW GPT RESPONSE
-                    {
-                      "imageQuality": {
-                        "focus": "Adequado",
-                        "nitidez": "Boa",
-                        "coloração": "Adequada",
-                        "iluminação": "Uniforme",
-                        "artefatos": "Mínimos",
-                        "compressão": "Baixa",
-                        "sobreposiçãoCelular": "Mínima",
-                        "resolução": "Alta",
-                        "distorções": "Nenhuma",
-                        "areasInadequadas": "Nenhuma"
-                      },
-                      "visualExtraction": {
-                        "neutrófilos": "Presentes",
-                        "linfócitos": "Presentes",
-                        "monócitos": "Não observados",
-                        "eosinófilos": "Não observados",
-                        "basófilos": "Não observados",
-                        "blastosSuspeitos": "Não observados",
-                        "célulasImaturas": "Não observadas",
-                        "eritroblastos": "Não observados",
-                        "plaquetas": "Presentes",
-                        "agregados": "Não observados",
-                        "artefatos": "Mínimos"
-                      },
-                      "normalityBlocked": false,
-                      "blockNormalReason": [],
-                      "morphologicRiskClass": "CLASS_0_NORMAL",
-                      "findings": {
-                        "largeMononuclearCells": false,
-                        "plasmacytoidCells": false,
-                        "plasmocytes": false,
-                        "plasmablasts": false,
-                        "atypicalLymphocytes": false,
-                        "atypicalLymphocyteSubtype": "none",
-                        "downeyLikeCells": false,
-                        "downeyType": "none",
-                        "monocytoidAtypicalLymphocytes": false,
-                        "lymphocytoidAtypicalLymphocytes": false,
-                        "immunoblastoidCells": false,
-                        "monomorphicPopulation": false,
-                        "immatureCells": false,
-                        "blastSuspicion": false
-                      },
-                      "morphologyAnalysis": {
-                        "overview": "A imagem apresenta boa qualidade com coloração e foco adequados. Observa-se uma distribuição celular homogênea com presença de linfócitos e neutrófilos. Não há sobreposição significativa de células.",
-                        "erythrocyteReview": "Os eritrócitos apresentam-se normocíticos e normocrômicos, sem anisocitose ou poiquilocitose evidente.",
-                        "leukocyteReview": "Presença de linfócitos e neutrófilos maduros. Não há evidência de células imaturas ou atípicas.",
-                        "plateletReview": "Plaquetas presentes em quantidade adequada, sem agregação ou gigantismo.",
-                        "absentFindings": "ELEMENTOS DE ALERTA NÃO EVIDENCIADOS: Blastos inequívocos; células imaturas críticas; bastonetes de Auer; população blástica significativa; células imaturas críticas; esquizócitos relevantes.",
-                        "biologicalInterpretation": "A morfologia observada é compatível com um esfregaço de sangue periférico normal, sem evidências de alterações patológicas significativas.",
-                        "differentialDiagnosis": "1. Esfregaço normal; 2. Alterações reacionais mínimas; 3. Artefatos de preparação.",
-                        "summary": "A análise morfológica não revela alterações significativas, com presença de células sanguíneas maduras e normais."
-                      },
-                      "patternRecognition": {
-                        "erythrocytePattern": "Normocítico e normocrômico",
-                        "leukocytePattern": "Presença de linfócitos e neutrófilos maduros",
-                        "plateletPattern": "Plaquetas em quantidade normal",
-                        "artifactPattern": "Artefatos mínimos",
-                        "overallPattern": "Padrão hematológico normal"
-                      },
-                      "interpretiveSynthesis": "A análise morfológica do esfregaço sanguíneo revela um padrão normal, com presença de linfócitos e neutrófilos maduros, eritrócitos normocíticos e normocrômicos, e plaquetas em quantidade adequada. Não há evidência de células imaturas ou atípicas, e a qualidade da imagem é boa, permitindo uma avaliação confiável.",
-                      "clinicalMeaning": "Os achados observados são sugestivos de um estado hematológico normal, sem evidências de alterações patológicas significativas. A presença de linfócitos e neutrófilos maduros, juntamente com eritrócitos normocíticos e normocrômicos, indica uma morfologia celular dentro dos padrões esperados. É importante correlacionar esses achados com dados clínicos e laboratoriais adicionais para uma avaliação completa.",
-                      "hematologicReasoning": "A análise morfológica do esfregaço sanguíneo demonstra uma população celular madura e normal, sem evidências de alterações reacionais ou patológicas. A presença de linfócitos e neutrófilos maduros sugere uma resposta imunológica adequada, enquanto a morfologia eritrocitária normocítica e normocrômica indica uma produção eritropoiética normal. A ausência de células imaturas ou atípicas reforça a interpretação de normalidade. No entanto, é essencial considerar a correlação com dados clínicos e laboratoriais adicionais para uma avaliação abrangente.",
-                      "educationalImpact": "Este caso ilustra a importância da avaliação morfológica detalhada em hematologia, destacando a necessidade de uma análise cuidadosa para identificar padrões normais e descartar alterações patológicas. A correlação com exames complementares, como hemograma completo, é fundamental para uma interpretação precisa e para a tomada de decisões clínicas informadas.",
-                      "visualEvidence": {
-                        "visualEvidenceScore": 85,
-                        "evidenceLevel": "alta evidência visual",
-                        "morphologyConfidence": "alta",
-                        "imageReliability": "alta",
-                        "artifactInterference": "mínima"
-                      },
-                      "confidenceAnalysis": {
-                        "coerênciaHematológica": "alta",
-                        "coerênciaVisual": "alta",
-                        "coerênciaMorfológica": "alta",
-                        "coerênciaDeConfiança": "alta"
-                      },
-                      "safetyValidation": {
-                        "contradiçõesInternas": "nenhuma",
-                        "exageroDiagnóstico": "nenhum",
-                        "inferênciasIndevidas": "nenhuma",
-                        "limitaçõesTécnicas": "nenhuma",
-                        "qualidadeInsuficiente": "nenhuma",
-                        "inconsistênciaMorfológica": "nenhuma"
-                      },
-                      "consensusAnalysis": {
-                        "coerênciaHematológica": "alta",
-                        "coerênciaVisual": "alta",
-                        "coerênciaMorfológica": "alta",
-                        "coerênciaDeConfiança": "alta"
-                      },
-                      "clinicalCorrelation": {
-                        "necessidadeDeRevisão": "não necessária",
-                        "correlaçãoClínica": "recomendada para confirmação",
-                        "examesComplementares": "hemograma completo"
-                      },
-                      "erythrocyteFindings": {
-                        "normocitose": true,
-                        "normocromia": true,
-                        "anisocitose": false,
-                        "poiquilocitose": false
-                      },
-                      "leukocyteFindings": {
-                        "linfócitosMaduros": true,
-                        "neutrófilosMaduros": true,
-                        "célulasImaturas": false,
-                        "célulasAtípicas": false
-                      },
-                      "plateletFindings": {
-                        "quantidadeNormal": true,
-                        "agregação": false,
-                        "gigantismo": false
-                      },
-                      "blastSuspicion": {
-                        "suspeitaDeBlastos": false
-                      },
-                      "overallAssessment": {
-                        "mainImpression": "A análise morfológica do esfregaço sanguíneo revela um padrão normal, com presença de linfócitos e neutrófilos maduros, eritrócitos normocíticos e normocrômicos, e plaquetas em quantidade adequada. Não há evidência de células imaturas ou atípicas, e a qualidade da imagem é boa, permitindo uma avaliação confiável."
-                      },
-                      "structuredReport": {
-                        "resumoMorfologico": "Esfregaço sanguíneo com padrão normal, presença de linfócitos e neutrófilos maduros, eritrócitos normocíticos e normocrômicos, e plaquetas adequadas.",
-                        "interpretacaoEducacional": "Os achados são compatíveis com um estado hematológico normal. A presença de células maduras e a ausência de alterações patológicas significativas indicam uma morfologia celular dentro dos padrões esperados.",
-                        "limitacoes": "Análise baseada apenas nas imagens enviadas. Necessidade de hemograma completo e revisão microscópica profissional quando indicada."
-                      },
-                      "criticalFlags": [],
-                      "educationalPearls": [
-                        "A avaliação morfológica detalhada é essencial para identificar padrões normais e descartar alterações patológicas.",
-                        "A correlação com exames complementares, como hemograma completo, é fundamental para uma interpretação precisa."
-                      ],
-                      "limitations": [
-                        "Análise baseada apenas nas imagens enviadas.",
-                        "Necessidade de hemograma completo para avaliação abrangente."
-                      ],
-                      "recommendedCorrelation": [
-                        "Hemograma completo",
-                        "Revisão microscópica profissional quando indicada"
-                      ],
-                      "heatmapRegions": []
-                    }
-                    ================================
-                    🧠 [bdd4b1ef-f653-437d-8f4b-793d5d7c9741] OPENAI TURBO ANALYSIS - 27320ms
-                    ================================
-                    NORMALIZED RESPONSE
-                    FIELD ADEQUACY
-                    {
-                      "visibleLeukocytes": 5,
-                      "singleCellConcern": false,
-                      "adequateForLeukocyteAnalysis": true,
-                      "adequateForBlastScreening": true,
-                      "adequateForPopulationAssessment": false
-                    }
-                    {
-                      "normalityBlocked": false,
-                      "blockNormalReason": [],
-                      "morphologicRiskClass": "CLASS_1_LIMITED_FIELD_ATYPICAL_CELL",
-                      "reactiveLymphoidPattern": false,
-                      "mononucleosisSuspicion": false,
-                      "downeyCellSuspicion": false,
-                      "summary": "",
-                      "riskLevel": "Achado celular isolado",
-                      "observations": "",
-                      "alerts": [],
-                      "morphologies": [],
-                      "counts": {},
-                      "findings": {
-                        "reactiveLymphocytes": false,
-                        "largeMononuclearCells": false,
-                        "plasmacytoidCells": false,
-                        "plasmocytes": false,
-                        "plasmablasts": false,
-                        "atypicalLymphocytes": false,
-                        "atypicalLymphocyteSubtype": "none",
-                        "downeyLikeCells": false,
-                        "downeyType": "none",
-                        "monocytoidAtypicalLymphocytes": false,
-                        "lymphocytoidAtypicalLymphocytes": false,
-                        "immunoblastoidCells": false,
-                        "monomorphicPopulation": false,
-                        "immatureCells": false,
-                        "blastSuspicion": false
-                      },
-                      "morphologyAnalysis": {
-                        "overview": "A imagem apresenta boa qualidade com coloração e foco adequados. Observa-se uma distribuição celular homogênea com presença de linfócitos e neutrófilos. Não há sobreposição significativa de células.",
-                        "erythrocyteReview": "Os eritrócitos apresentam-se normocíticos e normocrômicos, sem anisocitose ou poiquilocitose evidente.",
-                        "leukocyteReview": "Observa-se célula mononuclear isolada com possível atipia/reatividade. O campo é limitado para afirmar ativação linfoide populacional.",
-                        "plateletReview": "Plaquetas presentes em quantidade adequada, sem agregação ou gigantismo.",
-                        "absentFindings": "ELEMENTOS DE ALERTA NÃO EVIDENCIADOS: Blastos inequívocos; células imaturas críticas; bastonetes de Auer; população blástica significativa; células imaturas críticas; esquizócitos relevantes.",
-                        "biologicalInterpretation": "A morfologia observada é compatível com um esfregaço de sangue periférico normal, sem evidências de alterações patológicas significativas.",
-                        "differentialDiagnosis": "1. Esfregaço normal; 2. Alterações reacionais mínimas; 3. Artefatos de preparação.",
-                        "summary": "Campo limitado com célula mononuclear isolada. Recomenda-se avaliação de múltiplos campos e correlação com hemograma."
-                      },
-                      "educationalPearls": [
-                        "A avaliação morfológica detalhada é essencial para identificar padrões normais e descartar alterações patológicas.",
-                        "A correlação com exames complementares, como hemograma completo, é fundamental para uma interpretação precisa."
-                      ],
-                      "heatmapRegions": [],
-                      "imageQuality": {
-                        "focus": "Adequado",
-                        "nitidez": "Boa",
-                        "coloração": "Adequada",
-                        "iluminação": "Uniforme",
-                        "artefatos": "Mínimos",
-                        "compressão": "Baixa",
-                        "sobreposiçãoCelular": "Mínima",
-                        "resolução": "Alta",
-                        "distorções": "Nenhuma",
-                        "areasInadequadas": "Nenhuma"
-                      },
-                      "patternRecognition": {
-                        "erythrocytePattern": "Normocítico e normocrômico",
-                        "leukocytePattern": "Achado mononuclear isolado",
-                        "plateletPattern": "Plaquetas em quantidade normal",
-                        "artifactPattern": "Artefatos mínimos",
-                        "overallPattern": "Campo limitado para caracterização populacional"
-                      },
-                      "interpretiveSynthesis": "A análise morfológica do esfregaço sanguíneo revela um padrão normal, com presença de linfócitos e neutrófilos maduros, eritrócitos normocíticos e normocrômicos, e plaquetas em quantidade adequada. Não há evidência de células imaturas ou atípicas, e a qualidade da imagem é boa, permitindo uma avaliação confiável.",
-                      "clinicalMeaning": "Os achados observados são sugestivos de um estado hematológico normal, sem evidências de alterações patológicas significativas. A presença de linfócitos e neutrófilos maduros, juntamente com eritrócitos normocíticos e normocrômicos, indica uma morfologia celular dentro dos padrões esperados. É importante correlacionar esses achados com dados clínicos e laboratoriais adicionais para uma avaliação completa.",
-                      "hematologicReasoning": "A análise morfológica do esfregaço sanguíneo demonstra uma população celular madura e normal, sem evidências de alterações reacionais ou patológicas. A presença de linfócitos e neutrófilos maduros sugere uma resposta imunológica adequada, enquanto a morfologia eritrocitária normocítica e normocrômica indica uma produção eritropoiética normal. A ausência de células imaturas ou atípicas reforça a interpretação de normalidade. No entanto, é essencial considerar a correlação com dados clínicos e laboratoriais adicionais para uma avaliação abrangente.",
-                      "educationalImpact": "Este caso ilustra a importância da avaliação morfológica detalhada em hematologia, destacando a necessidade de uma análise cuidadosa para identificar padrões normais e descartar alterações patológicas. A correlação com exames complementares, como hemograma completo, é fundamental para uma interpretação precisa e para a tomada de decisões clínicas informadas.",
-                      "erythrocyteFindings": {
-                        "normocitose": true,
-                        "normocromia": true,
-                        "anisocitose": false,
-                        "poiquilocitose": false
-                      },
-                      "leukocyteFindings": {
-                        "linfócitosMaduros": true,
-                        "neutrófilosMaduros": true,
-                        "célulasImaturas": false,
-                        "célulasAtípicas": false
-                      },
-                      "plateletFindings": {
-                        "quantidadeNormal": true,
-                        "agregação": false,
-                        "gigantismo": false
-                      },
-                      "blastSuspicion": {
-                        "suspeitaDeBlastos": false
-                      },
-                      "overallAssessment": {
-                        "mainImpression": "A análise morfológica do esfregaço sanguíneo revela um padrão normal, com presença de linfócitos e neutrófilos maduros, eritrócitos normocíticos e normocrômicos, e plaquetas em quantidade adequada. Não há evidência de células imaturas ou atípicas, e a qualidade da imagem é boa, permitindo uma avaliação confiável.",
-                        "requiresHumanReview": false
-                      },
-                      "structuredReport": {
-                        "resumoMorfologico": "Esfregaço sanguíneo com padrão normal, presença de linfócitos e neutrófilos maduros, eritrócitos normocíticos e normocrômicos, e plaquetas adequadas.",
-                        "interpretacaoEducacional": "Os achados são compatíveis com um estado hematológico normal. A presença de células maduras e a ausência de alterações patológicas significativas indicam uma morfologia celular dentro dos padrões esperados.",
-                        "limitacoes": "Análise baseada apenas nas imagens enviadas. Necessidade de hemograma completo e revisão microscópica profissional quando indicada."
-                      },
-                      "differentialDiagnosis": [],
-                      "criticalFlags": [],
-                      "analysisSource": "ai_visual",
-                      "manualCounts": {},
-                      "aiDetectedCounts": {},
-                      "hybridValidation": {},
-                      "rawResponse": {
-                        "imageQuality": {
-                          "focus": "Adequado",
-                          "nitidez": "Boa",
-                          "coloração": "Adequada",
-                          "iluminação": "Uniforme",
-                          "artefatos": "Mínimos",
-                          "compressão": "Baixa",
-                          "sobreposiçãoCelular": "Mínima",
-                          "resolução": "Alta",
-                          "distorções": "Nenhuma",
-                          "areasInadequadas": "Nenhuma"
-                        },
-                        "visualExtraction": {
-                          "neutrófilos": "Presentes",
-                          "linfócitos": "Presentes",
-                          "monócitos": "Não observados",
-                          "eosinófilos": "Não observados",
-                          "basófilos": "Não observados",
-                          "blastosSuspeitos": "Não observados",
-                          "célulasImaturas": "Não observadas",
-                          "eritroblastos": "Não observados",
-                          "plaquetas": "Presentes",
-                          "agregados": "Não observados",
-                          "artefatos": "Mínimos"
-                        },
-                        "normalityBlocked": false,
-                        "blockNormalReason": [],
-                        "morphologicRiskClass": "CLASS_0_NORMAL",
-                        "findings": {
-                          "largeMononuclearCells": false,
-                          "plasmacytoidCells": false,
-                          "plasmocytes": false,
-                          "plasmablasts": false,
-                          "atypicalLymphocytes": false,
-                          "atypicalLymphocyteSubtype": "none",
-                          "downeyLikeCells": false,
-                          "downeyType": "none",
-                          "monocytoidAtypicalLymphocytes": false,
-                          "lymphocytoidAtypicalLymphocytes": false,
-                          "immunoblastoidCells": false,
-                          "monomorphicPopulation": false,
-                          "immatureCells": false,
-                          "blastSuspicion": false
-                        },
-                        "morphologyAnalysis": {
-                          "overview": "A imagem apresenta boa qualidade com coloração e foco adequados. Observa-se uma distribuição celular homogênea com presença de linfócitos e neutrófilos. Não há sobreposição significativa de células.",
-                          "erythrocyteReview": "Os eritrócitos apresentam-se normocíticos e normocrômicos, sem anisocitose ou poiquilocitose evidente.",
-                          "leukocyteReview": "Presença de linfócitos e neutrófilos maduros. Não há evidência de células imaturas ou atípicas.",
-                          "plateletReview": "Plaquetas presentes em quantidade adequada, sem agregação ou gigantismo.",
-                          "absentFindings": "ELEMENTOS DE ALERTA NÃO EVIDENCIADOS: Blastos inequívocos; células imaturas críticas; bastonetes de Auer; população blástica significativa; células imaturas críticas; esquizócitos relevantes.",
-                          "biologicalInterpretation": "A morfologia observada é compatível com um esfregaço de sangue periférico normal, sem evidências de alterações patológicas significativas.",
-                          "differentialDiagnosis": "1. Esfregaço normal; 2. Alterações reacionais mínimas; 3. Artefatos de preparação.",
-                          "summary": "A análise morfológica não revela alterações significativas, com presença de células sanguíneas maduras e normais."
-                        },
-                        "patternRecognition": {
-                          "erythrocytePattern": "Normocítico e normocrômico",
-                          "leukocytePattern": "Presença de linfócitos e neutrófilos maduros",
-                          "plateletPattern": "Plaquetas em quantidade normal",
-                          "artifactPattern": "Artefatos mínimos",
-                          "overallPattern": "Padrão hematológico normal"
-                        },
-                        "interpretiveSynthesis": "A análise morfológica do esfregaço sanguíneo revela um padrão normal, com presença de linfócitos e neutrófilos maduros, eritrócitos normocíticos e normocrômicos, e plaquetas em quantidade adequada. Não há evidência de células imaturas ou atípicas, e a qualidade da imagem é boa, permitindo uma avaliação confiável.",
-                        "clinicalMeaning": "Os achados observados são sugestivos de um estado hematológico normal, sem evidências de alterações patológicas significativas. A presença de linfócitos e neutrófilos maduros, juntamente com eritrócitos normocíticos e normocrômicos, indica uma morfologia celular dentro dos padrões esperados. É importante correlacionar esses achados com dados clínicos e laboratoriais adicionais para uma avaliação completa.",
-                        "hematologicReasoning": "A análise morfológica do esfregaço sanguíneo demonstra uma população celular madura e normal, sem evidências de alterações reacionais ou patológicas. A presença de linfócitos e neutrófilos maduros sugere uma resposta imunológica adequada, enquanto a morfologia eritrocitária normocítica e normocrômica indica uma produção eritropoiética normal. A ausência de células imaturas ou atípicas reforça a interpretação de normalidade. No entanto, é essencial considerar a correlação com dados clínicos e laboratoriais adicionais para uma avaliação abrangente.",
-                        "educationalImpact": "Este caso ilustra a importância da avaliação morfológica detalhada em hematologia, destacando a necessidade de uma análise cuidadosa para identificar padrões normais e descartar alterações patológicas. A correlação com exames complementares, como hemograma completo, é fundamental para uma interpretação precisa e para a tomada de decisões clínicas informadas.",
-                        "visualEvidence": {
-                          "visualEvidenceScore": 85,
-                          "evidenceLevel": "alta evidência visual",
-                          "morphologyConfidence": "alta",
-                          "imageReliability": "alta",
-                          "artifactInterference": "mínima"
-                        },
-                        "confidenceAnalysis": {
-                          "coerênciaHematológica": "alta",
-                          "coerênciaVisual": "alta",
-                          "coerênciaMorfológica": "alta",
-                          "coerênciaDeConfiança": "alta"
-                        },
-                        "safetyValidation": {
-                          "contradiçõesInternas": "nenhuma",
-                          "exageroDiagnóstico": "nenhum",
-                          "inferênciasIndevidas": "nenhuma",
-                          "limitaçõesTécnicas": "nenhuma",
-                          "qualidadeInsuficiente": "nenhuma",
-                          "inconsistênciaMorfológica": "nenhuma"
-                        },
-                        "consensusAnalysis": {
-                          "coerênciaHematológica": "alta",
-                          "coerênciaVisual": "alta",
-                          "coerênciaMorfológica": "alta",
-                          "coerênciaDeConfiança": "alta"
-                        },
-                        "clinicalCorrelation": {
-                          "necessidadeDeRevisão": "não necessária",
-                          "correlaçãoClínica": "recomendada para confirmação",
-                          "examesComplementares": "hemograma completo"
-                        },
-                        "erythrocyteFindings": {
-                          "normocitose": true,
-                          "normocromia": true,
-                          "anisocitose": false,
-                          "poiquilocitose": false
-                        },
-                        "leukocyteFindings": {
-                          "linfócitosMaduros": true,
-                          "neutrófilosMaduros": true,
-                          "célulasImaturas": false,
-                          "célulasAtípicas": false
-                        },
-                        "plateletFindings": {
-                          "quantidadeNormal": true,
-                          "agregação": false,
-                          "gigantismo": false
-                        },
-                        "blastSuspicion": {
-                          "suspeitaDeBlastos": false
-                        },
-                        "overallAssessment": {
-                          "mainImpression": "A análise morfológica do esfregaço sanguíneo revela um padrão normal, com presença de linfócitos e neutrófilos maduros, eritrócitos normocíticos e normocrômicos, e plaquetas em quantidade adequada. Não há evidência de células imaturas ou atípicas, e a qualidade da imagem é boa, permitindo uma avaliação confiável."
-                        },
-                        "structuredReport": {
-                          "resumoMorfologico": "Esfregaço sanguíneo com padrão normal, presença de linfócitos e neutrófilos maduros, eritrócitos normocíticos e normocrômicos, e plaquetas adequadas.",
-                          "interpretacaoEducacional": "Os achados são compatíveis com um estado hematológico normal. A presença de células maduras e a ausência de alterações patológicas significativas indicam uma morfologia celular dentro dos padrões esperados.",
-                          "limitacoes": "Análise baseada apenas nas imagens enviadas. Necessidade de hemograma completo e revisão microscópica profissional quando indicada."
-                        },
-                        "criticalFlags": [],
-                        "educationalPearls": [
-                          "A avaliação morfológica detalhada é essencial para identificar padrões normais e descartar alterações patológicas.",
-                          "A correlação com exames complementares, como hemograma completo, é fundamental para uma interpretação precisa."
-                        ],
-                        "limitations": [
-                          "Análise baseada apenas nas imagens enviadas.",
-                          "Necessidade de hemograma completo para avaliação abrangente."
-                        ],
-                        "recommendedCorrelation": [
-                          "Hemograma completo",
-                          "Revisão microscópica profissional quando indicada"
-                        ],
-                        "heatmapRegions": [],
-                        "analysisSource": "ai_visual",
-                        "manualCounts": {},
-                        "manualMetadata": {
-                          "analysisSource": "ai_visual",
-                          "manualMode": false,
-                          "hybridMode": false,
-                          "aiVisualMode": true,
-                          "hasManualData": false
-                        }
-                      },
-                      "fieldAdequacy": {
-                        "visibleLeukocytes": 5,
-                        "singleCellConcern": false,
-                        "adequateForLeukocyteAnalysis": true,
-                        "adequateForBlastScreening": true,
-                        "adequateForPopulationAssessment": false
-                      }
-                    }
-                    ================================
-                    MORPHOLOGY ANALYSIS
-                    {
-                      "overview": "A imagem apresenta boa qualidade com coloração e foco adequados. Observa-se uma distribuição celular homogênea com presença de linfócitos e neutrófilos. Não há sobreposição significativa de células.",
-                      "erythrocyteReview": "Os eritrócitos apresentam-se normocíticos e normocrômicos, sem anisocitose ou poiquilocitose evidente.",
-                      "leukocyteReview": "Observa-se célula mononuclear isolada com possível atipia/reatividade. O campo é limitado para afirmar ativação linfoide populacional.",
-                      "plateletReview": "Plaquetas presentes em quantidade adequada, sem agregação ou gigantismo.",
-                      "absentFindings": "ELEMENTOS DE ALERTA NÃO EVIDENCIADOS: Blastos inequívocos; células imaturas críticas; bastonetes de Auer; população blástica significativa; células imaturas críticas; esquizócitos relevantes.",
-                      "biologicalInterpretation": "A morfologia observada é compatível com um esfregaço de sangue periférico normal, sem evidências de alterações patológicas significativas.",
-                      "differentialDiagnosis": "1. Esfregaço normal; 2. Alterações reacionais mínimas; 3. Artefatos de preparação.",
-                      "summary": "Campo limitado com célula mononuclear isolada. Recomenda-se avaliação de múltiplos campos e correlação com hemograma."
-                    }
-                    ================================
-                    🔥 NORMALIZED RESPONSE:
-                    {
-                      "morphologyAnalysis": {
-                        "overview": "A imagem apresenta boa qualidade com coloração e foco adequados. Observa-se uma distribuição celular homogênea com presença de linfócitos e neutrófilos. Não há sobreposição significativa de células.",
-                        "erythrocyteReview": "Os eritrócitos apresentam-se normocíticos e normocrômicos, sem anisocitose ou poiquilocitose evidente.",
-                        "leukocyteReview": "Observa-se célula mononuclear isolada com possível atipia/reatividade. O campo é limitado para afirmar ativação linfoide populacional.",
-                        "plateletReview": "Plaquetas presentes em quantidade adequada, sem agregação ou gigantismo.",
-                        "absentFindings": "ELEMENTOS DE ALERTA NÃO EVIDENCIADOS: Blastos inequívocos; células imaturas críticas; bastonetes de Auer; população blástica significativa; células imaturas críticas; esquizócitos relevantes.",
-                        "biologicalInterpretation": "A morfologia observada é compatível com um esfregaço de sangue periférico normal, sem evidências de alterações patológicas significativas.",
-                        "differentialDiagnosis": "1. Esfregaço normal; 2. Alterações reacionais mínimas; 3. Artefatos de preparação.",
-                        "summary": "Campo limitado com célula mononuclear isolada. Recomenda-se avaliação de múltiplos campos e correlação com hemograma."
-                      },
-                      "patternRecognition": {
-                        "erythrocytePattern": "Normocítico e normocrômico",
-                        "leukocytePattern": "Achado mononuclear isolado",
-                        "plateletPattern": "Plaquetas em quantidade normal",
-                        "artifactPattern": "Artefatos mínimos",
-                        "overallPattern": "Campo limitado para caracterização populacional"
-                      },
-                      "structuredReport": {
-                        "resumoMorfologico": "Esfregaço sanguíneo com padrão normal, presença de linfócitos e neutrófilos maduros, eritrócitos normocíticos e normocrômicos, e plaquetas adequadas.",
-                        "interpretacaoEducacional": "Os achados são compatíveis com um estado hematológico normal. A presença de células maduras e a ausência de alterações patológicas significativas indicam uma morfologia celular dentro dos padrões esperados.",
-                        "limitacoes": "Análise baseada apenas nas imagens enviadas. Necessidade de hemograma completo e revisão microscópica profissional quando indicada."
-                      },
-                      "overallAssessment": {
-                        "mainImpression": "A análise morfológica do esfregaço sanguíneo revela um padrão normal, com presença de linfócitos e neutrófilos maduros, eritrócitos normocíticos e normocrômicos, e plaquetas em quantidade adequada. Não há evidência de células imaturas ou atípicas, e a qualidade da imagem é boa, permitindo uma avaliação confiável.",
-                        "requiresHumanReview": false
-                      },
-                      "interpretiveSynthesis": "A análise morfológica do esfregaço sanguíneo revela um padrão normal, com presença de linfócitos e neutrófilos maduros, eritrócitos normocíticos e normocrômicos, e plaquetas em quantidade adequada. Não há evidência de células imaturas ou atípicas, e a qualidade da imagem é boa, permitindo uma avaliação confiável.",
-                      "clinicalMeaning": "Os achados observados são sugestivos de um estado hematológico normal, sem evidências de alterações patológicas significativas. A presença de linfócitos e neutrófilos maduros, juntamente com eritrócitos normocíticos e normocrômicos, indica uma morfologia celular dentro dos padrões esperados. É importante correlacionar esses achados com dados clínicos e laboratoriais adicionais para uma avaliação completa.",
-                      "hematologicReasoning": "A análise morfológica do esfregaço sanguíneo demonstra uma população celular madura e normal, sem evidências de alterações reacionais ou patológicas. A presença de linfócitos e neutrófilos maduros sugere uma resposta imunológica adequada, enquanto a morfologia eritrocitária normocítica e normocrômica indica uma produção eritropoiética normal. A ausência de células imaturas ou atípicas reforça a interpretação de normalidade. No entanto, é essencial considerar a correlação com dados clínicos e laboratoriais adicionais para uma avaliação abrangente."
-                    }
-                    🧠 [bdd4b1ef-f653-437d-8f4b-793d5d7c9741] HEMATOLOGY ENGINES - 2ms
-                    🧠 [bdd4b1ef-f653-437d-8f4b-793d5d7c9741] SAFETY ENGINE - 5ms
-                    🧠 [bdd4b1ef-f653-437d-8f4b-793d5d7c9741] CONSENSUS ENGINE - 0ms
-                    CONFIDENCE DEBUG {
-                      "visualEvidenceScore": 0,
-                      "diagnosticReliability": 0,
-                      "morphologyCoherence": 0,
-                      "artifactProbability": 0,
-                      "falsePositiveRisk": 0,
-                      "safeDiagnosticGate": false,
-                      "globalConfidenceScore": 23,
-                      "hematologicRisk": {
-                        "level": "low",
-                        "score": 7,
-                        "label": "BAIXO RISCO"
-                      }
-                    }
-                    🧠 [bdd4b1ef-f653-437d-8f4b-793d5d7c9741] CONFIDENCE ENGINE - 3ms
-                    🧠 [bdd4b1ef-f653-437d-8f4b-793d5d7c9741] TOTAL PIPELINE TURBO - 28545ms
-                    ================================
-                    FINAL VALIDATED RESULT
-                    {
-                      "normalityBlocked": false,
-                      "morphologicRiskClass": "CLASS_1_LIMITED_FIELD_ATYPICAL_CELL",
-                      "riskLevel": "Achado celular isolado",
-                      "requiresHumanReview": false,
-                      "findings": {
-                        "reactiveLymphocytes": false,
-                        "largeMononuclearCells": false,
-                        "plasmacytoidCells": false,
-                        "plasmocytes": false,
-                        "plasmablasts": false,
-                        "atypicalLymphocytes": false,
-                        "atypicalLymphocyteSubtype": "none",
-                        "downeyLikeCells": false,
-                        "downeyType": "none",
-                        "monocytoidAtypicalLymphocytes": false,
-                        "lymphocytoidAtypicalLymphocytes": false,
-                        "immunoblastoidCells": false,
-                        "monomorphicPopulation": false,
-                        "immatureCells": false,
-                        "blastSuspicion": false
-                      },
-                      "blockNormalReason": [],
-                      "confidenceAnalysis": {
-                        "globalConfidenceScore": 23,
-                        "hematologicRisk": {
-                          "level": "low",
-                          "score": 7,
-                          "label": "BAIXO RISCO"
-                        },
-                        "microscopyQuality": {
-                          "score": 55,
-                          "classification": "Moderada"
-                        },
-                        "confidenceMatrix": {
-                          "blastConfidence": 0,
-                          "schistocyteConfidence": 8,
-                          "erythrocyteConfidence": 42,
-                          "plateletConfidence": 41,
-                          "inflammatoryPatternConfidence": 27,
-                          "dysplasiaConfidence": 7,
-                          "diagnosticCoherenceConfidence": 15
-                        },
-                        "confidenceHierarchy": {
-                          "cellLevel": 60,
-                          "morphologyLevel": 16,
-                          "diagnosticLevel": 15,
-                          "global": 23
-                        },
-                        "calibration": {
-                          "version": "V4_ENTERPRISE_SAFETY_AWARE",
-                          "strategy": "safety_weighted_multiengine_confidence",
-                          "safetyAware": true,
-                          "visualEvidenceAware": true,
-                          "yoloFusionAware": true,
-                          "overcallingSuppression": true,
-                          "undercallingProtection": true,
-                          "semanticExtractionAware": true
-                        },
-                        "safetySignals": {
-                          "visualEvidenceScore": 0,
-                          "diagnosticReliability": 0,
-                          "morphologyCoherence": 0,
-                          "artifactProbability": 0,
-                          "falsePositiveRisk": 0,
-                          "safeDiagnosticGate": false
-                        },
-                        "summary": "Análise hematológica processada com confiança hierárquica multi-engine V4. Baixa sustentação para suspeita blástica. Confiança global: 23%. Classificação: BAIXO RISCO."
-                      }
-                    }
-                    ================================
-                    🔬 1 imagens recebidas
-                    🧠 SOURCE: ai_visual
-                    🧠 [d9801a02-f34e-4668-baa2-95735918fab2] IMAGE ENHANCEMENT TURBO - 814ms
-                    ================================
-                    RAW GPT RESPONSE
-                    {
-                      "imageQuality": {
-                        "focus": "Adequado",
-                        "nitidez": "Boa",
-                        "coloração": "Uniforme",
-                        "iluminação": "Adequada",
-                        "artefatos": "Mínimos",
-                        "compressão": "Baixa",
-                        "sobreposiçãoCelular": "Mínima",
-                        "resolução": "Alta",
-                        "distorções": "Nenhuma",
-                        "areasInadequadas": "Nenhuma"
-                      },
-                      "visualExtraction": {
-                        "neutrófilos": "Presentes",
-                        "linfócitos": "Presentes",
-                        "monócitos": "Não observados",
-                        "eosinófilos": "Não observados",
-                        "basófilos": "Não observados",
-                        "blastosSuspeitos": "Não observados",
-                        "célulasImaturas": "Não observadas",
-                        "eritroblastos": "Não observados",
-                        "plaquetas": "Presentes",
-                        "agregados": "Não observados",
-                        "artefatos": "Mínimos"
-                      },
-                      "normalityBlocked": false,
-                      "blockNormalReason": [],
-                      "morphologicRiskClass": "CLASS_0_NORMAL",
-                      "findings": {
-                        "largeMononuclearCells": false,
-                        "plasmacytoidCells": false,
-                        "plasmocytes": false,
-                        "plasmablasts": false,
-                        "atypicalLymphocytes": false,
-                        "atypicalLymphocyteSubtype": "none",
-                        "downeyLikeCells": false,
-                        "downeyType": "none",
-                        "monocytoidAtypicalLymphocytes": false,
-                        "lymphocytoidAtypicalLymphocytes": false,
-                        "immunoblastoidCells": false,
-                        "monomorphicPopulation": false,
-                        "immatureCells": false,
-                        "blastSuspicion": false
-                      },
-                      "morphologyAnalysis": {
-                        "overview": "A imagem apresenta boa qualidade com coloração uniforme e nitidez adequada. A celularidade é composta principalmente por eritrócitos e alguns leucócitos, com destaque para um linfócito reativo.",
-                        "erythrocyteReview": "Os eritrócitos apresentam-se normocíticos e normocrômicos, sem anisocitose ou poiquilocitose significativa.",
-                        "leukocyteReview": "Presença de linfócitos normais e um linfócito reativo, sem evidência de células imaturas ou blastos.",
-                        "plateletReview": "Plaquetas presentes em número adequado, sem alterações morfológicas significativas.",
-                        "absentFindings": "ELEMENTOS DE ALERTA NÃO EVIDENCIADOS: Blastos inequívocos; células imaturas críticas; bastonetes de Auer; população blástica significativa; células imaturas críticas; esquizócitos relevantes.",
-                        "biologicalInterpretation": "Os achados são compatíveis com um esfregaço sanguíneo normal, com a presença de um linfócito reativo que pode estar associado a uma resposta imunológica.",
-                        "differentialDiagnosis": "1. Resposta imunológica reativa; 2. Infecção viral leve; 3. Estado normal sem alterações significativas.",
-                        "summary": "A análise morfológica não revela alterações significativas, exceto pela presença de um linfócito reativo, sugerindo uma possível resposta imunológica. Não há evidência de células imaturas ou blastos."
-                      },
-                      "patternRecognition": {
-                        "erythrocytePattern": "Normocítico, normocrômico",
-                        "leukocytePattern": "Presença de linfócitos normais e um linfócito reativo",
-                        "plateletPattern": "Plaquetas normais",
-                        "artifactPattern": "Mínimos artefatos",
-                        "overallPattern": "Esfregaço sanguíneo com características normais e presença de linfócito reativo"
-                      },
-                      "interpretiveSynthesis": "A análise morfológica do esfregaço sanguíneo revela um padrão predominantemente normal, com eritrócitos normocíticos e normocrômicos, e a presença de um linfócito reativo. Este achado pode estar associado a uma resposta imunológica, possivelmente devido a uma infecção viral leve ou outra forma de ativação imunológica. Não há evidência de células imaturas ou blastos, o que sugere um estado hematológico estável. A qualidade da imagem é adequada, permitindo uma avaliação confiável dos elementos celulares presentes.",
-                      "clinicalMeaning": "Os achados observados no esfregaço sanguíneo são sugestivos de um estado hematológico normal, com a presença de um linfócito reativo que pode indicar uma resposta imunológica. Este tipo de célula pode ser observado em infecções virais leves ou outras condições que estimulam o sistema imunológico. A ausência de células imaturas ou blastos é um indicativo positivo, sugerindo que não há processos hematológicos malignos evidentes. No entanto, é importante correlacionar esses achados com dados clínicos e laboratoriais adicionais para uma avaliação completa.",
-                      "hematologicReasoning": "A presença de um linfócito reativo no esfregaço sanguíneo pode ser interpretada como uma resposta do sistema imunológico a um estímulo, como uma infecção viral. Linfócitos reativos são frequentemente maiores que os linfócitos normais e podem apresentar citoplasma basofílico. A ausência de blastos ou outras células imaturas sugere que não há proliferação clonal ou processo maligno evidente. A análise morfológica é consistente com um estado hematológico estável, mas a correlação com dados clínicos é essencial para confirmar essa interpretação.",
-                      "educationalImpact": "Este caso ilustra a importância de reconhecer linfócitos reativos em esfregaços sanguíneos, que podem indicar uma resposta imunológica. A análise morfológica cuidadosa é crucial para diferenciar entre alterações reativas e processos malignos. Exames complementares, como hemograma completo e avaliação clínica, são fundamentais para uma interpretação precisa. Este exemplo destaca a relevância da correlação clínico-laboratorial na prática hematológica.",
-                      "visualEvidence": {
-                        "visualEvidenceScore": 85,
-                        "evidenceLevel": "alta evidência visual",
-                        "morphologyConfidence": "alta",
-                        "imageReliability": "alta",
-                        "artifactInterference": "mínima"
-                      },
-                      "confidenceAnalysis": {
-                        "coerênciaHematológica": "alta",
-                        "coerênciaVisual": "alta",
-                        "coerênciaMorfológica": "alta",
-                        "coerênciaDeConfiança": "alta"
-                      },
-                      "safetyValidation": {
-                        "contradiçõesInternas": "nenhuma",
-                        "exageroDiagnóstico": "nenhum",
-                        "inferênciasIndevidas": "nenhuma",
-                        "limitaçõesTécnicas": "nenhuma",
-                        "qualidadeInsuficiente": "nenhuma",
-                        "inconsistênciaMorfológica": "nenhuma"
-                      },
-                      "consensusAnalysis": {
-                        "coerênciaHematológica": "alta",
-                        "coerênciaVisual": "alta",
-                        "coerênciaMorfológica": "alta",
-                        "coerênciaDeConfiança": "alta"
-                      },
-                      "clinicalCorrelation": {
-                        "necessidadeDeRevisão": "sim",
-                        "correlaçãoClínica": "sim",
-                        "examesComplementares": "hemograma completo"
-                      },
-                      "erythrocyteFindings": {
-                        "normocitose": true,
-                        "normocromia": true,
-                        "anisocitose": false,
-                        "poiquilocitose": false
-                      },
-                      "leukocyteFindings": {
-                        "linfócitosReativos": true,
-                        "célulasImaturas": false,
-                        "blastos": false
-                      },
-                      "plateletFindings": {
-                        "quantidadeAparente": "normal",
-                        "alteraçõesMorfológicas": "nenhuma"
-                      },
-                      "blastSuspicion": {
-                        "suspeitaDeBlastos": false
-                      },
-                      "overallAssessment": {
-                        "mainImpression": "O esfregaço sanguíneo analisado apresenta características predominantemente normais, com eritrócitos normocíticos e normocrômicos, e a presença de um linfócito reativo. Este achado pode sugerir uma resposta imunológica, possivelmente associada a uma infecção viral leve. Não há evidência de células imaturas ou blastos, indicando um estado hematológico estável. A qualidade da imagem é adequada, permitindo uma avaliação confiável dos elementos celulares presentes. Recomenda-se correlação com dados clínicos e laboratoriais adicionais para uma avaliação completa."
-                      },
-                      "structuredReport": {
-                        "resumoMorfologico": "Esfregaço sanguíneo com eritrócitos normocíticos e normocrômicos, presença de linfócito reativo, sem células imaturas ou blastos.",
-                        "interpretacaoEducacional": "Os achados podem sugerir uma resposta imunológica, possivelmente associada a uma infecção viral leve. A ausência de células imaturas ou blastos é um indicativo positivo.",
-                        "limitacoes": "Análise baseada apenas nas imagens enviadas. Necessidade de hemograma completo e revisão microscópica profissional quando indicada."
-                      },
-                      "criticalFlags": [],
-                      "educationalPearls": [
-                        "Linfócitos reativos podem indicar resposta imunológica.",
-                        "Importância da correlação clínico-laboratorial."
-                      ],
-                      "limitations": [
-                        "Análise baseada apenas nas imagens enviadas.",
-                        "Necessidade de hemograma completo para avaliação completa."
-                      ],
-                      "recommendedCorrelation": [
-                        "Hemograma completo",
-                        "Avaliação clínica"
-                      ],
-                      "heatmapRegions": []
-                    }
-                    ================================
-                    🧠 [d9801a02-f34e-4668-baa2-95735918fab2] OPENAI TURBO ANALYSIS - 59676ms
-                    ================================
-                    NORMALIZED RESPONSE
-                    FIELD ADEQUACY
-                    {
-                      "visibleLeukocytes": 5,
-                      "singleCellConcern": false,
-                      "adequateForLeukocyteAnalysis": true,
-                      "adequateForBlastScreening": true,
-                      "adequateForPopulationAssessment": false
-                    }
-                    {
-                      "normalityBlocked": false,
-                      "blockNormalReason": [],
-                      "morphologicRiskClass": "CLASS_1_LIMITED_FIELD_ATYPICAL_CELL",
-                      "reactiveLymphoidPattern": false,
-                      "mononucleosisSuspicion": false,
-                      "downeyCellSuspicion": false,
-                      "summary": "",
-                      "riskLevel": "Achado celular isolado",
-                      "observations": "",
-                      "alerts": [],
-                      "morphologies": [],
-                      "counts": {},
-                      "findings": {
-                        "reactiveLymphocytes": false,
-                        "largeMononuclearCells": false,
-                        "plasmacytoidCells": false,
-                        "plasmocytes": false,
-                        "plasmablasts": false,
-                        "atypicalLymphocytes": false,
-                        "atypicalLymphocyteSubtype": "none",
-                        "downeyLikeCells": false,
-                        "downeyType": "none",
-                        "monocytoidAtypicalLymphocytes": false,
-                        "lymphocytoidAtypicalLymphocytes": false,
-                        "immunoblastoidCells": false,
-                        "monomorphicPopulation": false,
-                        "immatureCells": false,
-                        "blastSuspicion": false
-                      },
-                      "morphologyAnalysis": {
-                        "overview": "A imagem apresenta boa qualidade com coloração uniforme e nitidez adequada. A celularidade é composta principalmente por eritrócitos e alguns leucócitos, com destaque para um linfócito reativo.",
-                        "erythrocyteReview": "Os eritrócitos apresentam-se normocíticos e normocrômicos, sem anisocitose ou poiquilocitose significativa.",
-                        "leukocyteReview": "Observa-se célula mononuclear isolada com possível atipia/reatividade. O campo é limitado para afirmar ativação linfoide populacional.",
-                        "plateletReview": "Plaquetas presentes em número adequado, sem alterações morfológicas significativas.",
-                        "absentFindings": "ELEMENTOS DE ALERTA NÃO EVIDENCIADOS: Blastos inequívocos; células imaturas críticas; bastonetes de Auer; população blástica significativa; células imaturas críticas; esquizócitos relevantes.",
-                        "biologicalInterpretation": "Os achados são compatíveis com um esfregaço sanguíneo normal, com a presença de um linfócito reativo que pode estar associado a uma resposta imunológica.",
-                        "differentialDiagnosis": "1. Resposta imunológica reativa; 2. Infecção viral leve; 3. Estado normal sem alterações significativas.",
-                        "summary": "Campo limitado com célula mononuclear isolada. Recomenda-se avaliação de múltiplos campos e correlação com hemograma."
-                      },
-                      "educationalPearls": [
-                        "Linfócitos reativos podem indicar resposta imunológica.",
-                        "Importância da correlação clínico-laboratorial."
-                      ],
-                      "heatmapRegions": [],
-                      "imageQuality": {
-                        "focus": "Adequado",
-                        "nitidez": "Boa",
-                        "coloração": "Uniforme",
-                        "iluminação": "Adequada",
-                        "artefatos": "Mínimos",
-                        "compressão": "Baixa",
-                        "sobreposiçãoCelular": "Mínima",
-                        "resolução": "Alta",
-                        "distorções": "Nenhuma",
-                        "areasInadequadas": "Nenhuma"
-                      },
-                      "patternRecognition": {
-                        "erythrocytePattern": "Normocítico, normocrômico",
-                        "leukocytePattern": "Achado mononuclear isolado",
-                        "plateletPattern": "Plaquetas normais",
-                        "artifactPattern": "Mínimos artefatos",
-                        "overallPattern": "Campo limitado para caracterização populacional"
-                      },
-                      "interpretiveSynthesis": "A análise morfológica do esfregaço sanguíneo revela um padrão predominantemente normal, com eritrócitos normocíticos e normocrômicos, e a presença de um linfócito reativo. Este achado pode estar associado a uma resposta imunológica, possivelmente devido a uma infecção viral leve ou outra forma de ativação imunológica. Não há evidência de células imaturas ou blastos, o que sugere um estado hematológico estável. A qualidade da imagem é adequada, permitindo uma avaliação confiável dos elementos celulares presentes.",
-                      "clinicalMeaning": "Os achados observados no esfregaço sanguíneo são sugestivos de um estado hematológico normal, com a presença de um linfócito reativo que pode indicar uma resposta imunológica. Este tipo de célula pode ser observado em infecções virais leves ou outras condições que estimulam o sistema imunológico. A ausência de células imaturas ou blastos é um indicativo positivo, sugerindo que não há processos hematológicos malignos evidentes. No entanto, é importante correlacionar esses achados com dados clínicos e laboratoriais adicionais para uma avaliação completa.",
-                      "hematologicReasoning": "A presença de um linfócito reativo no esfregaço sanguíneo pode ser interpretada como uma resposta do sistema imunológico a um estímulo, como uma infecção viral. Linfócitos reativos são frequentemente maiores que os linfócitos normais e podem apresentar citoplasma basofílico. A ausência de blastos ou outras células imaturas sugere que não há proliferação clonal ou processo maligno evidente. A análise morfológica é consistente com um estado hematológico estável, mas a correlação com dados clínicos é essencial para confirmar essa interpretação.",
-                      "educationalImpact": "Este caso ilustra a importância de reconhecer linfócitos reativos em esfregaços sanguíneos, que podem indicar uma resposta imunológica. A análise morfológica cuidadosa é crucial para diferenciar entre alterações reativas e processos malignos. Exames complementares, como hemograma completo e avaliação clínica, são fundamentais para uma interpretação precisa. Este exemplo destaca a relevância da correlação clínico-laboratorial na prática hematológica.",
-                      "erythrocyteFindings": {
-                        "normocitose": true,
-                        "normocromia": true,
-                        "anisocitose": false,
-                        "poiquilocitose": false
-                      },
-                      "leukocyteFindings": {
-                        "linfócitosReativos": true,
-                        "célulasImaturas": false,
-                        "blastos": false
-                      },
-                      "plateletFindings": {
-                        "quantidadeAparente": "normal",
-                        "alteraçõesMorfológicas": "nenhuma"
-                      },
-                      "blastSuspicion": {
-                        "suspeitaDeBlastos": false
-                      },
-                      "overallAssessment": {
-                        "mainImpression": "O esfregaço sanguíneo analisado apresenta características predominantemente normais, com eritrócitos normocíticos e normocrômicos, e a presença de um linfócito reativo. Este achado pode sugerir uma resposta imunológica, possivelmente associada a uma infecção viral leve. Não há evidência de células imaturas ou blastos, indicando um estado hematológico estável. A qualidade da imagem é adequada, permitindo uma avaliação confiável dos elementos celulares presentes. Recomenda-se correlação com dados clínicos e laboratoriais adicionais para uma avaliação completa.",
-                        "requiresHumanReview": false
-                      },
-                      "structuredReport": {
-                        "resumoMorfologico": "Esfregaço sanguíneo com eritrócitos normocíticos e normocrômicos, presença de linfócito reativo, sem células imaturas ou blastos.",
-                        "interpretacaoEducacional": "Os achados podem sugerir uma resposta imunológica, possivelmente associada a uma infecção viral leve. A ausência de células imaturas ou blastos é um indicativo positivo.",
-                        "limitacoes": "Análise baseada apenas nas imagens enviadas. Necessidade de hemograma completo e revisão microscópica profissional quando indicada."
-                      },
-                      "differentialDiagnosis": [],
-                      "criticalFlags": [],
-                      "analysisSource": "ai_visual",
-                      "manualCounts": {},
-                      "aiDetectedCounts": {},
-                      "hybridValidation": {},
-                      "rawResponse": {
-                        "imageQuality": {
-                          "focus": "Adequado",
-                          "nitidez": "Boa",
-                          "coloração": "Uniforme",
-                          "iluminação": "Adequada",
-                          "artefatos": "Mínimos",
-                          "compressão": "Baixa",
-                          "sobreposiçãoCelular": "Mínima",
-                          "resolução": "Alta",
-                          "distorções": "Nenhuma",
-                          "areasInadequadas": "Nenhuma"
-                        },
-                        "visualExtraction": {
-                          "neutrófilos": "Presentes",
-                          "linfócitos": "Presentes",
-                          "monócitos": "Não observados",
-                          "eosinófilos": "Não observados",
-                          "basófilos": "Não observados",
-                          "blastosSuspeitos": "Não observados",
-                          "célulasImaturas": "Não observadas",
-                          "eritroblastos": "Não observados",
-                          "plaquetas": "Presentes",
-                          "agregados": "Não observados",
-                          "artefatos": "Mínimos"
-                        },
-                        "normalityBlocked": false,
-                        "blockNormalReason": [],
-                        "morphologicRiskClass": "CLASS_0_NORMAL",
-                        "findings": {
-                          "largeMononuclearCells": false,
-                          "plasmacytoidCells": false,
-                          "plasmocytes": false,
-                          "plasmablasts": false,
-                          "atypicalLymphocytes": false,
-                          "atypicalLymphocyteSubtype": "none",
-                          "downeyLikeCells": false,
-                          "downeyType": "none",
-                          "monocytoidAtypicalLymphocytes": false,
-                          "lymphocytoidAtypicalLymphocytes": false,
-                          "immunoblastoidCells": false,
-                          "monomorphicPopulation": false,
-                          "immatureCells": false,
-                          "blastSuspicion": false
-                        },
-                        "morphologyAnalysis": {
-                          "overview": "A imagem apresenta boa qualidade com coloração uniforme e nitidez adequada. A celularidade é composta principalmente por eritrócitos e alguns leucócitos, com destaque para um linfócito reativo.",
-                          "erythrocyteReview": "Os eritrócitos apresentam-se normocíticos e normocrômicos, sem anisocitose ou poiquilocitose significativa.",
-                          "leukocyteReview": "Presença de linfócitos normais e um linfócito reativo, sem evidência de células imaturas ou blastos.",
-                          "plateletReview": "Plaquetas presentes em número adequado, sem alterações morfológicas significativas.",
-                          "absentFindings": "ELEMENTOS DE ALERTA NÃO EVIDENCIADOS: Blastos inequívocos; células imaturas críticas; bastonetes de Auer; população blástica significativa; células imaturas críticas; esquizócitos relevantes.",
-                          "biologicalInterpretation": "Os achados são compatíveis com um esfregaço sanguíneo normal, com a presença de um linfócito reativo que pode estar associado a uma resposta imunológica.",
-                          "differentialDiagnosis": "1. Resposta imunológica reativa; 2. Infecção viral leve; 3. Estado normal sem alterações significativas.",
-                          "summary": "A análise morfológica não revela alterações significativas, exceto pela presença de um linfócito reativo, sugerindo uma possível resposta imunológica. Não há evidência de células imaturas ou blastos."
-                        },
-                        "patternRecognition": {
-                          "erythrocytePattern": "Normocítico, normocrômico",
-                          "leukocytePattern": "Presença de linfócitos normais e um linfócito reativo",
-                          "plateletPattern": "Plaquetas normais",
-                          "artifactPattern": "Mínimos artefatos",
-                          "overallPattern": "Esfregaço sanguíneo com características normais e presença de linfócito reativo"
-                        },
-                        "interpretiveSynthesis": "A análise morfológica do esfregaço sanguíneo revela um padrão predominantemente normal, com eritrócitos normocíticos e normocrômicos, e a presença de um linfócito reativo. Este achado pode estar associado a uma resposta imunológica, possivelmente devido a uma infecção viral leve ou outra forma de ativação imunológica. Não há evidência de células imaturas ou blastos, o que sugere um estado hematológico estável. A qualidade da imagem é adequada, permitindo uma avaliação confiável dos elementos celulares presentes.",
-                        "clinicalMeaning": "Os achados observados no esfregaço sanguíneo são sugestivos de um estado hematológico normal, com a presença de um linfócito reativo que pode indicar uma resposta imunológica. Este tipo de célula pode ser observado em infecções virais leves ou outras condições que estimulam o sistema imunológico. A ausência de células imaturas ou blastos é um indicativo positivo, sugerindo que não há processos hematológicos malignos evidentes. No entanto, é importante correlacionar esses achados com dados clínicos e laboratoriais adicionais para uma avaliação completa.",
-                        "hematologicReasoning": "A presença de um linfócito reativo no esfregaço sanguíneo pode ser interpretada como uma resposta do sistema imunológico a um estímulo, como uma infecção viral. Linfócitos reativos são frequentemente maiores que os linfócitos normais e podem apresentar citoplasma basofílico. A ausência de blastos ou outras células imaturas sugere que não há proliferação clonal ou processo maligno evidente. A análise morfológica é consistente com um estado hematológico estável, mas a correlação com dados clínicos é essencial para confirmar essa interpretação.",
-                        "educationalImpact": "Este caso ilustra a importância de reconhecer linfócitos reativos em esfregaços sanguíneos, que podem indicar uma resposta imunológica. A análise morfológica cuidadosa é crucial para diferenciar entre alterações reativas e processos malignos. Exames complementares, como hemograma completo e avaliação clínica, são fundamentais para uma interpretação precisa. Este exemplo destaca a relevância da correlação clínico-laboratorial na prática hematológica.",
-                        "visualEvidence": {
-                          "visualEvidenceScore": 85,
-                          "evidenceLevel": "alta evidência visual",
-                          "morphologyConfidence": "alta",
-                          "imageReliability": "alta",
-                          "artifactInterference": "mínima"
-                        },
-                        "confidenceAnalysis": {
-                          "coerênciaHematológica": "alta",
-                          "coerênciaVisual": "alta",
-                          "coerênciaMorfológica": "alta",
-                          "coerênciaDeConfiança": "alta"
-                        },
-                        "safetyValidation": {
-                          "contradiçõesInternas": "nenhuma",
-                          "exageroDiagnóstico": "nenhum",
-                          "inferênciasIndevidas": "nenhuma",
-                          "limitaçõesTécnicas": "nenhuma",
-                          "qualidadeInsuficiente": "nenhuma",
-                          "inconsistênciaMorfológica": "nenhuma"
-                        },
-                        "consensusAnalysis": {
-                          "coerênciaHematológica": "alta",
-                          "coerênciaVisual": "alta",
-                          "coerênciaMorfológica": "alta",
-                          "coerênciaDeConfiança": "alta"
-                        },
-                        "clinicalCorrelation": {
-                          "necessidadeDeRevisão": "sim",
-                          "correlaçãoClínica": "sim",
-                          "examesComplementares": "hemograma completo"
-                        },
-                        "erythrocyteFindings": {
-                          "normocitose": true,
-                          "normocromia": true,
-                          "anisocitose": false,
-                          "poiquilocitose": false
-                        },
-                        "leukocyteFindings": {
-                          "linfócitosReativos": true,
-                          "célulasImaturas": false,
-                          "blastos": false
-                        },
-                        "plateletFindings": {
-                          "quantidadeAparente": "normal",
-                          "alteraçõesMorfológicas": "nenhuma"
-                        },
-                        "blastSuspicion": {
-                          "suspeitaDeBlastos": false
-                        },
-                        "overallAssessment": {
-                          "mainImpression": "O esfregaço sanguíneo analisado apresenta características predominantemente normais, com eritrócitos normocíticos e normocrômicos, e a presença de um linfócito reativo. Este achado pode sugerir uma resposta imunológica, possivelmente associada a uma infecção viral leve. Não há evidência de células imaturas ou blastos, indicando um estado hematológico estável. A qualidade da imagem é adequada, permitindo uma avaliação confiável dos elementos celulares presentes. Recomenda-se correlação com dados clínicos e laboratoriais adicionais para uma avaliação completa."
-                        },
-                        "structuredReport": {
-                          "resumoMorfologico": "Esfregaço sanguíneo com eritrócitos normocíticos e normocrômicos, presença de linfócito reativo, sem células imaturas ou blastos.",
-                          "interpretacaoEducacional": "Os achados podem sugerir uma resposta imunológica, possivelmente associada a uma infecção viral leve. A ausência de células imaturas ou blastos é um indicativo positivo.",
-                          "limitacoes": "Análise baseada apenas nas imagens enviadas. Necessidade de hemograma completo e revisão microscópica profissional quando indicada."
-                        },
-                        "criticalFlags": [],
-                        "educationalPearls": [
-                          "Linfócitos reativos podem indicar resposta imunológica.",
-                          "Importância da correlação clínico-laboratorial."
-                        ],
-                        "limitations": [
-                          "Análise baseada apenas nas imagens enviadas.",
-                          "Necessidade de hemograma completo para avaliação completa."
-                        ],
-                        "recommendedCorrelation": [
-                          "Hemograma completo",
-                          "Avaliação clínica"
-                        ],
-                        "heatmapRegions": [],
-                        "analysisSource": "ai_visual",
-                        "manualCounts": {},
-                        "manualMetadata": {
-                          "analysisSource": "ai_visual",
-                          "manualMode": false,
-                          "hybridMode": false,
-                          "aiVisualMode": true,
-                          "hasManualData": false
-                        }
-                      },
-                      "fieldAdequacy": {
-                        "visibleLeukocytes": 5,
-                        "singleCellConcern": false,
-                        "adequateForLeukocyteAnalysis": true,
-                        "adequateForBlastScreening": true,
-                        "adequateForPopulationAssessment": false
-                      }
-                    }
-                    ================================
-                    MORPHOLOGY ANALYSIS
-                    {
-                      "overview": "A imagem apresenta boa qualidade com coloração uniforme e nitidez adequada. A celularidade é composta principalmente por eritrócitos e alguns leucócitos, com destaque para um linfócito reativo.",
-                      "erythrocyteReview": "Os eritrócitos apresentam-se normocíticos e normocrômicos, sem anisocitose ou poiquilocitose significativa.",
-                      "leukocyteReview": "Observa-se célula mononuclear isolada com possível atipia/reatividade. O campo é limitado para afirmar ativação linfoide populacional.",
-                      "plateletReview": "Plaquetas presentes em número adequado, sem alterações morfológicas significativas.",
-                      "absentFindings": "ELEMENTOS DE ALERTA NÃO EVIDENCIADOS: Blastos inequívocos; células imaturas críticas; bastonetes de Auer; população blástica significativa; células imaturas críticas; esquizócitos relevantes.",
-                      "biologicalInterpretation": "Os achados são compatíveis com um esfregaço sanguíneo normal, com a presença de um linfócito reativo que pode estar associado a uma resposta imunológica.",
-                      "differentialDiagnosis": "1. Resposta imunológica reativa; 2. Infecção viral leve; 3. Estado normal sem alterações significativas.",
-                      "summary": "Campo limitado com célula mononuclear isolada. Recomenda-se avaliação de múltiplos campos e correlação com hemograma."
-                    }
-                    ================================
-                    🔥 NORMALIZED RESPONSE:
-                    {
-                      "morphologyAnalysis": {
-                        "overview": "A imagem apresenta boa qualidade com coloração uniforme e nitidez adequada. A celularidade é composta principalmente por eritrócitos e alguns leucócitos, com destaque para um linfócito reativo.",
-                        "erythrocyteReview": "Os eritrócitos apresentam-se normocíticos e normocrômicos, sem anisocitose ou poiquilocitose significativa.",
-                        "leukocyteReview": "Observa-se célula mononuclear isolada com possível atipia/reatividade. O campo é limitado para afirmar ativação linfoide populacional.",
-                        "plateletReview": "Plaquetas presentes em número adequado, sem alterações morfológicas significativas.",
-                        "absentFindings": "ELEMENTOS DE ALERTA NÃO EVIDENCIADOS: Blastos inequívocos; células imaturas críticas; bastonetes de Auer; população blástica significativa; células imaturas críticas; esquizócitos relevantes.",
-                        "biologicalInterpretation": "Os achados são compatíveis com um esfregaço sanguíneo normal, com a presença de um linfócito reativo que pode estar associado a uma resposta imunológica.",
-                        "differentialDiagnosis": "1. Resposta imunológica reativa; 2. Infecção viral leve; 3. Estado normal sem alterações significativas.",
-                        "summary": "Campo limitado com célula mononuclear isolada. Recomenda-se avaliação de múltiplos campos e correlação com hemograma."
-                      },
-                      "patternRecognition": {
-                        "erythrocytePattern": "Normocítico, normocrômico",
-                        "leukocytePattern": "Achado mononuclear isolado",
-                        "plateletPattern": "Plaquetas normais",
-                        "artifactPattern": "Mínimos artefatos",
-                        "overallPattern": "Campo limitado para caracterização populacional"
-                      },
-                      "structuredReport": {
-                        "resumoMorfologico": "Esfregaço sanguíneo com eritrócitos normocíticos e normocrômicos, presença de linfócito reativo, sem células imaturas ou blastos.",
-                        "interpretacaoEducacional": "Os achados podem sugerir uma resposta imunológica, possivelmente associada a uma infecção viral leve. A ausência de células imaturas ou blastos é um indicativo positivo.",
-                        "limitacoes": "Análise baseada apenas nas imagens enviadas. Necessidade de hemograma completo e revisão microscópica profissional quando indicada."
-                      },
-                      "overallAssessment": {
-                        "mainImpression": "O esfregaço sanguíneo analisado apresenta características predominantemente normais, com eritrócitos normocíticos e normocrômicos, e a presença de um linfócito reativo. Este achado pode sugerir uma resposta imunológica, possivelmente associada a uma infecção viral leve. Não há evidência de células imaturas ou blastos, indicando um estado hematológico estável. A qualidade da imagem é adequada, permitindo uma avaliação confiável dos elementos celulares presentes. Recomenda-se correlação com dados clínicos e laboratoriais adicionais para uma avaliação completa.",
-                        "requiresHumanReview": false
-                      },
-                      "interpretiveSynthesis": "A análise morfológica do esfregaço sanguíneo revela um padrão predominantemente normal, com eritrócitos normocíticos e normocrômicos, e a presença de um linfócito reativo. Este achado pode estar associado a uma resposta imunológica, possivelmente devido a uma infecção viral leve ou outra forma de ativação imunológica. Não há evidência de células imaturas ou blastos, o que sugere um estado hematológico estável. A qualidade da imagem é adequada, permitindo uma avaliação confiável dos elementos celulares presentes.",
-                      "clinicalMeaning": "Os achados observados no esfregaço sanguíneo são sugestivos de um estado hematológico normal, com a presença de um linfócito reativo que pode indicar uma resposta imunológica. Este tipo de célula pode ser observado em infecções virais leves ou outras condições que estimulam o sistema imunológico. A ausência de células imaturas ou blastos é um indicativo positivo, sugerindo que não há processos hematológicos malignos evidentes. No entanto, é importante correlacionar esses achados com dados clínicos e laboratoriais adicionais para uma avaliação completa.",
-                      "hematologicReasoning": "A presença de um linfócito reativo no esfregaço sanguíneo pode ser interpretada como uma resposta do sistema imunológico a um estímulo, como uma infecção viral. Linfócitos reativos são frequentemente maiores que os linfócitos normais e podem apresentar citoplasma basofílico. A ausência de blastos ou outras células imaturas sugere que não há proliferação clonal ou processo maligno evidente. A análise morfológica é consistente com um estado hematológico estável, mas a correlação com dados clínicos é essencial para confirmar essa interpretação."
-                    }
-                    🧠 [d9801a02-f34e-4668-baa2-95735918fab2] HEMATOLOGY ENGINES - 1ms
-                    🧠 [d9801a02-f34e-4668-baa2-95735918fab2] SAFETY ENGINE - 2ms
-                    🧠 [d9801a02-f34e-4668-baa2-95735918fab2] CONSENSUS ENGINE - 0ms
-                    CONFIDENCE DEBUG {
-                      "visualEvidenceScore": 0,
-                      "diagnosticReliability": 0,
-                      "morphologyCoherence": 0,
-                      "artifactProbability": 0,
-                      "falsePositiveRisk": 0,
-                      "safeDiagnosticGate": false,
-                      "globalConfidenceScore": 55,
-                      "hematologicRisk": {
-                        "level": "low",
-                        "score": 9,
-                        "label": "BAIXO RISCO"
-                      }
-                    }
-                    🧠 [d9801a02-f34e-4668-baa2-95735918fab2] CONFIDENCE ENGINE - 1ms
-                    🧠 [d9801a02-f34e-4668-baa2-95735918fab2] TOTAL PIPELINE TURBO - 60495ms
-                    ================================
-                    FINAL VALIDATED RESULT
-                    {
-                      "normalityBlocked": false,
-                      "morphologicRiskClass": "CLASS_1_LIMITED_FIELD_ATYPICAL_CELL",
-                      "riskLevel": "Achado celular isolado",
-                      "requiresHumanReview": false,
-                      "findings": {
-                        "reactiveLymphocytes": true,
-                        "largeMononuclearCells": false,
-                        "plasmacytoidCells": false,
-                        "plasmocytes": false,
-                        "plasmablasts": false,
-                        "atypicalLymphocytes": false,
-                        "atypicalLymphocyteSubtype": "none",
-                        "downeyLikeCells": false,
-                        "downeyType": "none",
-                        "monocytoidAtypicalLymphocytes": false,
-                        "lymphocytoidAtypicalLymphocytes": false,
-                        "immunoblastoidCells": false,
-                        "monomorphicPopulation": false,
-                        "immatureCells": false,
-                        "blastSuspicion": false
-                      },
-                      "blockNormalReason": [],
-                      "confidenceAnalysis": {
-                        "globalConfidenceScore": 55,
-                        "hematologicRisk": {
-                          "level": "low",
-                          "score": 9,
-                          "label": "BAIXO RISCO"
-                        },
-                        "microscopyQuality": {
-                          "score": 55,
-                          "classification": "Moderada"
-                        },
-                        "confidenceMatrix": {
-                          "blastConfidence": 0,
-                          "schistocyteConfidence": 8,
-                          "erythrocyteConfidence": 42,
-                          "plateletConfidence": 41,
-                          "inflammatoryPatternConfidence": 47,
-                          "dysplasiaConfidence": 7,
-                          "diagnosticCoherenceConfidence": 15
-                        },
-                        "confidenceHierarchy": {
-                          "cellLevel": 60,
-                          "morphologyLevel": 16,
-                          "diagnosticLevel": 15,
-                          "global": 55
-                        },
-                        "calibration": {
-                          "version": "V4_ENTERPRISE_SAFETY_AWARE",
-                          "strategy": "safety_weighted_multiengine_confidence",
-                          "safetyAware": true,
-                          "visualEvidenceAware": true,
-                          "yoloFusionAware": true,
-                          "overcallingSuppression": true,
-                          "undercallingProtection": true,
-                          "semanticExtractionAware": true
-                        },
-                        "safetySignals": {
-                          "visualEvidenceScore": 0,
-                          "diagnosticReliability": 0,
-                          "morphologyCoherence": 0,
-                          "artifactProbability": 0,
-                          "falsePositiveRisk": 0,
-                          "safeDiagnosticGate": false
-                        },
-                        "summary": "Análise hematológica processada com confiança hierárquica multi-engine V4. Baixa sustentação para suspeita blástica. Confiança global: 55%. Classificação: BAIXO RISCO."
-                      }
-                    }
-                    ================================
-                    ==> Detected service running on port 10000ca recomendada
+- revisão microscópica recomendada
 
 ====================================================================
 REGRA MAIS IMPORTANTE
@@ -2989,93 +1963,6 @@ SOMENTE NO FINAL:
 GERAR CORRELAÇÃO EDUCACIONAL.
 
 NUNCA INTERPRETAR ANTES DA ANÁLISE VISUAL.
-
-
-====================================================================
-ANTI FALSE NORMAL ENGINE
-====================================================================
-
-A prioridade máxima é evitar falso normal.
-
-Antes de concluir qualquer análise:
-
-Procurar obrigatoriamente:
-
-- células mononucleares grandes
-- células plasmocitoides
-- plasmócitos
-- plasmoblastos
-- linfócitos atípicos
-- células imaturas
-- blastos suspeitos
-- população monomórfica
-- halo perinuclear
-- citoplasma intensamente basofílico
-- núcleos excêntricos
-
-SE QUALQUER UM DESSES ACHADOS ESTIVER PRESENTE:
-
-É PROIBIDO ESCREVER:
-
-- padrão normal
-- sem alterações
-- morfologia normal
-- ausência de alterações patológicas
-- estado hematológico normal
-
-Substituir por:
-
-"HÁ ACHADOS MORFOLÓGICOS QUE IMPEDEM A CLASSIFICAÇÃO DE NORMALIDADE."
-
-Definir:
-
-requiresHumanReview = true
-
-Classificar risco mínimo:
-
-CLASS_2_ATYPICAL_POPULATION
-
-====================================================================
-ANÁLISE DE MONOMORFISMO CELULAR
-====================================================================
-
-Avaliar obrigatoriamente a arquitetura populacional.
-
-Determinar se a população celular observada é:
-
-- Polimórfica
-- Oligomórfica
-- Monomórfica
-
-POPULAÇÃO MONOMÓRFICA
-
-Se mais de 50% das células nucleadas apresentarem:
-
-- tamanho semelhante
-- cromatina semelhante
-- citoplasma semelhante
-- padrão maturativo semelhante
-
-considerar população monomórfica.
-
-População monomórfica:
-
-- impede classificação como normal
-- aumenta suspeita de processo clonal
-- exige revisão humana
-- exige inclusão em blockNormalReason
-
-Se identificada:
-
-monomorphicPopulation = true
-
-normalityBlocked = true
-
-Classificação mínima:
-
-morphologicRiskClass = "CLASS_3_POSSIBLE_CLONALITY"
-
-A IA deve explicar por que considerou a população monomórfica.
 
 ====================================================================
 MODO IA VISUAL ISOLADA — PADRÃO ESPECIALISTA
@@ -3209,58 +2096,6 @@ Descrever SOMENTE estruturas VISUALMENTE observadas:
 - artefatos
 
 NÃO interpretar ainda.
-
-====================================================================
-VARREDURA OBRIGATÓRIA PARA HEMOPARASITAS E ESTRUTURAS INCOMUNS
-====================================================================
-
-Antes de concluir "nenhuma estrutura incomum", avaliar obrigatoriamente:
-
-1. Estruturas extracelulares alongadas
-2. Estruturas curvilíneas ou serpiginosas
-3. Estruturas filamentares
-4. Estruturas com aspecto flagelado
-5. Estruturas com possível membrana ondulante
-6. Estruturas compatíveis com tripomastigota
-7. Estruturas intraeritrocitárias em anel
-8. Inclusões intraeritrocitárias suspeitas
-9. Formas compatíveis com Babesia/Plasmodium
-10. Artefatos que mimetizem hemoparasitas
-
-SE houver qualquer estrutura alongada, curva, filamentosa, flagelada ou extracelular destacada do fundo eritrocitário:
-
-É PROIBIDO escrever:
-- nenhuma estrutura incomum
-- campo normal
-- morfologia preservada
-- sem alterações relevantes
-- estado hematológico normal
-
-Deve preencher obrigatoriamente:
-
-whatAISees.unusualStructures =
-"Estrutura extracelular alongada/curvilínea incomum observada; diferencial inclui hemoparasita ou artefato."
-
-positiveFindings incluir:
-"Estrutura extracelular incomum observada"
-
-findings.parasiteSuspected = true
-
-morphologicRiskClass nunca pode ser CLASS_0_NORMAL.
-
-requiresHumanReview = true
-
-clinicalMeaning deve dizer:
-"A imagem isolada não permite diagnóstico definitivo, espécie, parasitemia ou gravidade. Requer revisão microscópica profissional e correlação laboratorial."
-
-Se a estrutura for extracelular alongada/flagelada, NÃO classificar como Plasmodium spp.
-Preferir:
-"Hemoparasita extracelular suspeito, com diferencial incluindo Trypanosoma spp. ou artefato."
-
-Se a estrutura for intraeritrocitária anelar, considerar:
-"Plasmodium/Babesia no diferencial educacional, dependente de confirmação laboratorial."
-
-Nunca afirmar diagnóstico definitivo.
 
 ====================================================================
 
@@ -3407,101 +2242,6 @@ PESQUISAR OBRIGATORIAMENTE
 - células atípicas
 
 ====================================================================
-REGRA CRÍTICA — LINFÓCITO REATIVO vs MONÓCITO
-====================================================================
-
-Antes de classificar célula mononuclear grande como monócito, avaliar obrigatoriamente se pode representar linfócito reativo/virocito.
-
-Linfócitos reativos/virocitos costumam apresentar:
-- citoplasma abundante;
-- citoplasma basofílico intenso;
-- bordas citoplasmáticas irregulares;
-- citoplasma moldando-se às hemácias adjacentes;
-- núcleo irregular ou excêntrico;
-- cromatina relativamente densa ou parcialmente condensada;
-- heterogeneidade morfológica entre as células.
-
-Monócitos maduros costumam apresentar:
-- citoplasma cinza-azulado amplo;
-- núcleo dobrado, reniforme ou convoluto;
-- cromatina frouxa delicada;
-- vacuolização possível;
-- ausência de basofilia periférica intensa moldando hemácias.
-
-Se houver citoplasma basofílico abundante, contorno irregular e moldagem às hemácias, NÃO classificar primariamente como monócito.
-
-Preferir:
-"linfócitos reativos/atípicos compatíveis com resposta imunológica".
-
-Se houver população heterogênea de células mononucleares grandes sem critérios inequívocos de blasto, não sugerir leucemia aguda. Descrever como:
-"linfócitos reativos/atípicos, requerendo correlação clínica e hemograma".
-
-
-====================================================================
-CLASSIFICAÇÃO DOS LINFÓCITOS ATÍPICOS
-====================================================================
-
-Se forem observados linfócitos atípicos, classificá-los obrigatoriamente.
-
-TIPO LINFOCITOIDE
-
-Características:
-
-- núcleo relativamente regular
-- cromatina moderadamente condensada
-- discreta basofilia citoplasmática
-- aspecto próximo ao linfócito maduro
-
-Retornar:
-
-atypicalLymphocyteSubtype = "lymphocytoid"
-lymphocytoidAtypicalLymphocytes = true
-
-------------------------------------------------------------
-
-TIPO MONOCITOIDE (DOWNEY II)
-
-Características:
-
-- célula grande
-- citoplasma abundante
-- citoplasma moldando hemácias
-- basofilia intensa periférica
-- núcleo irregular ou excêntrico
-
-Retornar:
-
-atypicalLymphocyteSubtype = "monocytoid"
-monocytoidAtypicalLymphocytes = true
-downeyLikeCells = true
-downeyType = "II"
-
-mononucleosisSuspicion = true
-
-------------------------------------------------------------
-
-TIPO IMUNOBLASTOIDE (DOWNEY III)
-
-Características:
-
-- célula muito grande
-- nucléolo evidente
-- cromatina frouxa
-- citoplasma fortemente basofílico
-
-Retornar:
-
-atypicalLymphocyteSubtype = "immunoblastoid"
-immunoblastoidCells = true
-downeyType = "III"
-
-------------------------------------------------------------
-
-Se não houver evidência suficiente:
-
-atypicalLymphocyteSubtype = "none"
-
-====================================================================
 
 ANÁLISE NUCLEAR
 
@@ -3542,17 +2282,15 @@ Avaliar:
 
 ====================================================================
 
-Listar somente os elementos pesquisados e não evidenciados, sem repetir a palavra "ausência" ou "sem":
+ACHADOS IMPORTANTES NÃO IDENTIFICADOS
 
-- Blastos inequívocos
-- Células imaturas críticas
-- Bastonetes de Auer
-- Esquizócitos relevantes
-- População blástica significativa
+Criar obrigatoriamente seção específica contendo:
 
-Nunca usar o título "Achados não observados".
-Nunca usar a expressão "achados não encontrados".
-
+- ausência de bastonetes de Auer
+- ausência de blastos inequívocos
+- ausência de esquizócitos
+- ausência de rouleaux
+- ausência de displasia marcante
 
 Somente quando realmente ausentes.
 
@@ -3820,112 +2558,12 @@ ESTRUTURA OBRIGATÓRIA:
   "imageQuality": {},
   "visualExtraction": {},
 
-  "whatAISees": {
-    "globalField": "",
-    "cellularity": "",
-    "erythrocytes": "",
-    "leukocytes": "",
-    "platelets": "",
-    "dominantFinding": "",
-    "unusualStructures": "",
-    "negativeFindings": "",
-    "imageLimitations": "",
-    "freeNarrative": ""
-  },
-
-  "positiveFindings": [],
-  "negativeFindingsStructured": [],
-
-  "executiveSummary": {
-    "mainFinding": "",
-    "riskLevel": "",
-    "confidence": "",
-    "pattern": "",
-    "humanReview": ""
-  },
-
-  "normalityBlocked": false,
-
-  "blockNormalReason": [],
-
-  "morphologicRiskClass": "CLASS_0_NORMAL",
-
-  "findings": {
-
-    "largeMononuclearCells": false,
-
-    "plasmacytoidCells": false,
-
-    "plasmocytes": false,
-
-    "plasmablasts": false,
-
-    "atypicalLymphocytes": false,
-
-    "atypicalLymphocyteSubtype": "none",
-
-    "downeyLikeCells": false,
-
-    "downeyType": "none",
-
-    "monocytoidAtypicalLymphocytes": false,
-
-    "lymphocytoidAtypicalLymphocytes": false,
-
-    "immunoblastoidCells": false,
-
-    "monomorphicPopulation": false,
-
-    "immatureCells": false,
-
-    "blastSuspicion": false
-  },
-
   "morphologyAnalysis": {
-    "visualMorphologyDescription": {
-      "globalView": "",
-      "dominantPopulation": "",
-      "cellularity": "",
-      "nuclearFeatures": "",
-      "cytoplasmicFeatures": "",
-      "populationHeterogeneity": "",
-      "erythrocyteBackground": "",
-      "plateletBackground": "",
-      "criticalNegativeFindings": "",
-      "overallImpression": ""
-    },
-
-    "cellMorphology": {
-      "cellSize": "",
-      "nucleusShape": "",
-      "chromatinPattern": "",
-      "nucleoli": "",
-      "cytoplasm": "",
-      "uniformity": ""
-    },
-
-    "populationPatternAnalysis": {
-      "populationPattern": "",
-      "uniformityLevel": "",
-      "suspectedLineage": "",
-      "confidence": ""
-    },
-
     "overview": "",
     "erythrocyteReview": "",
     "leukocyteReview": "",
     "plateletReview": "",
-
-    "negativeFindings": [
-      "Blastos inequívocos não identificados",
-      "Bastonetes de Auer não observados",
-      "Esquizócitos relevantes não observados",
-      "Drepanócitos não observados",
-      "Granulações tóxicas não observadas",
-      "Hipersegmentação não observada",
-      "Agregados plaquetários não observados"
-    ],
-
+    "absentFindings": "",
     "biologicalInterpretation": "",
     "differentialDiagnosis": "",
     "summary": ""
@@ -3945,23 +2583,8 @@ ESTRUTURA OBRIGATÓRIA:
   "clinicalMeaning":
   "Texto obrigatório com no mínimo 500 caracteres. Explicar o significado dos achados encontrados, possíveis mecanismos fisiológicos associados e correlação clínico-laboratorial necessária. Nunca afirmar diagnóstico.",
 
-  "hematologicReasoning": {
-    "whatISee": "Descrever primeiro o que está visualmente presente no campo: população celular, padrão global, distribuição, células predominantes e limitações.",
-    "whatItResembles": "Explicar a qual padrão morfológico educacional os achados se assemelham: reacional, plasmocitoide, blastoide, monomórfico, misto ou inespecífico.",
-    "whatICannotConfirm": "Declarar claramente o que não pode ser confirmado apenas pela imagem: clonalidade, malignidade, leucemia, linfoma, mieloma ou diagnóstico definitivo.",
-    "finalInterpretation": "Síntese hematológica final em linguagem segura, com necessidade de correlação com hemograma, contexto clínico e revisão microscópica profissional."
-  },
-
-  "morphologicDecisionTree": {
-
-    "step1_visualDetection": "",
-    "step2_cellClassification": "",
-    "step3_patternRecognition": "",
-    "step4_riskAssessment": "",
-    "step5_conflictResolution": "",
-    "step6_finalConclusion": ""
-
-  },
+  "hematologicReasoning":
+  "Texto obrigatório com no mínimo 500 caracteres. Explicar raciocínio hematológico especialista considerando morfologia celular, maturação, alterações reacionais, sinais de alerta e limitações da imagem.",
 
   "educationalImpact":
   "Texto obrigatório explicando valor educacional, limitações e quais exames ou dados complementares poderiam auxiliar.",
@@ -3970,20 +2593,7 @@ ESTRUTURA OBRIGATÓRIA:
   "confidenceAnalysis": {},
   "safetyValidation": {},
   "consensusAnalysis": {},
-  "clinicalCorrelation": {
-
-    "possibleReactiveContexts": [],
-
-    "possibleNeoplasticContexts": [],
-
-    "recommendedLaboratoryCorrelation": [],
-
-    "recommendedClinicalCorrelation": [],
-
-    "recommendedComplementaryTests": []
-
-  },
-
+  "clinicalCorrelation": {},
   "erythrocyteFindings": {},
   "leukocyteFindings": {},
   "plateletFindings": {},
@@ -3997,323 +2607,6 @@ ESTRUTURA OBRIGATÓRIA:
   "heatmapRegions": []
 }
 
-====================================================================
-VISUAL MORPHOLOGY DESCRIPTION OBRIGATÓRIO
-====================================================================
-
-visualMorphologyDescription deve ser um objeto JSON.
-Nunca retornar texto simples.
-
-Preencher obrigatoriamente:
-globalView
-cellularity
-dominantPopulation
-nuclearFeatures
-cytoplasmicFeatures
-populationHeterogeneity
-erythrocyteBackground
-plateletBackground
-criticalNegativeFindings
-
-Descrever apenas estruturas efetivamente observadas.
-Não inferir malignidade.
-Não inferir blastos sem evidência morfológica inequívoca.
-Não deixar campos vazios.
-
-====================================================================
-BLOCO O QUE A IA ESTÁ VENDO
-====================================================================
-
-Antes de interpretar, classificar ou sugerir hipóteses, descreva literalmente tudo que é visível no campo.
-
-Preencher obrigatoriamente whatAISees.
-
-Não usar linguagem diagnóstica neste bloco.
-
-Descrever:
-- aspecto global do campo
-- celularidade
-- hemácias
-- leucócitos visíveis
-- plaquetas
-- população predominante
-- estruturas incomuns
-- achados críticos ausentes
-- limitações da imagem
-
-O campo freeNarrative deve ser um texto fluido, como um hematologista descrevendo a imagem ao microscópio.
-
-Exemplo de estilo:
-
-"Observa-se campo microscópico com predomínio de hemácias preservadas ao fundo, presença de leucócitos maduros dispersos e pequena quantidade de plaquetas. No centro do campo há estrutura alongada/curvilínea incomum, que se destaca do fundo eritrocitário. Não são observados blastos inequívocos, bastonetes de Auer ou agregados plaquetários evidentes. A interpretação é limitada por campo único e requer correlação com outros campos da lâmina."
-
-====================================================================
-ACHADOS POSITIVOS E NEGATIVOS ESTRUTURADOS
-====================================================================
-
-Preencher obrigatoriamente:
-
-positiveFindings
-negativeFindingsStructured
-
-positiveFindings deve conter apenas achados realmente observados na imagem.
-
-Exemplos:
-- Hemácias predominantemente normocíticas e normocrômicas
-- Neutrófilos maduros observados
-- Linfócitos maduros observados
-- Plaquetas presentes e distribuídas
-- Célula mononuclear isolada com possível reatividade
-- Estrutura incomum observada no campo
-
-negativeFindingsStructured deve conter apenas achados ativamente pesquisados e não evidenciados.
-
-Exemplos:
-- Blastos inequívocos não evidenciados
-- Bastonetes de Auer não evidenciados
-- Esquizócitos relevantes não evidenciados
-- Drepanócitos não evidenciados
-- Agregados plaquetários não evidenciados
-- Plaquetas gigantes não evidenciadas
-- Células imaturas críticas não evidenciadas
-
-Não repetir frases longas.
-Não usar linguagem diagnóstica.
-Não incluir hipóteses clínicas.
-Cada item deve ser curto, objetivo e auditável.
-
-====================================================================
-RESUMO EXECUTIVO OBRIGATÓRIO
-====================================================================
-
-Preencher obrigatoriamente:
-
-executiveSummary.mainFinding
-executiveSummary.riskLevel
-executiveSummary.confidence
-executiveSummary.pattern
-executiveSummary.humanReview
-
-Cada campo deve conter no máximo uma frase curta.
-
-Objetivo:
-permitir compreensão da análise em menos de 10 segundos.
-
-Não usar diagnóstico definitivo.
-
-Não usar linguagem alarmista.
-
-Usar linguagem objetiva, hospitalar e educacional.
-
-====================================================================
-DESCRIÇÃO OBRIGATÓRIA DAS TRÊS SÉRIES HEMATOLÓGICAS
-====================================================================
-
-Os campos:
-
-morphologyAnalysis.erythrocyteReview
-morphologyAnalysis.leukocyteReview
-morphologyAnalysis.plateletReview
-
-devem SEMPRE ser preenchidos.
-
-Nunca retornar string vazia.
-
-Mesmo quando não houver alterações relevantes,
-descrever:
-
-- elementos visualizados
-- padrão predominante
-- principais achados ausentes
-- limitações da avaliação
-
-A IA deve obrigatoriamente revisar:
-
-1. Série eritrocitária
-2. Série leucocitária
-3. Série plaquetária
-
-em toda imagem analisada.
-
-Os campos:
-
-morphologyAnalysis.erythrocyteReview
-morphologyAnalysis.leukocyteReview
-morphologyAnalysis.plateletReview
-
-devem SEMPRE ser preenchidos.
-
-Nunca retornar string vazia.
-
-====================================================================
-TAMANHO MÍNIMO DAS DESCRIÇÕES
-====================================================================
-
-morphologyAnalysis.erythrocyteReview:
-mínimo 150 caracteres.
-
-Descrever:
-- tamanho eritrocitário
-- cromia
-- anisocitose
-- poiquilocitose
-- alterações ausentes
-- limitações da avaliação
-
-morphologyAnalysis.leukocyteReview:
-mínimo 150 caracteres.
-
-Descrever:
-- população predominante
-- maturação celular
-- características nucleares
-- características citoplasmáticas
-- heterogeneidade populacional
-- alterações ausentes
-
-morphologyAnalysis.plateletReview:
-mínimo 100 caracteres.
-
-Descrever:
-- quantidade aparente
-- distribuição
-- agregação
-- gigantismo plaquetário
-- alterações ausentes
-- limitações da avaliação
-
-Nunca retornar:
-
-""
-
-ou
-
-"Não avaliado"
-
-ou
-
-"Sem alterações"
-
-sem descrição morfológica complementar.
-
-====================================================================
-RACIOCÍNIO MORFOLÓGICO OBRIGATÓRIO
-====================================================================
-
-A IA deve obrigatoriamente explicar:
-
-1. O que visualmente foi identificado.
-
-2. Quais características sustentam a classificação celular.
-
-3. Quais características afastam outras hipóteses.
-
-4. Se existe heterogeneidade populacional.
-
-5. Se existe monomorfismo populacional.
-
-6. Se existe maturação preservada.
-
-7. Se existe padrão reacional.
-
-8. Se existe padrão suspeito para neoplasia hematológica.
-
-9. Grau de confiança de cada inferência.
-
-10. Limitações da imagem.
-
-A conclusão final deve ser baseada apenas em estruturas realmente observadas.
-
-Nunca inferir blastos, plasmoblastos ou malignidade sem evidências morfológicas inequívocas.
-
-====================================================================
-REGRAS OBRIGATÓRIAS PARA O OBJETO findings
-====================================================================
-
-Os campos do objeto findings são obrigatórios.
-
-NÃO deixar todos como false automaticamente.
-
-Cada campo deve refletir a avaliação morfológica real da imagem.
-
-Se houver células mononucleares grandes:
-largeMononuclearCells = true
-
-Se houver células plasmocitoides:
-plasmacytoidCells = true
-
-Se houver plasmócitos identificáveis:
-plasmocytes = true
-
-Se houver plasmoblastos suspeitos:
-plasmablasts = true
-
-Se houver linfócitos atípicos:
-atypicalLymphocytes = true
-
-Se houver população monomórfica:
-monomorphicPopulation = true
-
-Se houver células imaturas:
-immatureCells = true
-
-Se houver suspeita morfológica de blastos:
-blastSuspicion = true
-
-====================================================================
-BLOQUEIO DE NORMALIDADE
-====================================================================
-
-Se qualquer um dos seguintes campos for true:
-
-- largeMononuclearCells
-- reactiveLymphocytes
-- atypicalLymphocytes
-- plasmacytoidCells
-- plasmocytes
-- plasmablasts
-- monomorphicPopulation
-- immatureCells
-- blastSuspicion
-
-Então:
-
-normalityBlocked = true
-
-Adicionar justificativa específica em blockNormalReason.
-
-morphologicRiskClass não pode ser CLASS_0_NORMAL.
-
-====================================================================
-CLASSIFICAÇÃO DE RISCO
-====================================================================
-
-Se houver apenas célula mononuclear grande isolada,
-linfócito reativo isolado ou linfócito atípico isolado,
-sem evidência de população sustentada:
-
-CLASS_1_LIMITED_FIELD_ATYPICAL_CELL
-
-Se houver população celular atípica sustentada,
-repetição de células semelhantes,
-padrão reacional amplo ou múltiplas células atípicas:
-
-CLASS_2_ATYPICAL_POPULATION
-
-Se houver população monomórfica,
-predomínio plasmocitoide,
-plasmócitos numerosos,
-plasmoblastos suspeitos
-ou padrão sugestivo de clonalidade:
-
-CLASS_3_POSSIBLE_CLONALITY
-
-Se houver critérios morfológicos convincentes de blastos:
-
-CLASS_4_BLAST_SUSPICION
-
-Nunca retornar CLASS_0_NORMAL quando houver população atípica,
-plasmocitoide, monomórfica, imatura ou suspeita blástica.
 ====================================================================
 ESTILO
 ====================================================================
@@ -4335,6 +2628,279 @@ PRIORIZE SEGURANÇA CLÍNICA SOBRE SENSACIONALISMO.
 
 `;
 
+
+// ============================================================================
+// CI-001B — SPECIMEN GATE & BONE MARROW ROUTING
+// ============================================================================
+
+const SPECIMEN_TYPES = new Set([
+  "PERIPHERAL_BLOOD",
+  "BONE_MARROW_ASPIRATE",
+  "BONE_MARROW_BIOPSY",
+  "HEMODILUTED_BONE_MARROW",
+  "INADEQUATE",
+  "INDETERMINATE",
+]);
+
+const SPECIMEN_ALLOWED_STATUSES = new Set([
+  "accepted",
+  "reviewRequired",
+]);
+
+function clampConfidence(value) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return 0;
+  return Math.max(0, Math.min(1, parsed));
+}
+
+function normalizeSpecimenType(value = "") {
+  const normalized = String(value).trim().toUpperCase();
+  return SPECIMEN_TYPES.has(normalized)
+    ? normalized
+    : "INDETERMINATE";
+}
+
+function parseSpecimenDecision(req) {
+  try {
+    const raw = req.body?.specimenDecision;
+    if (!raw) return null;
+    return typeof raw === "string"
+      ? JSON.parse(raw)
+      : raw;
+  } catch {
+    return null;
+  }
+}
+
+function validateSpecimenGate(req, { allowManualWithoutSpecimen = true } = {}) {
+  const analysisSource = normalizeAnalysisSource(req.body?.analysisSource);
+
+  if (allowManualWithoutSpecimen && analysisSource === "manual") {
+    return {
+      valid: true,
+      analysisSource,
+      specimenType: "INDETERMINATE",
+      analysisType: "manual",
+      decision: null,
+      reviewRequired: true,
+    };
+  }
+
+  const decision = parseSpecimenDecision(req);
+
+  if (!decision || typeof decision !== "object") {
+    return {
+      valid: false,
+      status: 422,
+      error:
+        "SpecimenDecision obrigatório antes da análise clínica de imagens.",
+    };
+  }
+
+  const status = String(
+    decision.status ||
+    req.body?.specimenDecisionStatus ||
+    "",
+  ).trim();
+
+  if (!SPECIMEN_ALLOWED_STATUSES.has(status)) {
+    return {
+      valid: false,
+      status: 422,
+      error:
+        "A decisão do tipo de material bloqueou o pipeline clínico.",
+    };
+  }
+
+  const specimenType = normalizeSpecimenType(
+    decision.effectiveType ||
+    req.body?.specimenType,
+  );
+
+  if (
+    specimenType === "INADEQUATE" ||
+    specimenType === "INDETERMINATE"
+  ) {
+    return {
+      valid: false,
+      status: 422,
+      error:
+        "Material inadequado ou indeterminado não pode seguir para interpretação clínica.",
+    };
+  }
+
+  const analysisType =
+    specimenType === "BONE_MARROW_ASPIRATE" ||
+    specimenType === "HEMODILUTED_BONE_MARROW" ||
+    specimenType === "BONE_MARROW_BIOPSY"
+      ? "bone_marrow"
+      : "peripheral_blood";
+
+  return {
+    valid: true,
+    analysisSource,
+    specimenType,
+    analysisType,
+    decision,
+    reviewRequired: status === "reviewRequired",
+  };
+}
+
+function buildSpecimenContext({
+  specimenType,
+  decision,
+  reviewRequired,
+}) {
+  const confidence =
+    clampConfidence(
+      decision?.classification?.confidence ??
+      decision?.confidence ??
+      0,
+    );
+
+  return `
+CI-001B — CONTEXTO OBRIGATÓRIO DO ESPÉCIME
+
+SPECIMEN TYPE: ${specimenType}
+SPECIMEN CONFIDENCE: ${confidence}
+SPECIMEN DECISION STATUS: ${decision?.status || "unknown"}
+REVIEW REQUIRED: ${reviewRequired === true}
+
+REGRAS ABSOLUTAS:
+- Utilize exclusivamente o motor correspondente ao tipo de material validado.
+- Nunca reinterpretar sangue periférico como medula óssea.
+- Nunca interpretar medula óssea como esfregaço periférico.
+- Não ocultar conflito, incerteza ou necessidade de revisão.
+- Se REVIEW REQUIRED for true, declarar revisão humana obrigatória.
+
+REGRAS PARA MEDULA ÓSSEA:
+- Avaliar representatividade antes de inferir celularidade.
+- Ausência de espículas em uma imagem não exclui origem medular.
+- Campo único não permite estimar celularidade global com segurança.
+- Avaliar separadamente séries mieloide, eritroide e megacariocítica.
+- Avaliar plasmócitos, células imaturas/blásticas, displasia e infiltração.
+- Não usar como conclusão global:
+  "esfregaço de sangue periférico normal",
+  "hemácias normocíticas e normocrômicas",
+  "plaquetas em quantidade adequada".
+- Não afirmar ausência global de blastos por imagem isolada.
+- Medula hemodiluída deve manter alerta explícito de hemodiluição.
+`;
+}
+
+function normalizeSpecimenClassification(raw = {}) {
+  const predictedType = normalizeSpecimenType(raw.predictedType);
+  const alternativeType = normalizeSpecimenType(raw.alternativeType);
+
+  return {
+    predictedType,
+    confidence: clampConfidence(raw.confidence),
+    alternativeType,
+    alternativeConfidence: clampConfidence(
+      raw.alternativeConfidence,
+    ),
+    modelVersion:
+      String(raw.modelVersion || "specimen-classifier-v1"),
+    evidence: Array.isArray(raw.evidence)
+      ? raw.evidence.slice(0, 12).map((item) => ({
+          kind: String(item?.kind || "other"),
+          description: String(item?.description || ""),
+          supports: normalizeSpecimenType(
+            item?.supports || predictedType,
+          ),
+          weight: clampConfidence(item?.weight),
+          confidence: clampConfidence(item?.confidence),
+        }))
+      : [],
+  };
+}
+
+function applySpecimenMetadata(result = {}, specimenGate = {}) {
+  const output = {
+    ...result,
+    specimenType:
+      specimenGate.specimenType || "INDETERMINATE",
+    specimenDecision:
+      specimenGate.decision || {},
+    specimenClassification:
+      specimenGate.decision?.classification || {},
+    specimenRouting: {
+      analysisType:
+        specimenGate.analysisType || "unknown",
+      reviewRequired:
+        specimenGate.reviewRequired === true,
+      version: "CI-001B-v1",
+    },
+  };
+
+  if (
+    specimenGate.specimenType ===
+    "HEMODILUTED_BONE_MARROW"
+  ) {
+    output.normalityBlocked = true;
+    output.requiresHumanReview = true;
+    output.blockNormalReason = [
+      ...new Set([
+        ...(Array.isArray(output.blockNormalReason)
+          ? output.blockNormalReason
+          : []),
+        "Amostra medular hemodiluída; representatividade e celularidade global limitadas.",
+      ]),
+    ];
+    output.marrowLimitations = [
+      ...new Set([
+        ...(Array.isArray(output.marrowLimitations)
+          ? output.marrowLimitations
+          : []),
+        "Hemodiluição pode reduzir a representatividade dos compartimentos medulares.",
+      ]),
+    ];
+  }
+
+  return output;
+}
+
+function applyBoneMarrowLanguageGuard(result = {}) {
+  if (!result || typeof result !== "object") return result;
+
+  const forbidden = [
+    /esfregaço de sangue periférico normal/gi,
+    /esfregaço sanguíneo normal/gi,
+    /hemácias normocíticas e normocrômicas/gi,
+    /plaquetas (presentes )?em quantidade adequada/gi,
+    /morfologia periférica preservada/gi,
+  ];
+
+  const replacement =
+    "A imagem medular deve ser interpretada conforme representatividade, qualidade, distribuição das linhagens e limitações do campo.";
+
+  const sanitize = (value) => {
+    if (typeof value !== "string") return value;
+    let output = value;
+    for (const pattern of forbidden) {
+      output = output.replace(pattern, replacement);
+    }
+    return output;
+  };
+
+  const cloned = JSON.parse(JSON.stringify(result));
+
+  const walk = (value) => {
+    if (Array.isArray(value)) {
+      return value.map(walk);
+    }
+    if (value && typeof value === "object") {
+      for (const key of Object.keys(value)) {
+        value[key] = walk(value[key]);
+      }
+      return value;
+    }
+    return sanitize(value);
+  };
+
+  return walk(cloned);
+}
+
 // ============================================================================
 // OPENAI ANALYSIS
 // ============================================================================
@@ -4347,6 +2913,10 @@ async function analyzeWithOpenAI({
   images,
   analysisSource = "ai_visual",
   manualCounts = {},
+  analysisType = "peripheral_blood",
+  specimenType = "PERIPHERAL_BLOOD",
+  specimenDecision = null,
+  specimenReviewRequired = false,
 }) {
   const requestId = generateRequestId();
   const pipelineStart = performance.now();
@@ -4379,6 +2949,12 @@ async function analyzeWithOpenAI({
     const contextualPrompt = `
 ANALYSIS SOURCE: ${analysisSource}
 MANUAL COUNTS: ${JSON.stringify(manualCounts)}
+
+${buildSpecimenContext({
+  specimenType,
+  decision: specimenDecision,
+  reviewRequired: specimenReviewRequired,
+})}
 
 MODOS DE ANÁLISE:
 
@@ -4667,6 +3243,163 @@ Responda SOMENTE JSON válido em português do Brasil.
 
     `;
 
+    const boneMarrowPrompt = `
+Você é uma IA hematológica educacional especializada em aspirado de medula óssea (mielograma).
+
+Seu objetivo é analisar exclusivamente imagens de medula óssea.
+
+Antes de interpretar:
+
+1. Avalie a celularidade global.
+2. Avalie a representatividade da amostra.
+3. Avalie a série granulocítica.
+4. Avalie a série eritroide.
+5. Avalie a série megacariocítica.
+6. Avalie plasmócitos.
+7. Avalie blastos.
+8. Avalie sinais de displasia.
+9. Avalie possíveis infiltrações.
+10. Avalie artefatos.
+
+Nunca emitir diagnóstico definitivo.
+
+Nunca confirmar:
+- Leucemia
+- Linfoma
+- Mieloma múltiplo
+- Síndrome mielodisplásica
+
+Utilizar apenas:
+
+"possível"
+"sugestivo"
+"compatível"
+"requer correlação"
+
+Responder SOMENTE JSON válido.
+
+Campos obrigatórios:
+
+imageQuality
+visualExtraction
+whatAISees
+cellularityAssessment
+myeloidSeries
+erythroidSeries
+megakaryocyticSeries
+plasmaCellAssessment
+blastAssessment
+dysplasiaAssessment
+overallAssessment
+structuredReport
+clinicalMeaning
+interpretiveSynthesis
+hematologicReasoning
+negativeFindings
+specimenAssessment
+marrowAdequacy
+spiculeAssessment
+hemodilutionAssessment
+cellularityAssessment
+myeloidSeries
+erythroidSeries
+megakaryocyticSeries
+plasmaCellAssessment
+blastAssessment
+dysplasiaAssessment
+infiltrationAssessment
+marrowLimitations
+
+REGRAS DE SAÍDA MEDULAR:
+- specimenAssessment deve registrar que o material é medular.
+- marrowAdequacy deve separar qualidade técnica de representatividade.
+- spiculeAssessment deve informar se espículas são vistas, não vistas ou inconclusivas.
+- hemodilutionAssessment deve informar suspeita de hemodiluição.
+- cellularityAssessment não pode afirmar celularidade global por campo único não representativo.
+- negativeFindings deve conter apenas ausências sustentadas pelo campo observado.
+- É proibido concluir "sangue periférico normal" em material medular.
+
+CONTRATO JSON MEDULAR OBRIGATÓRIO:
+
+{
+  "specimenAssessment": {
+    "status": "present|notObserved|notAssessable|indeterminate",
+    "summary": "",
+    "specimenType": ""
+  },
+  "marrowAdequacy": {
+    "status": "present|notObserved|notAssessable|indeterminate",
+    "technicalQuality": "",
+    "representativity": "",
+    "summary": ""
+  },
+  "spiculeAssessment": {
+    "status": "present|notObserved|notAssessable|indeterminate",
+    "observed": null,
+    "summary": ""
+  },
+  "hemodilutionAssessment": {
+    "status": "present|notObserved|notAssessable|indeterminate",
+    "suspected": null,
+    "summary": ""
+  },
+  "cellularityAssessment": {
+    "status": "present|notObserved|notAssessable|indeterminate",
+    "scope": "field_limited",
+    "globalEstimateAllowed": false,
+    "estimate": null,
+    "summary": ""
+  },
+  "myeloidSeries": {
+    "status": "present|notObserved|notAssessable|indeterminate",
+    "maturation": "",
+    "dysplasia": "",
+    "summary": ""
+  },
+  "erythroidSeries": {
+    "status": "present|notObserved|notAssessable|indeterminate",
+    "maturation": "",
+    "dysplasia": "",
+    "summary": ""
+  },
+  "megakaryocyticSeries": {
+    "status": "present|notObserved|notAssessable|indeterminate",
+    "maturation": "",
+    "dysplasia": "",
+    "summary": ""
+  },
+  "plasmaCellAssessment": {
+    "status": "present|notObserved|notAssessable|indeterminate",
+    "estimatedPercentage": null,
+    "summary": ""
+  },
+  "blastAssessment": {
+    "status": "present|notObserved|notAssessable|indeterminate",
+    "observed": null,
+    "estimatedPercentage": null,
+    "globalAbsenceAllowed": false,
+    "summary": ""
+  },
+  "dysplasiaAssessment": {
+    "status": "present|notObserved|notAssessable|indeterminate",
+    "globalExclusionAllowed": false,
+    "summary": ""
+  },
+  "infiltrationAssessment": {
+    "status": "present|notObserved|notAssessable|indeterminate",
+    "globalExclusionAllowed": false,
+    "summary": ""
+  },
+  "marrowLimitations": []
+}
+
+Nunca omitir qualquer um desses 13 campos.
+Quando não for possível avaliar, usar status="notAssessable".
+Não usar false para representar "não avaliável".
+
+`;
+
+
     console.log("================================");
     console.log("PROMPT SIZE");
     console.log(
@@ -4680,6 +3413,11 @@ Responda SOMENTE JSON válido em português do Brasil.
 
     const visualStart = performance.now();
 
+    const selectedPrompt =
+      analysisType === "bone_marrow"
+        ? boneMarrowPrompt
+        : compactHospitalPrompt;
+
     const completion = await openai.chat.completions.create({
       model: OPENAI_MODEL,
       temperature: 0.12,
@@ -4688,7 +3426,7 @@ Responda SOMENTE JSON válido em português do Brasil.
       messages: [
         {
           role: "system",
-          content: compactHospitalPrompt,
+          content: selectedPrompt,
         },
         {
           role: "user",
@@ -5616,59 +4354,1063 @@ function validateAIResult(
   };
 }
 
+function ensurePipelineObjects(result) {
+  const safeResult =
+    result && typeof result === "object"
+      ? result
+      : {};
+
+  // =====================================================
+  // HEMATOLOGIC REASONING
+  // =====================================================
+
+  const originalReasoning =
+    safeResult.hematologicReasoning;
+
+  if (
+    typeof originalReasoning === "string"
+  ) {
+    safeResult.hematologicReasoning = {
+      whatISee: "",
+      whatItResembles: "",
+      whatICannotConfirm: "",
+      finalInterpretation:
+        originalReasoning,
+    };
+  } else if (
+    !originalReasoning ||
+    typeof originalReasoning !== "object" ||
+    Array.isArray(originalReasoning)
+  ) {
+    safeResult.hematologicReasoning = {
+      whatISee: "",
+      whatItResembles: "",
+      whatICannotConfirm: "",
+      finalInterpretation: "",
+    };
+  } else {
+    safeResult.hematologicReasoning = {
+      whatISee:
+        String(
+          originalReasoning.whatISee || "",
+        ),
+      whatItResembles:
+        String(
+          originalReasoning.whatItResembles || "",
+        ),
+      whatICannotConfirm:
+        String(
+          originalReasoning.whatICannotConfirm || "",
+        ),
+      finalInterpretation:
+        String(
+          originalReasoning.finalInterpretation || "",
+        ),
+    };
+  }
+
+  // =====================================================
+  // STRUCTURED REPORT
+  // =====================================================
+
+  const originalReport =
+    safeResult.structuredReport;
+
+  if (
+    typeof originalReport === "string"
+  ) {
+    safeResult.structuredReport = {
+      conclusion: originalReport,
+      hematologicMeaning: "",
+      recommendation: "",
+    };
+  } else if (
+    !originalReport ||
+    typeof originalReport !== "object" ||
+    Array.isArray(originalReport)
+  ) {
+    safeResult.structuredReport = {
+      conclusion: "",
+      hematologicMeaning: "",
+      recommendation: "",
+    };
+  }
+
+  // =====================================================
+  // OVERALL ASSESSMENT
+  // =====================================================
+
+  const originalAssessment =
+    safeResult.overallAssessment;
+
+  if (
+    typeof originalAssessment === "string"
+  ) {
+    safeResult.overallAssessment = {
+      requiresHumanReview: true,
+      riskCategory:
+        safeResult.morphologicRiskClass || "",
+      mainImpression:
+        originalAssessment,
+    };
+  } else if (
+    !originalAssessment ||
+    typeof originalAssessment !== "object" ||
+    Array.isArray(originalAssessment)
+  ) {
+    safeResult.overallAssessment = {
+      requiresHumanReview: true,
+      riskCategory:
+        safeResult.morphologicRiskClass || "",
+      mainImpression: "",
+    };
+  }
+
+  // =====================================================
+  // MORPHOLOGY ANALYSIS
+  // =====================================================
+
+  const originalMorphology =
+    safeResult.morphologyAnalysis;
+
+  if (
+    typeof originalMorphology === "string"
+  ) {
+    safeResult.morphologyAnalysis = {
+      overview: originalMorphology,
+      erythrocyteReview: "",
+      leukocyteReview: "",
+      plateletReview: "",
+      biologicalInterpretation: "",
+      differentialDiagnosis: "",
+      summary: originalMorphology,
+    };
+  } else if (
+    !originalMorphology ||
+    typeof originalMorphology !== "object" ||
+    Array.isArray(originalMorphology)
+  ) {
+    safeResult.morphologyAnalysis = {};
+  }
+
+  // =====================================================
+  // FINDINGS AND ARRAYS
+  // =====================================================
+
+  if (
+    !safeResult.findings ||
+    typeof safeResult.findings !== "object" ||
+    Array.isArray(safeResult.findings)
+  ) {
+    safeResult.findings = {};
+  }
+
+  if (
+    !Array.isArray(
+      safeResult.blockNormalReason,
+    )
+  ) {
+    safeResult.blockNormalReason = [];
+  }
+
+  if (!Array.isArray(safeResult.alerts)) {
+    safeResult.alerts = [];
+  }
+
+  if (
+    !Array.isArray(
+      safeResult.morphologies,
+    )
+  ) {
+    safeResult.morphologies = [];
+  }
+
+  if (
+    !safeResult.counts ||
+    typeof safeResult.counts !== "object" ||
+    Array.isArray(safeResult.counts)
+  ) {
+    safeResult.counts = {};
+  }
+
+  return safeResult;
+}
+
+
 // ============================================================================
-// ROOT
+// CI-002C.2 — FEATURE MATCHER
+// ============================================================================
+
+app.post(
+  "/knowledge/morphology/match-features",
+  auth,
+  jsonBodyParser({
+    limit: "1mb",
+  }),
+  (req, res) => {
+    const features =
+      req.body?.features || {};
+
+    const specimenType =
+      req.body?.specimenType || null;
+
+    const results =
+      morphologyFeatureMatcher
+        .matcher
+        .match(
+          features,
+          {
+            specimenType,
+          },
+        );
+
+    return res.json({
+      success: true,
+      featureMatcher: {
+        version:
+          "CI-002C.2-v1",
+        candidateCount:
+          results.length,
+        specimenType,
+        results,
+      },
+    });
+  },
+);
+
+
+// ============================================================================
+// CI-002C.3 — MORPHOLOGIC SCORE CALCULATOR
+// ============================================================================
+
+app.post(
+  "/knowledge/morphology/score-features",
+  auth,
+  jsonBodyParser({
+    limit: "1mb",
+  }),
+  (req, res) => {
+    const features =
+      req.body?.features || {};
+
+    const specimenType =
+      req.body?.specimenType || null;
+
+    const result =
+      morphologyScoringEngine
+        .score(
+          features,
+          {
+            specimenType,
+          },
+        );
+
+    return res.json({
+      success: true,
+      scoreEngine: {
+        version:
+          "CI-002C.3-v1",
+        specimenType,
+        candidateCount:
+          result.scores.length,
+        scores:
+          result.scores,
+      },
+    });
+  },
+);
+
+
+// ============================================================================
+// CI-002C.4 — MORPHOLOGIC CANDIDATE GENERATOR
+// ============================================================================
+
+app.post(
+  "/knowledge/morphology/generate-candidates",
+  auth,
+  jsonBodyParser({
+    limit: "1mb",
+  }),
+  (req, res) => {
+    const features =
+      req.body?.features || {};
+
+    const specimenType =
+      req.body?.specimenType || null;
+
+    const result =
+      morphologyCandidateEngine
+        .generate(
+          features,
+          {
+            specimenType,
+          },
+        );
+
+    return res.json({
+      success: true,
+      candidateEngine: {
+        version:
+          "CI-002C.4-v1",
+        specimenType,
+        eligibleCount:
+          result.candidates
+            .eligible.length,
+        rejectedCount:
+          result.candidates
+            .rejected.length,
+        candidates:
+          result.candidates,
+      },
+    });
+  },
+);
+
+
+// ============================================================================
+// CI-002C.5 — MORPHOLOGIC RANKING ENGINE
+// ============================================================================
+
+app.post(
+  "/knowledge/morphology/rank-candidates",
+  auth,
+  jsonBodyParser({
+    limit: "1mb",
+  }),
+  (req, res) => {
+    const features =
+      req.body?.features || {};
+
+    const specimenType =
+      req.body?.specimenType || null;
+
+    const result =
+      morphologyRankingEngine
+        .rankFeatures(
+          features,
+          {
+            specimenType,
+          },
+        );
+
+    return res.json({
+      success: true,
+      rankingEngine: {
+        version:
+          "CI-002C.5-v1",
+        specimenType,
+        candidateCount:
+          result.ranking
+            .ranking.length,
+        winner:
+          result.ranking
+            .winner,
+        runnerUp:
+          result.ranking
+            .runnerUp,
+        summary:
+          result.ranking
+            .summary,
+        ranking:
+          result.ranking
+            .ranking,
+      },
+    });
+  },
+);
+
+
+// ============================================================================
+// CI-002C.6 — MORPHOLOGIC CONFIDENCE ENGINE
+// ============================================================================
+
+app.post(
+  "/knowledge/morphology/calculate-confidence",
+  auth,
+  jsonBodyParser({
+    limit: "1mb",
+  }),
+  (req, res) => {
+    const features =
+      req.body?.features || {};
+
+    const specimenType =
+      req.body?.specimenType || null;
+
+    const result =
+      morphologyConfidenceEngine
+        .analyze(
+          features,
+          {
+            specimenType,
+          },
+        );
+
+    return res.json({
+      success: true,
+      confidenceEngine: {
+        version:
+          "CI-002C.6-v1",
+        specimenType,
+        winner:
+          result.ranked
+            .ranking
+            .winner,
+        ranking:
+          result.ranked
+            .ranking
+            .ranking,
+        confidence:
+          result.confidence,
+      },
+    });
+  },
+);
+
+
+// ============================================================================
+// CI-002C.7 — MORPHOLOGIC EXPLANATION ENGINE
+// ============================================================================
+
+app.post(
+  "/knowledge/morphology/explain-decision",
+  auth,
+  jsonBodyParser({
+    limit: "1mb",
+  }),
+  (req, res) => {
+    const features =
+      req.body?.features || {};
+
+    const specimenType =
+      req.body?.specimenType || null;
+
+    const result =
+      morphologyExplanationEngine
+        .analyze(
+          features,
+          {
+            specimenType,
+          },
+        );
+
+    return res.json({
+      success: true,
+      explanationEngine: {
+        version:
+          "CI-002C.7-v1",
+        specimenType,
+        winner:
+          result.explanation
+            .winner,
+        runnerUp:
+          result.explanation
+            .runnerUp,
+        confidence:
+          result.explanation
+            .confidence,
+        narrative:
+          result.explanation
+            .narrative,
+        evidence:
+          result.explanation
+            .evidence,
+        alternatives:
+          result.explanation
+            .alternatives,
+        rejectedCandidates:
+          result.explanation
+            .rejectedCandidates,
+        humanReviewRecommended:
+          result.explanation
+            .humanReviewRecommended,
+        reviewReasons:
+          result.explanation
+            .reviewReasons,
+        rankingPreserved:
+          result.explanation
+            .rankingPreserved,
+        confidencePreserved:
+          result.explanation
+            .confidencePreserved,
+      },
+    });
+  },
+);
+
+
+// ============================================================================
+// CI-002C.8 — MORPHOLOGIC EVIDENCE GRAPH
+// ============================================================================
+
+app.post(
+  "/knowledge/morphology/build-evidence-graph",
+  auth,
+  jsonBodyParser({
+    limit: "1mb",
+  }),
+  (req, res) => {
+    const features =
+      req.body?.features || {};
+
+    const specimenType =
+      req.body?.specimenType || null;
+
+    const result =
+      morphologyEvidenceGraphEngine
+        .analyze(
+          features,
+          {
+            specimenType,
+          },
+        );
+
+    return res.json({
+      success: true,
+      evidenceGraphEngine: {
+        version:
+          "CI-002C.8-v1",
+        specimenType,
+        winner:
+          result.explained
+            .explanation
+            .winner,
+        confidence:
+          result.explained
+            .explanation
+            .confidence,
+        graph:
+          result.graph,
+      },
+    });
+  },
+);
+
+
+// ============================================================================
+// CI-002D.1 — DIFFERENTIAL RULE LIBRARY
 // ============================================================================
 
 app.get(
-  "/",
+  "/knowledge/morphology/differential-rules/pair",
+  auth,
   (req, res) => {
+    const firstCell =
+      String(
+        req.query?.firstCell || "",
+      ).trim();
 
-    res.json({
+    const secondCell =
+      String(
+        req.query?.secondCell || "",
+      ).trim();
 
+    if (
+      !firstCell ||
+      !secondCell
+    ) {
+      return res.status(400).json({
+        success: false,
+        error:
+          "firstCell and secondCell are required.",
+      });
+    }
+
+    const rule =
+      differentialRuleLibrary
+        .repository
+        .getByPair(
+          firstCell,
+          secondCell,
+        );
+
+    if (!rule) {
+      return res.status(404).json({
+        success: false,
+        error:
+          "Differential pair not found.",
+      });
+    }
+
+    return res.json({
       success: true,
-
-      app:
-        "CELLCOUNT ELITE HOSPITAL",
-
-      model:
-        OPENAI_MODEL,
-
-      status:
-        "online",
-
-      version:
-        "V6_SAFE_HYBRID",
+      differentialRule: rule,
     });
-  }
+  },
+);
+
+
+// ============================================================================
+// CI-002D.2 — DIFFERENTIAL PAIR BUILDER
+// ============================================================================
+
+app.post(
+  "/knowledge/morphology/build-differential-pairs",
+  auth,
+  jsonBodyParser({
+    limit: "1mb",
+  }),
+  (req, res) => {
+    const features =
+      req.body?.features || {};
+
+    const specimenType =
+      req.body?.specimenType || null;
+
+    const result =
+      differentialPairBuilderEngine
+        .analyze(
+          features,
+          {
+            specimenType,
+          },
+        );
+
+    return res.json({
+      success: true,
+      differentialPairBuilder: {
+        version:
+          "CI-002D.2-v1",
+        specimenType,
+        winner:
+          result.pairs
+            .winner,
+        statistics:
+          result.pairs
+            .statistics,
+        eligiblePairs:
+          result.pairs
+            .eligiblePairs,
+        rejectedPairs:
+          result.pairs
+            .rejectedPairs,
+      },
+    });
+  },
+);
+
+
+// ============================================================================
+// CI-002D.3 — DIFFERENTIAL SIMILARITY CALCULATOR
+// ============================================================================
+
+app.post(
+  "/knowledge/morphology/calculate-differential-similarity",
+  auth,
+  jsonBodyParser({
+    limit: "1mb",
+  }),
+  (req, res) => {
+    const features =
+      req.body?.features || {};
+
+    const specimenType =
+      req.body?.specimenType || null;
+
+    const result =
+      differentialSimilarityEngine
+        .analyze(
+          features,
+          {
+            specimenType,
+          },
+        );
+
+    return res.json({
+      success: true,
+      differentialSimilarityCalculator: {
+        version:
+          "CI-002D.3-v1",
+        specimenType,
+        pairStatistics:
+          result.pairAnalysis
+            .pairs
+            .statistics,
+        similarityCount:
+          result.similarities.length,
+        similarities:
+          result.similarities,
+      },
+    });
+  },
+);
+
+
+// ============================================================================
+// CI-002D.4 — DIFFERENTIAL EVIDENCE ENGINE
+// ============================================================================
+
+app.post(
+  "/knowledge/morphology/build-differential-evidence",
+  auth,
+  jsonBodyParser({
+    limit: "1mb",
+  }),
+  (req, res) => {
+    const features =
+      req.body?.features || {};
+
+    const specimenType =
+      req.body?.specimenType || null;
+
+    const result =
+      differentialEvidenceEngine
+        .analyze(
+          features,
+          {
+            specimenType,
+          },
+        );
+
+    return res.json({
+      success: true,
+      differentialEvidenceEngine: {
+        version:
+          "CI-002D.4-v1",
+        specimenType,
+        evidenceCount:
+          result.evidence.length,
+        evidence:
+          result.evidence,
+      },
+    });
+  },
+);
+
+
+// ============================================================================
+// CI-002D.5 — EXCLUSIVE FEATURE ENGINE
+// ============================================================================
+
+app.post(
+  "/knowledge/morphology/analyze-exclusive-features",
+  auth,
+  jsonBodyParser({
+    limit: "1mb",
+  }),
+  (req, res) => {
+    const features =
+      req.body?.features || {};
+
+    const specimenType =
+      req.body?.specimenType || null;
+
+    const result =
+      exclusiveFeatureEngine
+        .analyze(
+          features,
+          {
+            specimenType,
+          },
+        );
+
+    return res.json({
+      success: true,
+      exclusiveFeatureEngine: {
+        version:
+          "CI-002D.5-v1",
+        specimenType,
+        resultCount:
+          result.exclusiveFeatures.length,
+        results:
+          result.exclusiveFeatures,
+      },
+    });
+  },
+);
+
+
+// ============================================================================
+// CI-002D.6 — DIAGNOSTIC CONFLICT ENGINE
+// ============================================================================
+
+app.post(
+  "/knowledge/morphology/analyze-diagnostic-conflicts",
+  auth,
+  jsonBodyParser({
+    limit: "1mb",
+  }),
+  (req, res) => {
+    const features =
+      req.body?.features || {};
+
+    const specimenType =
+      req.body?.specimenType || null;
+
+    const result =
+      diagnosticConflictEngine
+        .analyze(
+          features,
+          {
+            specimenType,
+          },
+        );
+
+    return res.json({
+      success: true,
+      diagnosticConflictEngine: {
+        version:
+          "CI-002D.6-v1",
+        specimenType,
+        conflictCount:
+          result.conflicts.length,
+        conflicts:
+          result.conflicts,
+      },
+    });
+  },
+);
+
+
+// ============================================================================
+// CI-002D.7 — DIFFERENTIAL RECOMMENDATION ENGINE
+// ============================================================================
+
+app.post(
+  "/knowledge/morphology/recommend-differential",
+  auth,
+  jsonBodyParser({
+    limit: "1mb",
+  }),
+  (req, res) => {
+    const features =
+      req.body?.features || {};
+
+    const specimenType =
+      req.body?.specimenType || null;
+
+    const result =
+      differentialRecommendationEngine
+        .analyze(
+          features,
+          {
+            specimenType,
+          },
+        );
+
+    return res.json({
+      success: true,
+      differentialRecommendationEngine: {
+        version:
+          "CI-002D.7-v1",
+        specimenType,
+        recommendationCount:
+          result.recommendations.length,
+        recommendations:
+          result.recommendations,
+      },
+    });
+  },
+);
+
+
+// ============================================================================
+// CI-002D.8 — FINAL DIFFERENTIAL DIAGNOSIS ENGINE
+// ============================================================================
+
+app.post(
+  "/knowledge/morphology/final-differential",
+  auth,
+  jsonBodyParser({
+    limit: "1mb",
+  }),
+  (req, res) => {
+    const features =
+      req.body?.features || {};
+
+    const specimenType =
+      req.body?.specimenType || null;
+
+    const result =
+      finalDifferentialDiagnosisEngine
+        .analyze(
+          features,
+          {
+            specimenType,
+          },
+        );
+
+    return res.json({
+      success: true,
+      finalDifferentialDiagnosis:
+        result,
+    });
+  },
 );
 
 // ============================================================================
-// HEALTH
+// SYSTEM ROUTES
 // ============================================================================
 
-app.get(
-  "/health",
-  (req, res) => {
+registerSystemRoutes({
+  app,
+  model: OPENAI_MODEL,
+});
 
-    res.json({
+registerOperationalStatusRoutes({
+  app,
+  auth,
+  morphologyKnowledgeRegistry,
+  morphologyCriteriaEngine,
+  differentialRuleLibrary,
+});
 
-      success: true,
 
-      uptime:
-        process.uptime(),
+// ============================================================================
+// CI-001B — CLASSIFY SPECIMEN
+// ============================================================================
 
-      memory:
-        process.memoryUsage(),
+app.post(
+  "/classify-specimen",
+  auth,
+  upload.array("image", 4),
+  async (req, res) => {
+    try {
+      const files = req.files || [];
 
-      model:
-        OPENAI_MODEL,
+      if (!files.length) {
+        return res.status(400).json({
+          success: false,
+          error: "Nenhuma imagem enviada.",
+        });
+      }
 
-      timestamp:
-        new Date()
-          .toISOString(),
-    });
-  }
+      const imagesPayload = [];
+
+      for (const file of files) {
+        const enhanced =
+          await enhanceMicroscopyImage(file.buffer);
+
+        const payload =
+          buildGPTImagePayload(
+            enhanced,
+            "image/jpeg",
+            {
+              maxTiles:
+                Number(
+                  process.env.GPT_IMAGE_TILES ||
+                  1,
+                ),
+            },
+          );
+
+        imagesPayload.push(...payload);
+      }
+
+      const specimenPrompt = `
+Você é um classificador de tipo de material hematológico.
+Sua única tarefa é diferenciar:
+PERIPHERAL_BLOOD,
+BONE_MARROW_ASPIRATE,
+BONE_MARROW_BIOPSY,
+HEMODILUTED_BONE_MARROW,
+INADEQUATE,
+INDETERMINATE.
+
+Não diagnosticar doenças.
+Não interpretar risco, normalidade ou blastos.
+Avaliar apenas o tipo de material e a qualidade para classificação.
+
+Evidências favoráveis a sangue periférico:
+- forte predomínio eritrocitário;
+- células circulantes predominantemente maduras;
+- distribuição típica de esfregaço periférico.
+
+Evidências favoráveis a aspirado medular:
+- diversidade maturativa;
+- precursores hematopoéticos;
+- alta densidade de células nucleadas;
+- megacariócitos;
+- espículas ou fragmentos medulares.
+
+Ausência de espículas isoladamente não exclui medula.
+Se houver padrão medular com forte contaminação periférica,
+usar HEMODILUTED_BONE_MARROW.
+Se a evidência for insuficiente, usar INDETERMINATE.
+Se a imagem for tecnicamente inviável, usar INADEQUATE.
+
+Retorne somente JSON:
+{
+  "predictedType": "INDETERMINATE",
+  "confidence": 0.0,
+  "alternativeType": "INDETERMINATE",
+  "alternativeConfidence": 0.0,
+  "modelVersion": "specimen-classifier-v1",
+  "evidence": [
+    {
+      "kind": "other",
+      "description": "",
+      "supports": "INDETERMINATE",
+      "weight": 0.0,
+      "confidence": 0.0
+    }
+  ]
+}
+`;
+
+      const completion =
+        await openai.chat.completions.create({
+          model: OPENAI_MODEL,
+          temperature: 0,
+          max_tokens: 1200,
+          response_format: {
+            type: "json_object",
+          },
+          messages: [
+            {
+              role: "system",
+              content: specimenPrompt,
+            },
+            {
+              role: "user",
+              content: [
+                {
+                  type: "text",
+                  text:
+                    "Classifique o tipo de material das imagens sem realizar interpretação clínica.",
+                },
+                ...imagesPayload,
+              ],
+            },
+          ],
+        });
+
+      const parsed =
+        safeJsonParse(
+          completion?.choices?.[0]
+            ?.message?.content ||
+          "{}",
+        );
+
+      const classification =
+        normalizeSpecimenClassification(parsed);
+
+      return res.json({
+        success: true,
+        specimenClassification:
+          classification,
+        metadata: {
+          images: files.length,
+          model: OPENAI_MODEL,
+          version: "CI-001B-v1",
+          timestamp:
+            new Date().toISOString(),
+        },
+      });
+    } catch (error) {
+      console.error(
+        "CLASSIFY SPECIMEN ERROR:",
+        error,
+      );
+
+      return res.status(500).json({
+        success: false,
+        error:
+          "Erro ao classificar o tipo de material.",
+        detail: error.message,
+      });
+    }
+  },
 );
 
 // ============================================================================
@@ -5720,10 +5462,26 @@ app.post(
 
       const analysisSource =
         normalizeAnalysisSource(
-
-          req.body
-            ?.analysisSource,
+          req.body?.analysisSource,
         );
+
+      const specimenGate =
+        validateSpecimenGate(req);
+
+      if (!specimenGate.valid) {
+        return res
+          .status(specimenGate.status)
+          .json({
+            success: false,
+            error: specimenGate.error,
+          });
+      }
+
+      const analysisType =
+        specimenGate.analysisType;
+
+      const specimenType =
+        specimenGate.specimenType;
 
       // ====================================================================
       // MANUAL COUNTS
@@ -5732,19 +5490,10 @@ app.post(
       let manualCounts = {};
 
       try {
-
         manualCounts =
-          typeof req.body
-            ?.manualCounts ===
-          "string"
-
-            ? JSON.parse(
-                req.body
-                  .manualCounts,
-              )
-
-            : req.body
-                ?.manualCounts || {};
+          typeof req.body?.manualCounts === "string"
+            ? JSON.parse(req.body.manualCounts)
+            : req.body?.manualCounts || {};
 
       } catch {
 
@@ -5772,6 +5521,16 @@ app.post(
           analysisSource,
 
           manualCounts,
+
+          analysisType,
+
+          specimenType,
+
+          specimenDecision:
+            specimenGate.decision,
+
+          specimenReviewRequired:
+            specimenGate.reviewRequired,
         });
 
       // ====================================================================
@@ -5801,6 +5560,126 @@ app.post(
           validation.result,
         );
 
+      validation.result =
+        ensurePipelineObjects(
+          validation.result,
+        );
+
+      validation.result =
+        applySpecimenMetadata(
+          validation.result,
+          specimenGate,
+        );
+
+      validation.result =
+        ensurePipelineObjects(
+          validation.result,
+        );
+
+      if (
+        specimenGate.analysisType ===
+        "bone_marrow"
+      ) {
+        validation.result =
+          enforceBoneMarrowOutputContract(
+            validation.result,
+            {
+              rawResult:
+                validation.result.rawResponse ||
+                structured?.rawResponse ||
+                structured ||
+                {},
+              specimenGate,
+            },
+          );
+
+        validation.result =
+          applyBoneMarrowClinicalReasoning(
+            validation.result,
+            {
+              specimenGate,
+            },
+          );
+
+        validation.result =
+          applyBoneMarrowLanguageGuard(
+            validation.result,
+          );
+
+        validation.result =
+          ensurePipelineObjects(
+            validation.result,
+          );
+
+        validation.result =
+          enforceBoneMarrowOutputContract(
+            validation.result,
+            {
+              rawResult:
+                validation.result.rawResponse ||
+                structured?.rawResponse ||
+                structured ||
+                {},
+              specimenGate,
+            },
+          );
+
+        validation.result =
+          applyBoneMarrowClinicalReasoning(
+            validation.result,
+            {
+              specimenGate,
+            },
+          );
+
+        validation.result =
+          applyClinicalSafetyGovernor(
+            validation.result,
+            {
+              specimenGate,
+            },
+          );
+
+        if (
+          validation.result
+            .marrowSafetyValidation
+            ?.deliveryAllowed === false
+        ) {
+          return res.status(422).json({
+            success: false,
+            error:
+              "A validação de segurança medular bloqueou a entrega do resultado.",
+            marrowSafetyValidation:
+              validation.result
+                .marrowSafetyValidation,
+          });
+        }
+      }
+
+      validation.result =
+        stabilizeDualPipelineResult(
+          validation.result,
+          {
+            specimenGate,
+            analysisSource,
+          },
+        );
+
+      if (
+        validation.result
+          .dualPipelineValidation
+          ?.deliveryAllowed === false
+      ) {
+        return res.status(422).json({
+          success: false,
+          error:
+            "A estabilização do pipeline clínico bloqueou a entrega do resultado.",
+          dualPipelineValidation:
+            validation.result
+              .dualPipelineValidation,
+        });
+      }
+
       if (
         validation.result.morphologicRiskClass ===
           "CLASS_1_LIMITED_FIELD_ATYPICAL_CELL" ||
@@ -5809,26 +5688,24 @@ app.post(
       ) {
         validation.result.normalityBlocked = true;
 
-        validation.result.overallAssessment =
-          validation.result.overallAssessment || {};
+        validation.result.overallAssessment
+          .requiresHumanReview = true;
 
-        validation.result.overallAssessment.requiresHumanReview = true;
-
-        validation.result.overallAssessment.riskCategory =
-          validation.result.morphologicRiskClass ||
-          "CLASS_1_LIMITED_FIELD_ATYPICAL_CELL";
-
-        validation.result.blockNormalReason =
-          Array.isArray(validation.result.blockNormalReason)
-            ? validation.result.blockNormalReason
-            : [];
+        validation.result.overallAssessment
+          .riskCategory =
+            validation.result.morphologicRiskClass ||
+            "CLASS_1_LIMITED_FIELD_ATYPICAL_CELL";
 
         validation.result.blockNormalReason.push(
-          "Célula mononuclear isolada com possível padrão reacional/atípico impede classificação como morfologia preservada."
+          "Célula mononuclear isolada com possível padrão reacional/atípico "
+            + "impede classificação como morfologia preservada.",
         );
 
-        validation.result.blockNormalReason =
-          [...new Set(validation.result.blockNormalReason)];
+        validation.result.blockNormalReason = [
+          ...new Set(
+            validation.result.blockNormalReason,
+          ),
+        ];
       }
 
       const finalFindings =

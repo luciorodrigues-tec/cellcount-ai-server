@@ -1,0 +1,94 @@
+{
+  "classifications": [
+    {
+      "id": "WHO-HAEM5-V11-2024",
+      "family": "WHO",
+      "version": "5th-edition-volume-11",
+      "title": "WHO Classification of Tumours: Haematolymphoid Tumours",
+      "publicationYear": 2024,
+      "status": "REFERENCE_ONLY",
+      "sourceIds": [
+        "WHO-HAEM5-V11-2024"
+      ],
+      "notes": "Root metadata only."
+    },
+    {
+      "id": "ICC-MYELOID-2022",
+      "family": "ICC",
+      "version": "2022",
+      "title": "ICC Myeloid Neoplasms and Acute Leukemias",
+      "publicationYear": 2022,
+      "status": "REFERENCE_ONLY",
+      "sourceIds": [
+        "ICC-MYELOID-2022"
+      ],
+      "notes": "Root metadata only."
+    },
+    {
+      "id": "ICC-LYMPHOID-2022",
+      "family": "ICC",
+      "version": "2022",
+      "title": "ICC Mature Lymphoid Neoplasms",
+      "publicationYear": 2022,
+      "status": "REFERENCE_ONLY",
+      "sourceIds": [
+        "ICC-LYMPHOID-2022"
+      ],
+      "notes": "Root metadata only."
+    },
+    {
+      "id": "ELN-AML-2022",
+      "family": "ELN",
+      "version": "2022",
+      "title": "ELN AML Recommendations",
+      "publicationYear": 2022,
+      "status": "REFERENCE_ONLY",
+      "sourceIds": [
+        "ELN-AML-2022"
+      ],
+      "notes": "Recommendation root metadata only."
+    }
+  ],
+  "entities": [
+    {
+      "id": "WHO-HAEM5-ROOT",
+      "classificationId": "WHO-HAEM5-V11-2024",
+      "type": "CLASSIFICATION_NODE",
+      "label": "Haematolymphoid tumours",
+      "status": "REFERENCE_ONLY",
+      "evidenceSourceIds": [
+        "WHO-HAEM5-V11-2024"
+      ]
+    },
+    {
+      "id": "ICC-MYELOID-ROOT",
+      "classificationId": "ICC-MYELOID-2022",
+      "type": "CLASSIFICATION_NODE",
+      "label": "Myeloid neoplasms and acute leukemias",
+      "status": "REFERENCE_ONLY",
+      "evidenceSourceIds": [
+        "ICC-MYELOID-2022"
+      ]
+    },
+    {
+      "id": "ICC-LYMPHOID-ROOT",
+      "classificationId": "ICC-LYMPHOID-2022",
+      "type": "CLASSIFICATION_NODE",
+      "label": "Mature lymphoid neoplasms",
+      "status": "REFERENCE_ONLY",
+      "evidenceSourceIds": [
+        "ICC-LYMPHOID-2022"
+      ]
+    },
+    {
+      "id": "ELN-AML-ROOT",
+      "classificationId": "ELN-AML-2022",
+      "type": "CLASSIFICATION_NODE",
+      "label": "Adult acute myeloid leukemia recommendations",
+      "status": "REFERENCE_ONLY",
+      "evidenceSourceIds": [
+        "ELN-AML-2022"
+      ]
+    }
+  ]
+}
