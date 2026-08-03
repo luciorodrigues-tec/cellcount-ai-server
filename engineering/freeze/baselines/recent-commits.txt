@@ -1,0 +1,20 @@
+959b821 (HEAD -> integrate-audited-backend) Update regression baseline after audited backend integration
+515d5cb Backup audited backend before origin synchronization
+718f3c4 (origin/main, origin/HEAD, main) Fix final clinical governor and hematologic reasoning object
+23442ec Fix hematology consensus and final clinical governor
+c17b1b6 Fix reactive lymphoid pattern and risk classification
+be89b03 Prevent limited field lock from overriding blast suspicion
+0f04280 Restore raw critical blast findings after normalization
+a2b64df Strengthen blast safety lock
+7e49e2b Strengthen blast safety lock
+95ab6cc Fix blast safety lock and limited field logic
+b46e2bb Fix server syntax and AI report cleanup
+ae3dfb8 Reduce parasite false positives and improve report UX
+5ec3e07 hide clinical hypotheses
+d46a55d Add hemoparasite unusual structure governor
+b6373a9 Fix limited field and parasite consistency locks
+0d2b8e0 Remove garbage files
+8d9fb14 Fix validation pipeline and finalResult initialization
+514ef82 Fix limited field semantic lock and parasite governor
+34f96d6 Fix parasite governor and limited field override
+5657bfb fix: limited field lock and morphology safety rules
