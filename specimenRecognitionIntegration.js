@@ -18,7 +18,7 @@ export function registerSpecimenRecognitionRoute({app,auth,upload,openai,model,b
       const files=req.files||[];
       if (!files.length) return res.status(400).json({success:false,error:"Nenhuma imagem enviada."});
       const imagePayload=await buildGPTImagePayload(files);
-      const response=await openai.chat.completions.create({model,temperature:0,response_format:{type:"json_object"},messages:[{role:"system",content:SPECIMEN_PROMPT},{role:"user",content:[{type:"text",text:"Classifique o tipo de material. Não faça interpretação clínica."},...imagePayload]}]});
+      const response=await openai.chat.completions.create({model,response_format:{type:"json_object"},messages:[{role:"system",content:SPECIMEN_PROMPT},{role:"user",content:[{type:"text",text:"Classifique o tipo de material. Não faça interpretação clínica."},...imagePayload]}]});
       const classification=normalizeClassification(safeJson(response.choices?.[0]?.message?.content||"{}"));
       return res.json({success:true,specimenClassification:classification,metadata:{images:files.length,model,clinicalIntelligenceVersion:"CI-001A-v1"}});
     } catch(error) {
