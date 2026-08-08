@@ -3420,8 +3420,7 @@ Não usar false para representar "não avaliável".
 
     const completion = await openai.chat.completions.create({
       model: OPENAI_MODEL,
-      temperature: 0.12,
-      max_tokens: 4000,
+      max_completion_tokens: 4000,
       response_format: { type: "json_object" },
       messages: [
         {
@@ -5351,8 +5350,7 @@ Retorne somente JSON:
       const completion =
         await openai.chat.completions.create({
           model: OPENAI_MODEL,
-          temperature: 0,
-          max_tokens: 1200,
+          max_completion_tokens: 1200,
           response_format: {
             type: "json_object",
           },
@@ -7352,19 +7350,11 @@ ${question}
 
       const completion =
         await openai.chat.completions.create({
-
-          model:
-            OPENAI_MODEL,
-
-          temperature:
-            0.25,
+          model: OPENAI_MODEL,
 
           messages: [
-
             {
-              role:
-                "user",
-
+              role: "user",
               content,
             },
           ],
