@@ -1,8 +1,12 @@
 // ============================================================================
 // GLOBAL PATTERN ENGINE
-// CELLCOUNT HEMATOLOGY AI — V1
-// Analisa o padrão global antes da classificação celular específica
+// CELLCOUNT HEMATOLOGY AI — V2 / BE-FIX-005.15
+// Evidence-grounded global pattern classification.
 // ============================================================================
+
+import {
+  evaluateReactiveLymphoidEvidence,
+} from "./reactiveLymphoidEvidenceSentinel.js";
 
 export function analyzeGlobalPattern(result = {}) {
   const findings = result.findings || {};
@@ -19,10 +23,11 @@ export function analyzeGlobalPattern(result = {}) {
     visualEvidence.repetitiveMononuclearCells === true ||
     visualEvidence.uniformAtypicalCells === true;
 
+  const reactiveEvidence =
+    evaluateReactiveLymphoidEvidence(result);
+
   const reactivePattern =
-    findings.reactiveLymphocytes === true ||
-    findings.mononucleosisSuspicion === true ||
-    findings.downeyLikeCells === true;
+    reactiveEvidence.reactivePatternSupported === true;
 
   const atypical =
     findings.atypicalLymphocytes === true ||
@@ -37,6 +42,12 @@ export function analyzeGlobalPattern(result = {}) {
   if (monomorphic) {
     reasons.push(
       "Presença de população mononuclear relativamente uniforme/repetitiva no campo."
+    );
+  }
+
+  if (reactivePattern) {
+    reasons.push(
+      "Padrão linfoide reacional sustentado por achado estruturado e características morfológicas de suporte."
     );
   }
 
@@ -56,34 +67,43 @@ export function analyzeGlobalPattern(result = {}) {
     !monomorphic &&
     !atypical &&
     !blastLike &&
+    !reactivePattern &&
     result.normalityBlocked !== true;
 
   let dominantPattern = "GLOBAL_UNREMARKABLE_PATTERN";
 
-    if (reactivePattern) {
-      dominantPattern = "REACTIVE_LYMPHOID_PATTERN";
-    } else if (monomorphic) {
-      dominantPattern = "MONOMORPHIC_MONONUCLEAR_POPULATION";
-    } else if (atypical) {
-      dominantPattern = "ATYPICAL_MONONUCLEAR_PATTERN";
-    } else if (blastLike) {
-      dominantPattern = "IMMATURE_OR_BLAST_LIKE_PATTERN";
-    }
+  if (blastLike) {
+    dominantPattern = "IMMATURE_OR_BLAST_LIKE_PATTERN";
+  } else if (monomorphic) {
+    dominantPattern = "MONOMORPHIC_MONONUCLEAR_POPULATION";
+  } else if (reactivePattern) {
+    dominantPattern = "REACTIVE_LYMPHOID_PATTERN";
+  } else if (atypical) {
+    dominantPattern = "ATYPICAL_MONONUCLEAR_PATTERN";
+  }
 
   return {
     dominantPattern,
-    populationDistribution: monomorphic ? "REPETITIVE_OR_UNIFORM" : "SCATTERED_OR_NOT_DEFINED",
+    populationDistribution:
+      monomorphic
+        ? "REPETITIVE_OR_UNIFORM"
+        : "SCATTERED_OR_NOT_DEFINED",
     physiologicAppearance,
     normalityBlocked: !physiologicAppearance,
     normalityReason: reasons,
+    reactiveEvidence,
     globalSummary: physiologicAppearance
       ? "Padrão global sem alterações morfológicas relevantes no campo analisado."
-      : "A avaliação global identifica padrão morfológico não plenamente fisiológico, com necessidade de correlação microscópica, hematimétrica e clínica.",
+      : (
+          reactivePattern
+            ? "Padrão linfoide reacional morfologicamente sustentado no campo analisado; etiologia específica depende de correlação."
+            : "A avaliação global identifica alteração morfológica não plenamente fisiológica, sem promover padrão reacional além da evidência visual disponível."
+        ),
     globalInterpretation:
       morphology.overview ||
       morphology.summary ||
       "",
-    ruleVersion: "GLOBAL_PATTERN_ENGINE_V1",
+    ruleVersion: "GLOBAL_PATTERN_ENGINE_V2_BE_FIX_005_15",
   };
 }
 

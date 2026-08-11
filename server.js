@@ -165,6 +165,18 @@ import {
 } from "./ai/singleBlastSentinel.js";
 
 import {
+  PARASITE_EVIDENCE_SENTINEL_VERSION,
+  applyParasiteEvidenceSentinel,
+  evaluateParasiteArtifactEvidence,
+} from "./ai/parasiteEvidenceSentinel.js";
+
+import {
+  REACTIVE_LYMPHOID_EVIDENCE_SENTINEL_VERSION,
+  applyReactiveLymphoidEvidenceSentinel,
+  evaluateReactiveLymphoidEvidence,
+} from "./ai/reactiveLymphoidEvidenceSentinel.js";
+
+import {
   PRODUCTION_VME_ENFORCEMENT_VERSION,
   LOCAL_MORPHOLOGY_ACQUISITION_RECOVERY_VERSION,
   assessVisualMorphologyEvidenceAcquisition,
@@ -1111,84 +1123,31 @@ function isLimitedFieldResult(result = {}) {
 }
 
 function detectHemoparasitePattern(result = {}) {
-  const raw = JSON.stringify(result || {})
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "");
+  // BE-FIX-005.14 — free-text scanning is forbidden as a positive parasite
+  // source. Canonical LME-1.0 structured evidence is authoritative.
+  const assessment = evaluateParasiteArtifactEvidence(result);
 
-  const strongTrypanosomaEvidence =
-    raw.includes("kinetoplast") ||
-    raw.includes("cinetoplasto") ||
-    raw.includes("undulating membrane") ||
-    raw.includes("membrana ondulante") ||
-    raw.includes("flagellum") ||
-    raw.includes("flagelo") ||
-    raw.includes("trypomastigote") ||
-    raw.includes("tripomastigota");
-
-  const strongMicrofilariaEvidence =
-    raw.includes("microfilaria") ||
-    raw.includes("microfilária");
-
-  const intracellular =
-    raw.includes("intraeritroc") ||
-    raw.includes("forma anelar") ||
-    raw.includes("trofozoito") ||
-    raw.includes("trofozoíto") ||
-    raw.includes("esquizonte") ||
-    raw.includes("gametocito") ||
-    raw.includes("gametócito");
-
-  if (strongTrypanosomaEvidence) {
+  if (!assessment.explicitPositiveParasiteEvidence) {
     return {
-      suspected: true,
-      type: "TRYPANOSOMA_SUSPECT",
-      confidence: "moderate",
-      blockPlasmodium: true,
-      label:
-        "Estrutura extracelular com critérios sugestivos de hemoflagelado circulante. Requer confirmação laboratorial.",
-    };
-  }
-
-  if (strongMicrofilariaEvidence) {
-    return {
-      suspected: true,
-      type: "MICROFILARIA_SUSPECT",
-      confidence: "moderate",
-      blockPlasmodium: true,
-      label:
-        "Estrutura filamentosa extracelular suspeita para microfilária circulante. Requer confirmação laboratorial.",
-    };
-  }
-
-  if (intracellular && raw.includes("plasmodium")) {
-    return {
-      suspected: true,
-      type: "PLASMODIUM_SUSPECT",
-      confidence: "moderate",
+      suspected: false,
+      type: "NONE",
+      confidence: "low",
       blockPlasmodium: false,
-      label:
-        "Estruturas intraeritrocitárias suspeitas para Plasmodium spp.; requer confirmação laboratorial.",
-    };
-  }
-
-  if (intracellular && raw.includes("babesia")) {
-    return {
-      suspected: true,
-      type: "BABESIA_SUSPECT",
-      confidence: "moderate",
-      blockPlasmodium: true,
-      label:
-        "Estruturas intraeritrocitárias suspeitas para Babesia spp.; requer confirmação laboratorial.",
+      label: assessment.artifactLikely
+        ? "Estrutura incomum favorecendo artefato técnico/óptico; sem evidência estruturada positiva de hemoparasita."
+        : "",
+      artifactLikely: assessment.artifactLikely,
     };
   }
 
   return {
-    suspected: false,
-    type: "NONE",
-    confidence: "low",
+    suspected: true,
+    type: "HEMOPARASITE_SUSPECT",
+    confidence: "moderate",
     blockPlasmodium: false,
-    label: "",
+    label:
+      "Evidência visual estruturada positiva para forma parasitária no campo analisado; requer confirmação laboratorial.",
+    artifactLikely: assessment.artifactLikely,
   };
 }
 
@@ -1533,47 +1492,23 @@ function normalizeMedicalResponse(
         atypicalLymphocyteSubtype === "immunoblastoid"
       );
 
+  // BE-FIX-005.15 — large/atypical mononuclear cells alone do not
+  // authorize a reactive lymphoid population pattern.
+  const reactiveEvidenceAssessment =
+    evaluateReactiveLymphoidEvidence({
+      ...data,
+      findings,
+      visualEvidence:
+        data.visualEvidence ||
+        data.rawResponse?.visualEvidence ||
+        {},
+    });
+
   const reactiveLymphoidPattern =
-    Boolean(
-
-      data.reactiveLymphoidPattern ||
-
-      findings.reactiveLymphocytes ||
-
-      findings.atypicalLymphocytes ||
-
-      findings.largeMononuclearCells ||
-
-      findings.plasmacytoidCells ||
-
-      findings.plasmocytes ||
-
-      findings.plasmablasts ||
-
-      findings.downeyLikeCells ||
-
-      findings.monocytoidAtypicalLymphocytes ||
-
-      findings.immunoblastoidCells
-    );
+    reactiveEvidenceAssessment.reactivePatternSupported === true;
 
   const mononucleosisSuspicion =
-    Boolean(
-
-      data.mononucleosisSuspicion ||
-
-      findings.downeyLikeCells ||
-
-      findings.monocytoidAtypicalLymphocytes ||
-
-      findings.immunoblastoidCells ||
-
-      findings.atypicalLymphocyteSubtype ===
-        "monocytoid" ||
-
-      findings.atypicalLymphocyteSubtype ===
-        "immunoblastoid"
-    );
+    reactiveEvidenceAssessment.mononucleosisPatternSupported === true;
 
   const normalityBlocked =
     Boolean(
@@ -6217,6 +6152,10 @@ app.get("/runtime-version", (_req, res) => {
       EVIDENCE_CONSISTENT_MORPHOLOGY_SYNTHESIS_VERSION,
     singleBlastSentinelVersion:
       SINGLE_BLAST_SENTINEL_VERSION,
+    parasiteEvidenceSentinelVersion:
+      PARASITE_EVIDENCE_SENTINEL_VERSION,
+    reactiveLymphoidEvidenceSentinelVersion:
+      REACTIVE_LYMPHOID_EVIDENCE_SENTINEL_VERSION,
     vmeContract: "VME-1.0",
     model: OPENAI_MODEL,
     defaults: {
@@ -7723,6 +7662,27 @@ finalResult =
 // ============================================================================
 finalResult =
   applySingleBlastSentinel(
+    finalResult,
+  );
+
+// ============================================================================
+// BE-FIX-005.14 — PARASITE EVIDENCE SENTINEL & ARTIFACT DISCRIMINATION
+// Runs after the blast sentinel. It may remove false parasite promotion but
+// never downgrades a positive blast alert.
+// ============================================================================
+finalResult =
+  applyParasiteEvidenceSentinel(
+    finalResult,
+  );
+
+// ============================================================================
+// BE-FIX-005.15 — EVIDENCE-GROUNDED REACTIVE LYMPHOID SENTINEL
+// Removes unsupported reactive/viral population inference while preserving
+// observed atypical mononuclear morphology. Blast and parasite sentinels retain
+// higher priority.
+// ============================================================================
+finalResult =
+  applyReactiveLymphoidEvidenceSentinel(
     finalResult,
   );
 
