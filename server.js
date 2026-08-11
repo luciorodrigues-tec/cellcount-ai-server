@@ -6202,6 +6202,7 @@ app.get("/runtime-version", (_req, res) => {
       PRODUCTION_VME_ENFORCEMENT_VERSION,
     localMorphologyAcquisitionRecoveryVersion:
       LOCAL_MORPHOLOGY_ACQUISITION_RECOVERY_VERSION,
+    finalAnalysisAssemblyRecoveryVersion: "BE-FIX-005.10",
     vmeContract: "VME-1.0",
     model: OPENAI_MODEL,
     defaults: {
@@ -7067,10 +7068,15 @@ let finalResult =
 // BE-FIX-005.7 — preserve acquisition provenance through final governor and
 // validator layers. An incomplete VME response may be safely limited, but it
 // must never be represented as complete negative morphology.
+// BE-FIX-005.10 — Final Analysis Assembly & Response Recovery
+// Preserve VME provenance from values that are in scope in /analyze-slide:
+// prefer the validated result and fall back to the structured AI result.
 finalResult.visualMorphologyEvidenceAcquisition =
-  mergedAnalysis.visualMorphologyEvidenceAcquisition;
+  validation.result.visualMorphologyEvidenceAcquisition ??
+  structured.visualMorphologyEvidenceAcquisition;
 finalResult.visualEvidenceAcquisitionIncomplete =
-  mergedAnalysis.visualEvidenceAcquisitionIncomplete === true;
+  validation.result.visualEvidenceAcquisitionIncomplete === true ||
+  structured.visualEvidenceAcquisitionIncomplete === true;
 
 if (finalResult.visualEvidenceAcquisitionIncomplete) {
   finalResult.requiresHumanReview = true;
