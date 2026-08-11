@@ -160,6 +160,11 @@ import {
 } from "./ai/evidenceConsistentMorphologySynthesis.js";
 
 import {
+  applySingleBlastSentinel,
+  SINGLE_BLAST_SENTINEL_VERSION,
+} from "./ai/singleBlastSentinel.js";
+
+import {
   PRODUCTION_VME_ENFORCEMENT_VERSION,
   LOCAL_MORPHOLOGY_ACQUISITION_RECOVERY_VERSION,
   assessVisualMorphologyEvidenceAcquisition,
@@ -6210,6 +6215,8 @@ app.get("/runtime-version", (_req, res) => {
     finalAnalysisAssemblyRecoveryVersion: "BE-FIX-005.10",
     evidenceConsistentMorphologySynthesisVersion:
       EVIDENCE_CONSISTENT_MORPHOLOGY_SYNTHESIS_VERSION,
+    singleBlastSentinelVersion:
+      SINGLE_BLAST_SENTINEL_VERSION,
     vmeContract: "VME-1.0",
     model: OPENAI_MODEL,
     defaults: {
@@ -7705,6 +7712,22 @@ finalResult =
 // ============================================================================
 finalResult =
   applyEvidenceConsistentFinalMorphologySynthesis(
+    finalResult,
+  );
+
+// ============================================================================
+// BE-FIX-005.13 — SINGLE BLAST SENTINEL
+// One positive blast/blast-like signal is sufficient to activate the critical
+// review pathway. Run after the final morphology synthesis so reactive/limited
+// field layers cannot suppress it, then rebuild field-scoped negatives.
+// ============================================================================
+finalResult =
+  applySingleBlastSentinel(
+    finalResult,
+  );
+
+finalResult =
+  applyFieldScopedNegativeFindings(
     finalResult,
   );
 
