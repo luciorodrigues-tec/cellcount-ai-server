@@ -138,6 +138,36 @@ import {
 } from "./ai/plateletEngine.js";
 
 import {
+  attachLocalMorphologyEvidence,
+  createLocalMorphologyEvidence,
+  enrichLocalMorphologyEvidenceWithEngines,
+  localMorphologyEvidenceContractStatus,
+} from "./ai/localMorphologyEvidenceContract.js";
+
+import {
+  attachAcademicMorphologyReasoning,
+  createAcademicMorphologyReasoning,
+  academicMorphologyReasoningContractStatus,
+} from "./ai/academicMorphologyReasoningContract.js";
+
+import {
+  applyFieldScopedNegativeFindings,
+} from "./ai/fieldScopedNegativeFindings.js";
+
+import {
+  PRODUCTION_VME_ENFORCEMENT_VERSION,
+  LOCAL_MORPHOLOGY_ACQUISITION_RECOVERY_VERSION,
+  assessVisualMorphologyEvidenceAcquisition,
+  buildPrimaryVisualMorphologyAcquisitionPrompt,
+  buildVisualMorphologyAcquisitionResponseFormat,
+  buildVisualMorphologyRepairPrompt,
+  buildIncompleteVisualAcquisitionResponse,
+  mergeVisualMorphologyRepair,
+  shouldAttemptVisualMorphologyRepair,
+  visualMorphologyEvidenceAcquisitionContractStatus,
+} from "./ai/visualMorphologyEvidenceAcquisitionContract.js";
+
+import {
   buildDiagnosticCorrelation,
 } from "./ai/diagnosticCorrelationEngine.js";
 
@@ -618,6 +648,442 @@ function sanitizeNarrativeRepetition(result = {}) {
   return cloned;
 }
 
+
+// ============================================================================
+// BE/FE-FIX-004 — IMMUTABLE MORPHOLOGY EVIDENCE LAYER
+// Governors may constrain interpretation, but may not erase direct visual
+// evidence produced by the vision model.
+// ============================================================================
+
+function nonEmptyText(value) {
+  return typeof value === "string" && value.trim().length > 0;
+}
+
+function asPlainObject(value) {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? value
+    : {};
+}
+
+function compactObservationParts(parts = []) {
+  return parts
+    .map(([label, value]) => {
+      const text = String(value || "").trim();
+      return text ? `${label}: ${text}` : "";
+    })
+    .filter(Boolean)
+    .join("; ");
+}
+
+function buildStructuredSeriesDescription(series = {}, kind = "") {
+  const value = asPlainObject(series);
+
+  if (kind === "erythrocyte") {
+    return compactObservationParts([
+      ["Tamanho", value.size],
+      ["Forma", value.shape],
+      ["Cromia", value.chromia],
+      ["Distribuição", value.distribution],
+      ["Anisocitose", value.anisocytosis],
+      ["Poiquilocitose", value.poikilocytosis],
+      ["Formas específicas", Array.isArray(value.specificForms) ? value.specificForms.join(", ") : ""],
+      ["Inclusões", Array.isArray(value.inclusions) ? value.inclusions.join(", ") : ""],
+    ]);
+  }
+
+  if (kind === "leukocyte") {
+    return compactObservationParts([
+      ["Heterogeneidade", value.heterogeneity],
+      ["Morfologia nuclear", value.nuclearMorphology],
+      ["Cromatina", value.chromatin],
+      ["Nucléolos", value.nucleoli],
+      ["Relação N:C", value.ncRatio],
+      ["Citoplasma", value.cytoplasm],
+      ["Granulação", value.granulation],
+      ["Maturação", value.maturation],
+      ["Atipia", value.atypia],
+      ["Características blastoides", value.blastLikeFeatures],
+    ]);
+  }
+
+  if (kind === "platelet") {
+    return compactObservationParts([
+      ["Distribuição", value.distribution],
+      ["Tamanho", value.size],
+      ["Agregados", value.aggregates],
+      ["Morfologia", value.morphology],
+    ]);
+  }
+
+  return "";
+}
+
+function buildObservedMorphologyEvidence(result = {}) {
+  const canonical = asPlainObject(result.localMorphologyEvidence);
+  const canonicalRbc = asPlainObject(canonical.erythrocytes);
+  const canonicalWbc = asPlainObject(canonical.leukocytes);
+  const canonicalPlt = asPlainObject(canonical.platelets);
+  const canonicalField = asPlainObject(canonical.field);
+  const raw = asPlainObject(result.rawResponse);
+  const explicit = asPlainObject(
+    result.observedMorphology || raw.observedMorphology,
+  );
+  const rawMorphology = asPlainObject(raw.morphologyAnalysis);
+  const currentMorphology = asPlainObject(result.morphologyAnalysis);
+  const rawSeeing = asPlainObject(raw.whatAISees);
+  const currentSeeing = asPlainObject(result.whatAISees);
+  const field = asPlainObject(result.fieldAdequacy || raw.fieldAdequacy);
+
+  const erythro = asPlainObject(explicit.erythrocytes);
+  const leuk = asPlainObject(explicit.leukocytes);
+  const platelets = asPlainObject(explicit.platelets);
+
+  const observed = {
+    ...explicit,
+    globalField:
+      canonicalField.description ||
+      explicit.globalField ||
+      rawSeeing.globalField ||
+      currentSeeing.globalField ||
+      rawMorphology.overview ||
+      currentMorphology.overview ||
+      "",
+    technicalQuality:
+      canonicalField.technicalQuality ||
+      explicit.technicalQuality ||
+      raw.imageQuality?.description ||
+      raw.imageQuality?.summary ||
+      result.imageQuality?.description ||
+      result.imageQuality?.summary ||
+      "",
+    representativity:
+      explicit.representativity ||
+      field.limitationReason ||
+      rawSeeing.imageLimitations ||
+      currentSeeing.imageLimitations ||
+      "",
+    erythrocytes: {
+      ...erythro,
+      ...canonicalRbc,
+      description:
+        canonicalRbc.description ||
+        buildStructuredSeriesDescription(canonicalRbc, "erythrocyte") ||
+        erythro.description ||
+        rawMorphology.erythrocyteReview ||
+        rawSeeing.erythrocytes ||
+        currentMorphology.erythrocyteReview ||
+        currentSeeing.erythrocytes ||
+        "",
+    },
+    leukocytes: {
+      ...leuk,
+      ...canonicalWbc,
+      approximateVisibleCells:
+        leuk.approximateVisibleCells !== null &&
+        leuk.approximateVisibleCells !== undefined &&
+        leuk.approximateVisibleCells !== "" &&
+        Number.isFinite(Number(leuk.approximateVisibleCells))
+          ? Number(leuk.approximateVisibleCells)
+          : (
+              field.visibleLeukocytes !== null &&
+              field.visibleLeukocytes !== undefined &&
+              field.visibleLeukocytes !== "" &&
+              Number.isFinite(Number(field.visibleLeukocytes))
+                ? Number(field.visibleLeukocytes)
+                : null
+            ),
+      description:
+        canonicalWbc.description ||
+        buildStructuredSeriesDescription(canonicalWbc, "leukocyte") ||
+        leuk.description ||
+        rawMorphology.leukocyteReview ||
+        rawSeeing.leukocytes ||
+        currentMorphology.leukocyteReview ||
+        currentSeeing.leukocytes ||
+        "",
+    },
+    platelets: {
+      ...platelets,
+      ...canonicalPlt,
+      description:
+        canonicalPlt.description ||
+        buildStructuredSeriesDescription(canonicalPlt, "platelet") ||
+        platelets.description ||
+        rawMorphology.plateletReview ||
+        rawSeeing.platelets ||
+        currentMorphology.plateletReview ||
+        currentSeeing.platelets ||
+        "",
+    },
+    artifacts: Array.isArray(explicit.artifacts) ? explicit.artifacts : [],
+    positiveEvidence: Array.isArray(explicit.positiveEvidence)
+      ? explicit.positiveEvidence
+      : [],
+    uncertainty: Array.isArray(explicit.uncertainty)
+      ? explicit.uncertainty
+      : [],
+  };
+
+  return observed;
+}
+
+function buildAcademicInterpretation(result = {}, observed = {}) {
+  const raw = asPlainObject(result.rawResponse);
+  const explicit = asPlainObject(
+    result.academicInterpretation || raw.academicInterpretation,
+  );
+  const reasoning = asPlainObject(raw.hematologicReasoning || result.hematologicReasoning);
+
+  return {
+    ...explicit,
+    morphologicSynthesis:
+      explicit.morphologicSynthesis ||
+      raw.interpretiveSynthesis ||
+      result.interpretiveSynthesis ||
+      observed.globalField ||
+      "",
+    erythrocyteReasoning:
+      explicit.erythrocyteReasoning ||
+      asPlainObject(observed.erythrocytes).description ||
+      "",
+    leukocyteReasoning:
+      explicit.leukocyteReasoning ||
+      reasoning.whatISee ||
+      asPlainObject(observed.leukocytes).description ||
+      "",
+    plateletReasoning:
+      explicit.plateletReasoning ||
+      asPlainObject(observed.platelets).description ||
+      "",
+    differentialConsiderations: Array.isArray(explicit.differentialConsiderations)
+      ? explicit.differentialConsiderations
+      : [],
+    pathophysiology: explicit.pathophysiology || "",
+    teachingPoints: Array.isArray(explicit.teachingPoints)
+      ? explicit.teachingPoints
+      : [],
+    confirmationNeeds: Array.isArray(explicit.confirmationNeeds)
+      ? explicit.confirmationNeeds
+      : [],
+  };
+}
+
+
+function projectAcademicMorphologyReasoningCompatibility(
+  result = {},
+  reasoning = {},
+) {
+  if (!result || typeof result !== "object") return result;
+
+  const amr =
+    reasoning &&
+    typeof reasoning === "object" &&
+    !Array.isArray(reasoning)
+      ? reasoning
+      : {};
+
+  const joinLines = (value) =>
+    Array.isArray(value)
+      ? value
+          .map((item) => String(item || "").trim())
+          .filter(Boolean)
+          .join("\n")
+      : String(value || "").trim();
+
+  const isAdequacyOnlyNarrative = (value) => {
+    const text = normalizeSemanticText(String(value || ""));
+    if (!text) return true;
+
+    const adequacySignals = [
+      "campo limitado",
+      "baixa representatividade",
+      "limitada pela representatividade",
+      "limitado para avaliacao populacional",
+      "nao permite caracterizacao populacional",
+      "nao posso confirmar normalidade global",
+      "imagem isolada nao permite",
+      "campo microscopico limitado",
+    ];
+
+    const morphologySignals = [
+      "cromatina", "nucleolo", "citoplasma", "segment", "granul",
+      "anisocit", "poiquilocit", "hipocrom", "normocrom",
+      "linfocit", "neutrofil", "monocit", "eosinofil", "basofil",
+      "reativ", "atipic", "blasto", "plaquet",
+    ];
+
+    const hasAdequacy = adequacySignals.some((signal) => text.includes(signal));
+    const hasMorphology = morphologySignals.some((signal) => text.includes(signal));
+
+    return hasAdequacy && !hasMorphology;
+  };
+
+  const preserved = {
+    ...result,
+    hematologicReasoning:
+      result.hematologicReasoning &&
+      typeof result.hematologicReasoning === "object" &&
+      !Array.isArray(result.hematologicReasoning)
+        ? { ...result.hematologicReasoning }
+        : {
+            whatISee: "",
+            whatItResembles: "",
+            whatICannotConfirm: "",
+            finalInterpretation:
+              typeof result.hematologicReasoning === "string"
+                ? result.hematologicReasoning
+                : "",
+          },
+    academicInterpretation:
+      result.academicInterpretation &&
+      typeof result.academicInterpretation === "object" &&
+      !Array.isArray(result.academicInterpretation)
+        ? { ...result.academicInterpretation }
+        : {},
+  };
+
+  const amrWhatISee = joinLines(amr.whatISee);
+  const amrResembles = joinLines(amr.whatItResembles);
+  const amrCannotConfirm = joinLines(amr.cannotConfirm);
+  const amrEvidenceFor = joinLines(amr.evidenceFor);
+  const amrEvidenceAgainst = joinLines(amr.evidenceAgainst);
+  const amrDifferentials = joinLines(amr.differentialMorphology);
+  const amrTeachingPoints = Array.isArray(amr.teachingPoints)
+    ? [...amr.teachingPoints]
+    : [];
+
+  // BE-FIX-005.6 — Compatibility bridge for the current Flutter UI.
+  // Real morphology remains authoritative; adequacy-only prose is not allowed
+  // to occupy morphology slots when AMR contains preserved local evidence.
+  if (
+    amrWhatISee &&
+    (
+      !String(preserved.hematologicReasoning.whatISee || "").trim() ||
+      isAdequacyOnlyNarrative(preserved.hematologicReasoning.whatISee)
+    )
+  ) {
+    preserved.hematologicReasoning.whatISee = amrWhatISee;
+  }
+
+  if (
+    amrResembles &&
+    (
+      !String(preserved.hematologicReasoning.whatItResembles || "").trim() ||
+      isAdequacyOnlyNarrative(preserved.hematologicReasoning.whatItResembles)
+    )
+  ) {
+    preserved.hematologicReasoning.whatItResembles = amrResembles;
+  }
+
+  // Boundary/limitation language belongs here, so only fill when absent.
+  if (!String(preserved.hematologicReasoning.whatICannotConfirm || "").trim()) {
+    preserved.hematologicReasoning.whatICannotConfirm = amrCannotConfirm;
+  }
+
+  if (!String(preserved.academicInterpretation.evidenceFor || "").trim()) {
+    preserved.academicInterpretation.evidenceFor = amrEvidenceFor;
+  }
+
+  if (!String(preserved.academicInterpretation.evidenceAgainst || "").trim()) {
+    preserved.academicInterpretation.evidenceAgainst = amrEvidenceAgainst;
+  }
+
+  if (
+    !Array.isArray(preserved.academicInterpretation.differentialConsiderations) ||
+    preserved.academicInterpretation.differentialConsiderations.length === 0
+  ) {
+    preserved.academicInterpretation.differentialConsiderations =
+      Array.isArray(amr.differentialMorphology)
+        ? [...amr.differentialMorphology]
+        : [];
+  }
+
+  if (
+    !Array.isArray(preserved.academicInterpretation.teachingPoints) ||
+    preserved.academicInterpretation.teachingPoints.length === 0
+  ) {
+    preserved.academicInterpretation.teachingPoints = amrTeachingPoints;
+  }
+
+  if (
+    !Array.isArray(preserved.academicInterpretation.confirmationNeeds) ||
+    preserved.academicInterpretation.confirmationNeeds.length === 0
+  ) {
+    preserved.academicInterpretation.confirmationNeeds =
+      Array.isArray(amr.cannotConfirm)
+        ? [...amr.cannotConfirm]
+        : [];
+  }
+
+  if (
+    amrWhatISee &&
+    (
+      !String(preserved.academicInterpretation.morphologicSynthesis || "").trim() ||
+      isAdequacyOnlyNarrative(preserved.academicInterpretation.morphologicSynthesis)
+    )
+  ) {
+    preserved.academicInterpretation.morphologicSynthesis = amrWhatISee;
+  }
+
+  if (!String(preserved.academicInterpretation.differentialReasoning || "").trim()) {
+    preserved.academicInterpretation.differentialReasoning =
+      [amrResembles, amrEvidenceFor, amrEvidenceAgainst, amrDifferentials]
+        .filter(Boolean)
+        .join("\n");
+  }
+
+  return preserved;
+}
+
+function applyMorphologyEvidencePreservation(result = {}) {
+  if (!result || typeof result !== "object") return result;
+
+  const preserved = { ...result };
+  const observed = buildObservedMorphologyEvidence(preserved);
+  const academic = buildAcademicInterpretation(preserved, observed);
+
+  preserved.observedMorphology = observed;
+  preserved.academicInterpretation = academic;
+  preserved.morphologyAnalysis = {
+    ...asPlainObject(preserved.morphologyAnalysis),
+  };
+  preserved.whatAISees = {
+    ...asPlainObject(preserved.whatAISees),
+  };
+
+  // Prefer the direct-observation layer for series descriptions. These fields
+  // describe what is visible in the submitted field and therefore remain valid
+  // even when representativity is limited.
+  if (nonEmptyText(observed.globalField)) {
+    preserved.morphologyAnalysis.overview = observed.globalField;
+    preserved.whatAISees.globalField = observed.globalField;
+  }
+
+  if (nonEmptyText(observed.erythrocytes?.description)) {
+    preserved.morphologyAnalysis.erythrocyteReview =
+      observed.erythrocytes.description;
+    preserved.whatAISees.erythrocytes = observed.erythrocytes.description;
+  }
+
+  if (nonEmptyText(observed.leukocytes?.description)) {
+    preserved.morphologyAnalysis.leukocyteReview =
+      observed.leukocytes.description;
+    preserved.whatAISees.leukocytes = observed.leukocytes.description;
+  }
+
+  if (nonEmptyText(observed.platelets?.description)) {
+    preserved.morphologyAnalysis.plateletReview =
+      observed.platelets.description;
+    preserved.whatAISees.platelets = observed.platelets.description;
+  }
+
+  if (nonEmptyText(observed.representativity)) {
+    preserved.whatAISees.imageLimitations = observed.representativity;
+  }
+
+  return preserved;
+}
+
 // ============================================================================
 // LIMITED FIELD FINAL LOCK V4 — HEMOPARASITE SAFE GOVERNOR
 // Bloqueia falso normal em campo limitado e força segurança para estruturas
@@ -946,34 +1412,51 @@ function applyLimitedFieldFinalLock(result = {}) {
     return locked;
   }
 
+  // BE-FIX — final lock protects safety without erasing upstream morphology.
   locked.finalClassification = "CLASS_1_LIMITED_FIELD";
   locked.morphologicRiskClass = "CLASS_1_LIMITED_FIELD";
   locked.riskLevel = "Campo limitado";
 
-  locked.mainFinding =
-    "Campo microscópico limitado e insuficiente para avaliação populacional confiável. A imagem isolada não permite afirmar normalidade global nem excluir alterações críticas com segurança.";
+  const limitedConclusion =
+    "Campo microscópico limitado para conclusão populacional global. Os achados morfológicos observados permanecem válidos para o campo analisado e não devem ser generalizados para toda a lâmina.";
 
-  locked.primaryFinding = locked.mainFinding;
-  locked.finalConclusion = locked.mainFinding;
+  locked.mainFinding = locked.mainFinding || limitedConclusion;
+  locked.primaryFinding = locked.primaryFinding || locked.mainFinding;
+  locked.finalConclusion = locked.finalConclusion || locked.mainFinding;
 
-  locked.morphologyAnalysis.summary = locked.mainFinding;
   locked.morphologyAnalysis.overview =
-    "Campo microscópico limitado para conclusão morfológica global. A baixa representatividade celular impede afirmar morfologia preservada, estado hematológico normal ou padrão populacional sustentado.";
+    locked.morphologyAnalysis.overview || limitedConclusion;
+  locked.morphologyAnalysis.summary =
+    locked.morphologyAnalysis.summary || locked.mainFinding;
+  locked.morphologyAnalysis.absentFindings =
+    locked.morphologyAnalysis.absentFindings ||
+    "A não visualização de um elemento neste campo não permite sua exclusão global na lâmina.";
 
-  locked.clinicalMeaning =
-    "Campo limitado. A imagem isolada não permite afirmar estado hematológico normal ou morfologia preservada global. Recomenda-se correlação com hemograma completo, dados clínicos e revisão microscópica profissional.";
+  locked.whatAISees.imageLimitations =
+    locked.whatAISees.imageLimitations ||
+    "Representatividade limitada: preservar achados observados e evitar inferências globais.";
+  locked.whatAISees.negativeFindings =
+    "A ausência de um elemento neste campo não permite sua exclusão global na lâmina.";
 
-  locked.interpretiveSynthesis =
-    "A baixa representatividade celular limita a interpretação. A imagem isolada não permite afirmar normalidade global nem excluir alterações críticas com segurança. Recomenda-se avaliação de múltiplos campos e correlação com hemograma.";
+  locked.clinicalMeaning = locked.clinicalMeaning ||
+    "Campo limitado. Os achados morfológicos observados devem ser correlacionados com hemograma completo, múltiplos campos e revisão microscópica profissional.";
+  locked.interpretiveSynthesis = locked.interpretiveSynthesis ||
+    "A representatividade limitada reduz a força das conclusões populacionais sem apagar evidências morfológicas positivas observadas.";
+
   locked.overallAssessment.requiresHumanReview = true;
   locked.overallAssessment.riskCategory = "CLASS_1_LIMITED_FIELD";
-  locked.overallAssessment.mainImpression = locked.mainFinding;
+  locked.overallAssessment.mainImpression =
+    locked.overallAssessment.mainImpression || locked.mainFinding;
 
-  locked.structuredReport.conclusion = locked.mainFinding;
-  locked.structuredReport.hematologicMeaning = locked.clinicalMeaning;
+  locked.structuredReport.conclusion =
+    locked.structuredReport.conclusion || locked.mainFinding;
+  locked.structuredReport.hematologicMeaning =
+    locked.structuredReport.hematologicMeaning || locked.clinicalMeaning;
   locked.structuredReport.recommendation =
-    "Correlacionar com hemograma completo, dados clínicos e revisão microscópica profissional.";
+    locked.structuredReport.recommendation ||
+    "Correlacionar com hemograma completo, avaliação de múltiplos campos e revisão microscópica profissional.";
 
+  // Confidence remains constrained by limited representativity, but morphology is preserved.
   locked.confidenceAnalysis.globalConfidenceScore = Math.min(
     Number(locked.confidenceAnalysis.globalConfidenceScore || 40),
     40,
@@ -991,15 +1474,17 @@ function normalizeMedicalResponse(
 
   const defaultAbsentFindings = `
 
-  ✓ Blastos inequívocos não evidenciados
+  ✓ Blastos inequívocos não identificados entre as células suficientemente avaliáveis neste campo
 
-  ✓ Bastonetes de Auer não evidenciados
+  ✓ Bastonetes de Auer não identificados entre as células suficientemente avaliáveis neste campo
 
-  ✓ População blástica significativa não evidenciada
+  ✓ População blástica significativa não estabelecida neste campo
 
-  ✓ Células imaturas críticas não evidenciadas
+  ✓ Células imaturas críticas não identificadas entre as células suficientemente avaliáveis neste campo
 
-  ✓ Esquizócitos clinicamente relevantes não evidenciados`;
+  ✓ Esquizócitos clinicamente relevantes não identificados entre os eritrócitos suficientemente avaliáveis neste campo
+
+  ⚠ A não visualização neste campo não permite exclusão global na lâmina`;
 
   const atypicalLymphocyteSubtype =
     findings.atypicalLymphocyteSubtype ||
@@ -1179,7 +1664,7 @@ function normalizeMedicalResponse(
     findings?.blastSuspicion !== true
   ) {
     negativeFindingsStructured.push(
-      "Blastos inequívocos não evidenciados"
+      "Blastos inequívocos não identificados entre as células suficientemente avaliáveis neste campo. Esta observação não permite exclusão global na lâmina."
     );
   }
 
@@ -1187,16 +1672,16 @@ function normalizeMedicalResponse(
     findings?.immatureCells !== true
   ) {
     negativeFindingsStructured.push(
-      "Células imaturas críticas não evidenciadas"
+      "Células imaturas críticas não identificadas entre as células suficientemente avaliáveis neste campo. Esta observação não permite exclusão global na lâmina."
     );
   }
 
   negativeFindingsStructured.push(
-    "Bastonetes de Auer não evidenciados"
+    "Bastonetes de Auer não identificados entre as células suficientemente avaliáveis neste campo. Esta observação não permite exclusão global na lâmina."
   );
 
   negativeFindingsStructured.push(
-    "Agregados plaquetários não evidenciados"
+    "Agregados plaquetários não identificados entre os elementos suficientemente avaliáveis neste campo. Esta observação não permite exclusão global na lâmina."
   );
 
   const uniquePositiveFindings =
@@ -2926,14 +3411,32 @@ async function analyzeWithOpenAI({
     const imagesPayload = [];
     const imageMetadata = [];
 
-    for (const file of images) {
-      const enhanced = await enhanceMicroscopyImage(file.buffer);
+    // BE/FE-FIX-004 — process independent microscopy images concurrently.
+    // This removes avoidable sequential preprocessing latency while preserving
+    // the exact same enhancement/payload behavior for each image.
+    const enhancedImages = await Promise.all(
+      images.map((file) => enhanceMicroscopyImage(file.buffer)),
+    );
+
+    for (const enhanced of enhancedImages) {
       if (enhanced?.metadata) {
         imageMetadata.push(enhanced.metadata);
       }
 
       const payload = buildGPTImagePayload(enhanced, "image/jpeg", {
-        maxTiles: Number(process.env.GPT_IMAGE_TILES || 1),
+        maxTiles:
+          analysisType === "bone_marrow"
+            ? Number(process.env.GPT_IMAGE_TILES || 1)
+            : Number(process.env.VME_PRIMARY_TILES || 0),
+        includeCenterCrop:
+          analysisType === "bone_marrow"
+            ? true
+            : String(process.env.VME_INCLUDE_CENTER_CROP || "false")
+                .toLowerCase() === "true",
+        detail:
+          analysisType === "bone_marrow"
+            ? String(process.env.GPT_IMAGE_DETAIL || "auto")
+            : String(process.env.VME_IMAGE_DETAIL || "high"),
       });
 
       imagesPayload.push(...payload);
@@ -3120,6 +3623,83 @@ Responda SOMENTE JSON válido em português do Brasil.
 
     imageQuality,
     visualExtraction,
+
+    fieldAdequacy contendo obrigatoriamente:
+    - visibleLeukocytes: número aproximado de leucócitos/células nucleadas leucocitárias realmente visíveis no conjunto de imagens; não contar menções textuais
+    - adequateForLeukocyteAnalysis: boolean
+    - adequateForBlastScreening: boolean
+    - adequateForPopulationAssessment: boolean; usar true somente quando houver representatividade visual suficiente
+    - limitedField: boolean
+    - limitationReason: string
+
+    IMPORTANTE SOBRE REPRESENTATIVIDADE:
+    Campo limitado não significa ausência de morfologia analisável. Descrever obrigatoriamente RBC/WBC/PLT e toda evidência positiva observável mesmo quando limitedField=true. A limitação deve reduzir inferências populacionais e impedir exclusões globais, nunca apagar achados visuais.
+
+    CAMADA DE EVIDÊNCIA MORFOLÓGICA IMUTÁVEL — OBRIGATÓRIA
+
+    Preencher observedMorphology ANTES de qualquer interpretação. Este objeto deve conter apenas descrição visual sustentada pela imagem e não pode ser substituído por frases genéricas de segurança:
+
+    observedMorphology: {
+      "globalField": "descrição objetiva do campo",
+      "technicalQuality": "foco, iluminação, coloração, contraste, artefatos de aquisição/preparo",
+      "representativity": "o que o campo permite ou não generalizar",
+      "erythrocytes": {
+        "description": "descrição detalhada das hemácias visíveis",
+        "size": "tamanho e variação aparente",
+        "chromia": "cromia aparente quando avaliável",
+        "anisocytosis": "presente/ausente/não avaliável + justificativa",
+        "poikilocytosis": "presente/ausente/não avaliável + justificativa",
+        "specificForms": [],
+        "artifactConsiderations": "distinguir alteração biológica de crenação, secagem, borda de esfregaço ou aquisição"
+      },
+      "leukocytes": {
+        "description": "descrição detalhada dos elementos nucleados visíveis",
+        "approximateVisibleCells": 0,
+        "heterogeneity": "heterogêneo/monomórfico/indeterminado",
+        "nuclearMorphology": "forma, segmentação, relação N:C",
+        "chromatin": "condensada/intermediária/frouxa/indeterminada",
+        "nucleoli": "visíveis/não evidentes/não avaliáveis",
+        "cytoplasm": "volume, basofilia, granulação, vacuolização, bordas",
+        "maturation": "madura/reativa/atípica/imaturo suspeito/indeterminada",
+        "atypia": "descrição sem overcalling",
+        "blastLikeFeatures": "critérios presentes e ausentes; não concluir blasto por tamanho isolado"
+      },
+      "platelets": {
+        "description": "descrição das plaquetas/elementos púrpura visíveis",
+        "distribution": "dispersas/agregadas/indeterminada",
+        "size": "habitual/aumentada/indeterminada",
+        "aggregates": "presentes/não evidentes/não avaliáveis"
+      },
+      "artifacts": [],
+      "positiveEvidence": [],
+      "uncertainty": []
+    }
+
+    CAMADA ACADÊMICA AVANÇADA — OBRIGATÓRIA
+
+    Preencher academicInterpretation em nível de residência, especialização e pós-graduação, mantendo caráter educacional e não diagnóstico:
+
+    academicInterpretation: {
+      "morphologicSynthesis": "integração objetiva do que foi observado",
+      "erythrocyteReasoning": "raciocínio morfológico eritrocitário e diferenciação de artefatos",
+      "leukocyteReasoning": "raciocínio citomorfológico: tamanho relativo, N:C, cromatina, nucléolo, citoplasma, maturação e diferenciais",
+      "plateletReasoning": "raciocínio plaquetário e limitações quantitativas",
+      "differentialConsiderations": [],
+      "pathophysiology": "explicação biológica/fisiopatológica apenas quando sustentada pelos achados",
+      "teachingPoints": [],
+      "confirmationNeeds": []
+    }
+
+    REGRAS PARA NÍVEL ACADÊMICO:
+    - Não usar "campo limitado" como substituto de descrição morfológica.
+    - Separar explicitamente observação, interpretação e representatividade.
+    - Quando uma característica não puder ser avaliada, escrever "não avaliável" e explicar por quê.
+    - Não inventar índices hematimétricos, contagens ou diagnósticos a partir da fotografia.
+    - Diferenciar alteração provável de artefato de preparo/aquisição.
+    - Para leucócitos, descrever primeiro cada padrão morfológico visual e só depois discutir diferenciais.
+    - Para blastos, registrar critérios citomorfológicos presentes e ausentes; na ausência de conjunto convincente, não classificar como blasto.
+    - Cada seção deve acrescentar conhecimento e evitar repetição textual.
+
     normalityBlocked,
     blockNormalReason,
     morphologicRiskClass,
@@ -3413,15 +3993,59 @@ Não usar false para representar "não avaliável".
 
     const visualStart = performance.now();
 
-    const selectedPrompt =
-      analysisType === "bone_marrow"
-        ? boneMarrowPrompt
-        : compactHospitalPrompt;
+    // ======================================================================
+    // BE-FIX-005.8 — PRODUCTION VME ENFORCEMENT
+    // Peripheral-blood vision is now an evidence-acquisition pass, not a full
+    // report-writing pass. Structured Outputs forces the morphology container
+    // to exist before LME/AMR/governors run. GPT-5.5 low reasoning is used for
+    // this latency-sensitive visual extraction workload.
+    // ======================================================================
+    const isPeripheralVisualAcquisition = analysisType !== "bone_marrow";
 
-    const completion = await openai.chat.completions.create({
+    const selectedPrompt = isPeripheralVisualAcquisition
+      ? buildPrimaryVisualMorphologyAcquisitionPrompt()
+      : boneMarrowPrompt;
+
+    const acquisitionContext = isPeripheralVisualAcquisition
+      ? `ANALYSIS SOURCE: ${analysisSource}\nSPECIMEN: ${specimenType || "peripheral_blood"}\nAvalie diretamente as imagens anexadas. Não use ausência de descrição como ausência celular.`
+      : contextualPrompt;
+
+    console.log(
+      "BE-FIX-005.8 — VME PRODUCTION ENFORCEMENT",
+      JSON.stringify({
+        version: PRODUCTION_VME_ENFORCEMENT_VERSION,
+        structuredOutput: isPeripheralVisualAcquisition,
+        reasoningEffort: isPeripheralVisualAcquisition
+          ? (process.env.OPENAI_VISION_REASONING_EFFORT || "low")
+          : "model-default",
+        systemPromptLength: selectedPrompt.length,
+        acquisitionContextLength: acquisitionContext.length,
+      }),
+    );
+
+    console.log(
+      "BE-FIX-005.9 — LOCAL MORPHOLOGY ACQUISITION RECOVERY",
+      JSON.stringify({
+        version: LOCAL_MORPHOLOGY_ACQUISITION_RECOVERY_VERSION,
+        primaryImages: imagesPayload.length,
+        maxCompletionTokens:
+          Number(process.env.OPENAI_VISION_MAX_COMPLETION_TOKENS || 1800),
+        imageDetail:
+          process.env.VME_IMAGE_DETAIL || "high",
+        centerCrop:
+          String(process.env.VME_INCLUDE_CENTER_CROP || "false")
+            .toLowerCase() === "true",
+      }),
+    );
+
+    const completionRequest = {
       model: OPENAI_MODEL,
-      max_completion_tokens: 4000,
-      response_format: { type: "json_object" },
+      max_completion_tokens: isPeripheralVisualAcquisition
+        ? Number(process.env.OPENAI_VISION_MAX_COMPLETION_TOKENS || 1800)
+        : 4000,
+      response_format: isPeripheralVisualAcquisition
+        ? buildVisualMorphologyAcquisitionResponseFormat()
+        : { type: "json_object" },
       messages: [
         {
           role: "system",
@@ -3430,12 +4054,24 @@ Não usar false para representar "não avaliável".
         {
           role: "user",
           content: [
-            { type: "text", text: contextualPrompt },
+            { type: "text", text: acquisitionContext },
             ...imagesPayload,
           ],
         },
       ],
-    });
+    };
+
+    if (isPeripheralVisualAcquisition) {
+      completionRequest.reasoning_effort =
+        process.env.OPENAI_VISION_REASONING_EFFORT || "low";
+
+      if (process.env.OPENAI_VISION_SERVICE_TIER) {
+        completionRequest.service_tier =
+          process.env.OPENAI_VISION_SERVICE_TIER;
+      }
+    }
+
+    const completion = await openai.chat.completions.create(completionRequest);
 
     const visualTiming = logStep(
       requestId,
@@ -3443,12 +4079,187 @@ Não usar false para representar "não avaliável".
       visualStart,
     );
 
-    const parsed = safeJsonParse(
+    let parsed = safeJsonParse(
       completion?.choices?.[0]?.message?.content || "{}",
     );
 
+    // ======================================================================
+    // BE-FIX-005.7 — VME-1.0 ACQUISITION GATE
+    // Validate morphology BEFORE defaulting missing visual flags to false and
+    // before LME/field-adequacy/governors can interpret an incomplete payload.
+    // ======================================================================
+    let visualMorphologyEvidenceAcquisition =
+      assessVisualMorphologyEvidenceAcquisition({
+        visionResponse: parsed,
+        analysisSource,
+      });
+
+    console.log("VME-1.0 — INITIAL ACQUISITION");
+    console.log(
+      JSON.stringify(
+        {
+          ...visualMorphologyEvidenceAcquisition,
+          finishReason: completion?.choices?.[0]?.finish_reason || null,
+          usage: completion?.usage || null,
+        },
+        null,
+        2,
+      ),
+    );
+
+    let visualMorphologyRepairAttempted = false;
+
+    const visualRepairEnabled =
+      String(process.env.VME_REPAIR_ENABLED || "false").toLowerCase() === "true";
+    const visualRepairBudgetMs = Number(
+      process.env.VME_REPAIR_PRIMARY_BUDGET_MS || 45000,
+    );
+
+    if (
+      analysisType !== "bone_marrow" &&
+      shouldAttemptVisualMorphologyRepair({
+        acquisition: visualMorphologyEvidenceAcquisition,
+        primaryElapsedMs: visualTiming,
+        repairEnabled: visualRepairEnabled,
+        latencyBudgetMs: visualRepairBudgetMs,
+      })
+    ) {
+      visualMorphologyRepairAttempted = true;
+
+      const repairStart = performance.now();
+      const repairPrompt = buildVisualMorphologyRepairPrompt({
+        missingRequirements:
+          visualMorphologyEvidenceAcquisition.missingRequirements,
+      });
+
+      try {
+        const repairCompletion = await openai.chat.completions.create({
+          model: OPENAI_MODEL,
+          reasoning_effort:
+            process.env.OPENAI_VISION_REPAIR_REASONING_EFFORT || "low",
+          max_completion_tokens: Number(
+            process.env.OPENAI_VISION_REPAIR_MAX_COMPLETION_TOKENS || 2400,
+          ),
+          response_format: buildVisualMorphologyAcquisitionResponseFormat(),
+          messages: [
+            {
+              role: "system",
+              content: repairPrompt,
+            },
+            {
+              role: "user",
+              content: [
+                {
+                  type: "text",
+                  text: "Reanalise as mesmas imagens apenas para adquirir a morfologia visual ausente. Não produza relatório clínico final.",
+                },
+                ...imagesPayload,
+              ],
+            },
+          ],
+        });
+
+        logStep(requestId, "VME-1.0 MORPHOLOGY REPAIR", repairStart);
+
+        const repaired = safeJsonParse(
+          repairCompletion?.choices?.[0]?.message?.content || "{}",
+        );
+
+        parsed = mergeVisualMorphologyRepair(parsed, repaired);
+
+        visualMorphologyEvidenceAcquisition =
+          assessVisualMorphologyEvidenceAcquisition({
+            visionResponse: parsed,
+            analysisSource,
+          });
+
+        console.log("VME-1.0 — REPAIR ACQUISITION");
+        console.log(
+          JSON.stringify(
+            {
+              ...visualMorphologyEvidenceAcquisition,
+              finishReason:
+                repairCompletion?.choices?.[0]?.finish_reason || null,
+              usage: repairCompletion?.usage || null,
+            },
+            null,
+            2,
+          ),
+        );
+      } catch (repairError) {
+        logStep(requestId, "VME-1.0 MORPHOLOGY REPAIR FAILED", repairStart);
+        console.error(
+          "VME-1.0 repair error:",
+          repairError?.message || repairError,
+        );
+      }
+    }
+
+    if (
+      analysisType !== "bone_marrow" &&
+      visualMorphologyEvidenceAcquisition.retryRecommended === true &&
+      visualMorphologyRepairAttempted === false
+    ) {
+      console.warn(
+        "BE-FIX-005.9 — VME INCOMPLETE: repair skipped by latency budget/default production policy",
+        JSON.stringify({
+          primaryElapsedMs: visualTiming,
+          repairEnabled: visualRepairEnabled,
+          latencyBudgetMs: visualRepairBudgetMs,
+          missingRequirements:
+            visualMorphologyEvidenceAcquisition.missingRequirements,
+        }),
+      );
+    }
+
+    parsed.visualMorphologyEvidenceAcquisition = {
+      ...visualMorphologyEvidenceAcquisition,
+      repairAttempted: visualMorphologyRepairAttempted,
+      contractStatus: visualMorphologyEvidenceAcquisitionContractStatus(
+        visualMorphologyEvidenceAcquisition,
+      ),
+    };
+
+    if (
+      analysisType !== "bone_marrow" &&
+      visualMorphologyEvidenceAcquisition.complete !== true
+    ) {
+      const incompleteResponse =
+        buildIncompleteVisualAcquisitionResponse({
+          acquisition: visualMorphologyEvidenceAcquisition,
+          primaryElapsedMs: visualTiming,
+          requestId,
+        });
+
+      console.warn(
+        "BE-FIX-005.9 — REPORT SUPPRESSED: INCOMPLETE VISUAL ACQUISITION",
+        JSON.stringify(incompleteResponse, null, 2),
+      );
+
+      return {
+        ...incompleteResponse,
+        processingTimeMs:
+          Math.round(performance.now() - pipelineStart),
+        pipeline: {
+          version: "V8_TURBO_ENTERPRISE",
+          productionVmeEnforcementVersion:
+            PRODUCTION_VME_ENFORCEMENT_VERSION,
+          localMorphologyAcquisitionRecoveryVersion:
+            LOCAL_MORPHOLOGY_ACQUISITION_RECOVERY_VERSION,
+          failedClosed: true,
+          visualAcquisitionOnly: true,
+        },
+      };
+    }
+
+    // Only after VME validation may legacy visual flags receive compatibility
+    // defaults. These defaults are not considered acquired morphology.
     parsed.visualEvidence =
-      parsed.visualEvidence || {};
+      parsed.visualEvidence &&
+      typeof parsed.visualEvidence === "object" &&
+      !Array.isArray(parsed.visualEvidence)
+        ? parsed.visualEvidence
+        : {};
 
     parsed.visualEvidence.cellSizeIncrease ??= false;
     parsed.visualEvidence.abundantBasophilicCytoplasm ??= false;
@@ -3456,17 +4267,6 @@ Não usar false para representar "não avaliável".
     parsed.visualEvidence.irregularCellBorders ??= false;
     parsed.visualEvidence.eccentricNucleus ??= false;
     parsed.visualEvidence.prominentNucleolus ??= false;
-
-    if (
-      typeof parsed.visualEvidence === "string"
-    ) {
-      parsed.visualEvidence = {
-        visualEvidenceScore: 65,
-        imageReliability: "moderate",
-        artifactInterference: "low",
-        evidenceLevel: "moderada evidência visual",
-      };
-    }
 
     parsed.heatmapRegions =
       Array.isArray(parsed.heatmapRegions)
@@ -3483,6 +4283,29 @@ Não usar false para representar "não avaliável".
     console.log(JSON.stringify(parsed, null, 2));
     console.log("================================");
 
+    // BE-FIX-005.1 — capture direct morphology exactly once, before any
+    // adequacy/safety/governor layer can rewrite clinical narratives.
+    let localMorphologyEvidence = createLocalMorphologyEvidence({
+      visionResponse: parsed,
+      analysisSource,
+    });
+
+    const initialLocalMorphologyContractStatus =
+      localMorphologyEvidenceContractStatus(localMorphologyEvidence);
+
+    console.log(
+      "LOCAL MORPHOLOGY EVIDENCE — CAPTURED",
+      JSON.stringify(
+        {
+          contractVersion: localMorphologyEvidence.contractVersion,
+          evidenceAvailable: localMorphologyEvidence.evidenceAvailable,
+          contractStatus: initialLocalMorphologyContractStatus,
+        },
+        null,
+        2,
+      ),
+    );
+
     let mergedAnalysis = normalizeMedicalResponse({
       ...parsed,
       analysisSource,
@@ -3490,10 +4313,41 @@ Não usar false para representar "não avaliável".
       manualMetadata,
     });
 
+    // VME provenance must survive legacy normalization.
+    mergedAnalysis.visualMorphologyEvidenceAcquisition =
+      parsed.visualMorphologyEvidenceAcquisition;
+    mergedAnalysis.visualEvidenceAcquisitionIncomplete =
+      parsed.visualMorphologyEvidenceAcquisition?.complete === false;
+
+    if (mergedAnalysis.visualEvidenceAcquisitionIncomplete) {
+      mergedAnalysis.requiresHumanReview = true;
+      mergedAnalysis.normalityBlocked = true;
+      mergedAnalysis.blockNormalReason = [
+        ...new Set([
+          ...(Array.isArray(mergedAnalysis.blockNormalReason)
+            ? mergedAnalysis.blockNormalReason
+            : []),
+          "Aquisição de evidência morfológica visual incompleta (VME-1.0)",
+        ]),
+      ];
+    }
+
+    mergedAnalysis = attachLocalMorphologyEvidence(
+      mergedAnalysis,
+      localMorphologyEvidence,
+    );
+
+    // Compatibility layer for current UI. The canonical source is now
+    // localMorphologyEvidence; observedMorphology remains a legacy projection.
+    mergedAnalysis = applyMorphologyEvidencePreservation(mergedAnalysis);
+
     mergedAnalysis =
       applyFieldAdequacyRules(
         mergedAnalysis,
       );
+
+    // Field adequacy qualifies representativity; restore observed morphology.
+    mergedAnalysis = applyMorphologyEvidencePreservation(mergedAnalysis);
 
 // =====================================================
 // RESTORE RAW ATYPICAL MONONUCLEAR FINDINGS
@@ -3928,6 +4782,79 @@ if (hasReactiveOrAtypicalSignal) {
     ]);
     const engineTiming = logStep(requestId, "HEMATOLOGY ENGINES", engineStart);
 
+    // Engine findings are attached as secondary evidence. They may support or
+    // challenge interpretation, but never overwrite direct visual observations.
+    localMorphologyEvidence = enrichLocalMorphologyEvidenceWithEngines(
+      localMorphologyEvidence,
+      {
+        erythrocyteAnalysis,
+        leukocyteAnalysis,
+        plateletAnalysis,
+      },
+    );
+
+    mergedAnalysis = attachLocalMorphologyEvidence(
+      mergedAnalysis,
+      localMorphologyEvidence,
+    );
+
+    const enrichedLocalMorphologyContractStatus =
+      localMorphologyEvidenceContractStatus(localMorphologyEvidence);
+
+    // ========================================================================
+    // BE-FIX-005.5.2 — AMR PIPELINE INTEGRATION
+    // AMR is derived only from the canonical LME after engine enrichment.
+    // ========================================================================
+    let academicMorphologyReasoning =
+      createAcademicMorphologyReasoning({
+        localMorphologyEvidence,
+        fieldAdequacy:
+          mergedAnalysis.fieldAdequacy || {},
+        evidenceGovernance:
+          mergedAnalysis.evidenceGovernance || {},
+      });
+
+    const academicMorphologyReasoningContract =
+      academicMorphologyReasoningContractStatus(
+        academicMorphologyReasoning,
+      );
+
+    mergedAnalysis =
+      attachAcademicMorphologyReasoning(
+        mergedAnalysis,
+        academicMorphologyReasoning,
+      );
+
+    mergedAnalysis =
+      projectAcademicMorphologyReasoningCompatibility(
+        mergedAnalysis,
+        academicMorphologyReasoning,
+      );
+
+    console.log(
+      "ACADEMIC MORPHOLOGY REASONING — AMR-1.0",
+      JSON.stringify(
+        {
+          evidenceSource:
+            academicMorphologyReasoning.evidenceSource,
+          evidenceAvailable:
+            academicMorphologyReasoning.evidenceAvailable,
+          reasoningScope:
+            academicMorphologyReasoning.reasoningScope,
+          whatISeeCount:
+            academicMorphologyReasoning.whatISee?.length || 0,
+          featureCount:
+            academicMorphologyReasoning.morphologicFeatures?.length || 0,
+          cannotConfirmCount:
+            academicMorphologyReasoning.cannotConfirm?.length || 0,
+          contract:
+            academicMorphologyReasoningContract,
+        },
+        null,
+        2,
+      ),
+    );
+
     const safetyStart = performance.now();
     const safetyValidation = validateHematologyAnalysis({
       analysis: mergedAnalysis,
@@ -4186,6 +5113,7 @@ if (
     return {
 
       ...mergedAnalysis,
+      processingTimeMs: totalPipelineTime,
       structuredReport: finalStructuredReport,
       manualMetadata,
       extractedText,
@@ -4200,8 +5128,14 @@ if (
       lymphoidPatternAnalysis,
       consensusAnalysis,
       safetyValidation,
+      localMorphologyEvidence,
+      localMorphologyEvidenceContract: enrichedLocalMorphologyContractStatus,
+      academicMorphologyReasoning,
+      academicMorphologyReasoningContract,
       pipeline: {
         version: "V8_TURBO_ENTERPRISE",
+        academicMorphologyReasoningVersion: "AMR-1.0",
+        academicMorphologyReasoningIntegrated: true,
         source: analysisSource,
         multiStagePipeline: true,
         turboSingleOpenAICall: true,
@@ -4220,6 +5154,7 @@ if (
         requestId,
         model: OPENAI_MODEL,
         pipelineVersion: "V8_TURBO_ENTERPRISE",
+        academicMorphologyReasoningVersion: "AMR-1.0",
         architecture: "turbo_semantic_hematology_engine",
         hospitalGrade: true,
         educationalMode: true,
@@ -5256,6 +6191,43 @@ registerOperationalStatusRoutes({
 
 
 // ============================================================================
+// BE-FIX-005.9 — PUBLIC RUNTIME FINGERPRINT
+// ============================================================================
+app.get("/runtime-version", (_req, res) => {
+  return res.json({
+    success: true,
+    product: "CELLCOUNT HEMATOLOGY ENTERPRISE",
+    pipeline: "V8_TURBO_ENTERPRISE",
+    productionVmeEnforcementVersion:
+      PRODUCTION_VME_ENFORCEMENT_VERSION,
+    localMorphologyAcquisitionRecoveryVersion:
+      LOCAL_MORPHOLOGY_ACQUISITION_RECOVERY_VERSION,
+    vmeContract: "VME-1.0",
+    model: OPENAI_MODEL,
+    defaults: {
+      reasoningEffort:
+        process.env.OPENAI_VISION_REASONING_EFFORT || "low",
+      maxCompletionTokens:
+        Number(process.env.OPENAI_VISION_MAX_COMPLETION_TOKENS || 1800),
+      primaryTiles:
+        Number(process.env.VME_PRIMARY_TILES || 0),
+      includeCenterCrop:
+        String(process.env.VME_INCLUDE_CENTER_CROP || "false")
+          .toLowerCase() === "true",
+      imageDetail:
+        process.env.VME_IMAGE_DETAIL || "high",
+      repairEnabled:
+        String(process.env.VME_REPAIR_ENABLED || "false")
+          .toLowerCase() === "true",
+      serviceTier:
+        process.env.OPENAI_VISION_SERVICE_TIER || "default",
+    },
+    timestamp: new Date().toISOString(),
+  });
+});
+
+
+// ============================================================================
 // CI-001B — CLASSIFY SPECIMEN
 // ============================================================================
 
@@ -5530,6 +6502,17 @@ app.post(
           specimenReviewRequired:
             specimenGate.reviewRequired,
         });
+
+      // ====================================================================
+      // BE-FIX-005.9 — SAFE ACQUISITION FAILURE DELIVERY
+      // ====================================================================
+
+      if (
+        structured?.success === false &&
+        structured?.errorCode === "INCOMPLETE_VISUAL_EVIDENCE"
+      ) {
+        return res.status(422).json(structured);
+      }
 
       // ====================================================================
       // VALIDATION
@@ -6081,6 +7064,27 @@ let finalResult =
     validation.result,
   );
 
+// BE-FIX-005.7 — preserve acquisition provenance through final governor and
+// validator layers. An incomplete VME response may be safely limited, but it
+// must never be represented as complete negative morphology.
+finalResult.visualMorphologyEvidenceAcquisition =
+  mergedAnalysis.visualMorphologyEvidenceAcquisition;
+finalResult.visualEvidenceAcquisitionIncomplete =
+  mergedAnalysis.visualEvidenceAcquisitionIncomplete === true;
+
+if (finalResult.visualEvidenceAcquisitionIncomplete) {
+  finalResult.requiresHumanReview = true;
+  finalResult.normalityBlocked = true;
+  finalResult.blockNormalReason = [
+    ...new Set([
+      ...(Array.isArray(finalResult.blockNormalReason)
+        ? finalResult.blockNormalReason
+        : []),
+      "Aquisição de evidência morfológica visual incompleta (VME-1.0)",
+    ]),
+  ];
+}
+
 finalResult =
   sanitizeNarrativeRepetition(
     finalResult,
@@ -6201,8 +7205,8 @@ if (rawHasAtypicalMononuclearPopulation) {
       "Achado morfológico relevante. Requer correlação com hemograma, revisão microscópica profissional e, se indicado, imunofenotipagem.";
   }
 // =====================================================
-// RAW GPT CRITICAL FINDINGS RESTORE
-// impede normalização apagar achados críticos
+// RAW GPT POSITIVE FINDINGS RECOVERY — BE/FE-FIX-003
+// Preserve explicit positive evidence without promoting atypia to blast.
 // =====================================================
 
 const rawPositiveFindings =
@@ -6224,53 +7228,43 @@ const rawLargeMononuclearCells =
 const rawAtypicalLymphocytes =
   rawPositiveFindings.atypicalLymphocytes === true;
 
+finalResult.findings = finalResult.findings || {};
+
+finalResult.findings.blastSuspicion =
+  rawBlastSuspicion || finalResult.findings.blastSuspicion === true;
+finalResult.findings.immatureCells =
+  rawImmatureCells || finalResult.findings.immatureCells === true;
+finalResult.findings.monomorphicPopulation =
+  rawMonomorphicPopulation || finalResult.findings.monomorphicPopulation === true;
+finalResult.findings.largeMononuclearCells =
+  rawLargeMononuclearCells || finalResult.findings.largeMononuclearCells === true;
+finalResult.findings.atypicalLymphocytes =
+  rawAtypicalLymphocytes || finalResult.findings.atypicalLymphocytes === true;
+
+const explicitBlastEvidence =
+  finalResult.findings.blastSuspicion === true &&
+  (
+    finalResult.visualEvidence?.prominentNucleolus === true ||
+    finalResult.visualEvidence?.highNuclearCytoplasmicRatio === true ||
+    finalResult.visualEvidence?.cellSizeIncrease === true ||
+    finalResult.rawResponse?.visualEvidence?.prominentNucleolus === true
+  );
+
+const explicitImmaturePopulationEvidence =
+  finalResult.findings.immatureCells === true &&
+  finalResult.fieldAdequacy?.adequateForBlastScreening === true;
+
+// Single final predicate used by every downstream blast safety decision.
+const shouldClassifyAsBlast =
+  explicitBlastEvidence || explicitImmaturePopulationEvidence;
+
 if (
-  rawBlastSuspicion ||
-  rawImmatureCells ||
-  rawMonomorphicPopulation ||
-  rawLargeMononuclearCells
+  rawLargeMononuclearCells ||
+  rawAtypicalLymphocytes ||
+  rawMonomorphicPopulation
 ) {
-  finalResult.findings = finalResult.findings || {};
-
-  finalResult.findings.blastSuspicion = true;
-  finalResult.findings.immatureCells =
-    rawImmatureCells || finalResult.findings.immatureCells === true;
-  finalResult.findings.monomorphicPopulation =
-    rawMonomorphicPopulation || finalResult.findings.monomorphicPopulation === true;
-  finalResult.findings.largeMononuclearCells =
-    rawLargeMononuclearCells || finalResult.findings.largeMononuclearCells === true;
-  finalResult.findings.atypicalLymphocytes =
-    rawAtypicalLymphocytes || finalResult.findings.atypicalLymphocytes === true;
-
   finalResult.normalityBlocked = true;
   finalResult.requiresHumanReview = true;
-
-  finalResult.finalClassification = "CLASS_4_BLAST_SUSPICION";
-  finalResult.morphologicRiskClass = "CLASS_4_BLAST_SUSPICION";
-  finalResult.riskLevel = "Suspeita de população imatura/blástica";
-
-  finalResult.mainFinding =
-    "População mononuclear imatura/atípica suspeita. Não classificar como campo limitado simples.";
-
-  finalResult.primaryFinding = finalResult.mainFinding;
-  finalResult.finalConclusion = finalResult.mainFinding;
-
-  finalResult.morphologyAnalysis = finalResult.morphologyAnalysis || {};
-  finalResult.morphologyAnalysis.summary = finalResult.mainFinding;
-  finalResult.morphologyAnalysis.overview =
-    "Campo com células mononucleares grandes/atípicas, com suspeita de população imatura/blástica. Requer revisão hematológica especializada.";
-
-  finalResult.morphologyAnalysis.leukocyteReview =
-    "Presença de células mononucleares grandes/atípicas. A hipótese de população imatura/blástica não deve ser descartada pela imagem isolada.";
-
-  finalResult.morphologyAnalysis.absentFindings =
-    "Bastonetes de Auer não claramente identificados; ausência global de blastos não pode ser afirmada.";
-
-  finalResult.clinicalMeaning =
-    "Achado morfológico crítico. Requer correlação com hemograma, revisão microscópica profissional e, se indicado, imunofenotipagem.";
-
-  finalResult.interpretiveSynthesis =
-    "Não afirmar ausência de blastos. A imagem contém achados compatíveis com população celular imatura/atípica.";
 }
 
 finalResult.findings = finalResult.findings || {};
@@ -6281,13 +7275,22 @@ finalResult.structuredReport = finalResult.structuredReport || {};
 finalResult.confidenceAnalysis = finalResult.confidenceAnalysis || {};
 finalResult.patternRecognition = finalResult.patternRecognition || {};
 
-const finalVisibleLeukocytes =
+const finalVisibleLeukocytesRaw =
   finalResult.visibleLeukocytes ??
   finalResult.fieldAdequacy?.visibleLeukocytes ??
   finalResult.rawResponse?.fieldAdequacy?.visibleLeukocytes ??
-  0;
+  null;
+
+const finalVisibleLeukocytes =
+  finalVisibleLeukocytesRaw !== null &&
+  finalVisibleLeukocytesRaw !== undefined &&
+  finalVisibleLeukocytesRaw !== "" &&
+  Number.isFinite(Number(finalVisibleLeukocytesRaw))
+    ? Number(finalVisibleLeukocytesRaw)
+    : null;
 
 const isLimitedFieldFinal =
+  finalVisibleLeukocytes === null ||
   finalVisibleLeukocytes < 8 ||
   finalResult.finalClassification === "CLASS_1_LIMITED_FIELD" ||
   finalResult.morphologicRiskClass === "CLASS_1_LIMITED_FIELD" ||
@@ -6310,35 +7313,13 @@ const hasCriticalHematologicFinding =
   finalResult.findings?.atypicalLymphocytes === true ||
   finalResult.findings?.parasiteSuspected === true;
 
-const rawFinalText =
-  JSON.stringify(finalResult || {})
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "");
-
-const textSuggestsBlastPattern =
-  rawFinalText.includes("blasto") ||
-  rawFinalText.includes("blast") ||
-  rawFinalText.includes("celulas imaturas") ||
-  rawFinalText.includes("celula imatura") ||
-  rawFinalText.includes("populacao monomorfica") ||
-  rawFinalText.includes("monomorphic") ||
-  rawFinalText.includes("alta relacao nucleo") ||
-  rawFinalText.includes("relacao n/c") ||
-  rawFinalText.includes("nucleo citoplasma");
-
-
-
 // =====================================================
-// BLAST SAFETY LOCK
+// BLAST SAFETY LOCK — EVIDENCE BASED
+// Never infer blasts from free-text cautions such as
+// "não permite excluir células imaturas".
 // =====================================================
 
-const blastLock =
-  finalResult.findings?.blastSuspicion === true ||
-  finalResult.findings?.immatureCells === true ||
-  finalResult.findings?.monomorphicPopulation === true ||
-  finalResult.findings?.plasmablasts === true ||
-  textSuggestsBlastPattern === true;
+const blastLock = shouldClassifyAsBlast === true;
 
 if (blastLock) {
 
@@ -6391,52 +7372,13 @@ if (
   isLimitedFieldFinal &&
   !hasCriticalHematologicFinding
 ) {
-
+  // BE-FIX — LIMITED FIELD PRESERVATION GATE
+  // Safety remains strict, but observed morphology is not replaced by generic text.
   finalResult.finalClassification = "CLASS_1_LIMITED_FIELD";
   finalResult.morphologicRiskClass = "CLASS_1_LIMITED_FIELD";
   finalResult.riskLevel = "Campo limitado";
   finalResult.normalityBlocked = true;
   finalResult.requiresHumanReview = true;
-
-  // =====================================================
-  // HOSPITAL PREMIUM CLEANUP
-  // =====================================================
-
-  finalResult.showRadar = false;
-  finalResult.hideAISeeingCard = true;
-  finalResult.hideEducationalHypotheses = true;
-  finalResult.hideClinicalCorrelations = true;
-  finalResult.hideDifferentialDiagnosis = true;
-  finalResult.hidePopulationAnalysis = true;
-
-  finalResult.riskLevel =
-    "Não aplicável (campo limitado)";
-
-  finalResult.confidenceAnalysis =
-    finalResult.confidenceAnalysis || {};
-
-  finalResult.confidenceAnalysis.globalConfidenceScore =
-    Math.min(
-      Number(
-        finalResult.confidenceAnalysis
-          .globalConfidenceScore || 35
-      ),
-      35,
-    );
-
-  finalResult.confidenceAnalysis.summary =
-    "Campo microscópico limitado. A confiança global não deve ser interpretada como normalidade hematológica.";
-
-  finalResult.whatAISees =
-    finalResult.whatAISees || {};
-
-  finalResult.whatAISees.unusualStructures = "";
-
-  finalResult.associatedEducationalHypotheses = [];
-  finalResult.possibleClinicalCorrelations = [];
-  finalResult.clinicalCorrelationNeeds = [];
-
-  // =====================================================
 
   finalResult.blockNormalReason = [
     ...new Set([
@@ -6446,264 +7388,72 @@ if (
       "Campo microscópico limitado",
       "Baixa representatividade celular",
       "Não afirmar normalidade global pela imagem isolada",
+      "Não converter não visualização em exclusão global",
     ]),
   ];
 
-  finalResult.finalConclusion = limitedConclusion;
-  finalResult.mainFinding = limitedConclusion;
-  finalResult.primaryFinding = limitedConclusion;
-  finalResult.finalRecommendation = limitedRecommendation;
+  finalResult.confidenceAnalysis.globalConfidenceScore = Math.min(
+    Number(finalResult.confidenceAnalysis.globalConfidenceScore || 40),
+    40,
+  );
+  finalResult.confidenceAnalysis.summary =
+    finalResult.confidenceAnalysis.summary ||
+    "Representatividade limitada. A confiança descreve os achados observados e não equivale a normalidade global.";
 
-  finalResult.hideEducationalHypotheses = true;
-  finalResult.hideClinicalCorrelations = true;
-  finalResult.hideDifferentialDiagnosis = true;
-  finalResult.hidePopulationAnalysis = true;
-
-  finalResult.educationalHypotheses = [];
-  finalResult.associatedEducationalHypotheses = [];
-  finalResult.clinicalCorrelations = [];
-  finalResult.possibleClinicalCorrelations = [];
-  finalResult.clinicalCorrelationNeeds = [
-    "Hemograma completo",
-    "Revisão microscópica profissional",
-    "Avaliação de múltiplos campos da lâmina",
-  ];
-
-  finalResult.differentialDiagnosis = [];
-
-  finalResult.findings.immatureCells = false;
-  finalResult.findings.blastSuspicion = false;
-  finalResult.findings.plasmablasts =
-    finalResult.findings.plasmablasts === true &&
-    finalResult.findings.monomorphicPopulation === true;
-
-  finalResult.patternRecognition = {
-    ...(finalResult.patternRecognition || {}),
-    erythrocytePattern: "Avaliação limitada",
-    leukocytePattern: "Baixa representatividade leucocitária",
-    plateletPattern: "Avaliação limitada",
-    artifactPattern:
-      finalResult.patternRecognition?.artifactPattern || "Não definido",
-    overallPattern: "Campo limitado para conclusão populacional",
-  };
-
+  // Preserve morphology cards and AI observations already generated upstream.
   finalResult.morphologyAnalysis.overview =
-    "Campo microscópico limitado para conclusão morfológica global. A baixa representatividade celular impede afirmar morfologia preservada, estado hematológico normal ou padrão populacional sustentado.";
-
-  finalResult.morphologyAnalysis.summary = limitedConclusion;
-
-  finalResult.morphologyAnalysis.erythrocyteReview =
-    "Avaliação eritrocitária limitada ao campo enviado. Hemácias são visíveis, porém não é adequado afirmar normocitose, normocromia ou preservação global da série eritrocitária apenas por este campo isolado.";
-
-  finalResult.morphologyAnalysis.leukocyteReview =
-    "Avaliação leucocitária limitada pela representatividade do campo. A imagem isolada não permite caracterização populacional confiável nem exclusão global de células imaturas."
-  finalResult.morphologyAnalysis.plateletReview =
-    "Avaliação plaquetária limitada ao campo enviado. A imagem isolada não permite conclusão quantitativa ou morfológica global confiável da série plaquetária.";
-
-  finalResult.morphologyAnalysis.biologicalInterpretation =
-    "A baixa representatividade do campo impede conclusão hematológica global. Os achados devem ser interpretados de forma conservadora e correlacionados com hemograma completo e revisão de múltiplos campos.";
-
-  finalResult.morphologyAnalysis.differentialDiagnosis = "";
-
+    finalResult.morphologyAnalysis.overview || limitedConclusion;
+  finalResult.morphologyAnalysis.summary =
+    finalResult.morphologyAnalysis.summary || limitedConclusion;
   finalResult.morphologyAnalysis.absentFindings =
-    "Avaliação leucocitária limitada pela representatividade do campo. A imagem isolada não permite caracterização populacional confiável nem exclusão global de células imaturas."
-  finalResult.whatAISees.globalField =
-    "Campo microscópico limitado para avaliação global.";
-
-  finalResult.whatAISees.cellularity =
-    "Baixa representatividade leucocitária para análise populacional confiável.";
-
-  finalResult.whatAISees.erythrocytes =
-    "Hemácias visíveis no campo, porém sem base suficiente para afirmar preservação global da série.";
-
-  finalResult.whatAISees.leukocytes =
-   "Avaliação leucocitária limitada pela representatividade do campo. A imagem isolada não permite caracterização populacional confiável nem exclusão global de células imaturas."
-  finalResult.whatAISees.platelets =
-    "Avaliação plaquetária limitada pela representatividade do campo.";
-
-  finalResult.whatAISees.dominantFinding =
-    "Campo microscópico limitado.";
-
-  finalResult.whatAISees.unusualStructures =
-    finalResult.whatAISees.unusualStructures || "";
-
-  finalResult.whatAISees.negativeFindings =
-    "Blastos inequívocos, bastonetes de Auer e células imaturas críticas não evidenciados neste campo.";
+    finalResult.morphologyAnalysis.absentFindings ||
+    "A não visualização de um elemento neste campo não permite sua exclusão global na lâmina.";
 
   finalResult.whatAISees.imageLimitations =
-    "Campo único/limitado; não permite conclusão hematológica global.";
+    finalResult.whatAISees.imageLimitations ||
+    "Campo único/limitado; os achados observados não devem ser generalizados para toda a lâmina.";
+  finalResult.whatAISees.negativeFindings =
+    "A ausência de um elemento neste campo não permite sua exclusão global na lâmina.";
 
-  finalResult.whatAISees.freeNarrative =
-    "Avaliação leucocitária limitada pela representatividade do campo. A imagem isolada não permite caracterização populacional confiável nem exclusão global de células imaturas.";
+  finalResult.mainFinding = finalResult.mainFinding || limitedConclusion;
+  finalResult.primaryFinding = finalResult.primaryFinding || finalResult.mainFinding;
+  finalResult.finalConclusion = finalResult.finalConclusion || finalResult.mainFinding;
+  finalResult.finalRecommendation =
+    finalResult.finalRecommendation || limitedRecommendation;
 
-  finalResult.clinicalMeaning =
-    "Campo limitado. A imagem isolada não permite afirmar estado hematológico normal ou morfologia preservada global. Recomenda-se correlação com hemograma completo, dados clínicos e revisão microscópica profissional.";
+  finalResult.clinicalMeaning = finalResult.clinicalMeaning ||
+    "Campo limitado. Preservar os achados morfológicos observados e correlacioná-los com hemograma completo, múltiplos campos e revisão microscópica profissional.";
+  finalResult.interpretiveSynthesis = finalResult.interpretiveSynthesis ||
+    "A representatividade limitada reduz a força das inferências populacionais sem apagar evidências morfológicas positivas observadas.";
 
-  finalResult.interpretiveSynthesis =
-    "A baixa representatividade celular limita a interpretação. O campo analisado não demonstra blastos inequívocos ou células imaturas críticas, porém não permite conclusão global sobre normalidade hematológica.";
-
-  finalResult.hematologicReasoning = {
-    whatISee:
-      "Avaliação leucocitária limitada pela representatividade do campo. A imagem isolada não permite caracterização populacional confiável nem exclusão global de células imaturas.",
-
-    whatItResembles:
-      "Campo limitado para avaliação populacional, sem base suficiente para inferir padrão normal, reacional ou clonal sustentado.",
-
-    whatICannotConfirm:
-      "Não é possível confirmar normalidade global, morfologia preservada, clonalidade, malignidade, parasitemia ou diagnóstico definitivo pela imagem isolada.",
-
-    finalInterpretation:
-      limitedConclusion,
-  };
-
-  finalResult.structuredReport.conclusion = limitedConclusion;
+  finalResult.structuredReport.conclusion =
+    finalResult.structuredReport.conclusion || finalResult.mainFinding;
   finalResult.structuredReport.hematologicMeaning =
-    finalResult.clinicalMeaning;
-  finalResult.structuredReport.recommendation = limitedRecommendation;
-  finalResult.structuredReport.resumoMorfologico =
-    "Campo microscópico limitado; não emitir conclusão global de normalidade ou preservação.";
-  finalResult.structuredReport.interpretacaoEducacional =
-    "A baixa representatividade celular impede afirmar morfologia preservada, normocitose, normocromia, número plaquetário adequado ou estado hematológico normal.";
+    finalResult.structuredReport.hematologicMeaning || finalResult.clinicalMeaning;
+  finalResult.structuredReport.recommendation =
+    finalResult.structuredReport.recommendation || limitedRecommendation;
   finalResult.structuredReport.limitacoes =
+    finalResult.structuredReport.limitacoes ||
     "Campo limitado. Necessária avaliação de múltiplos campos, hemograma completo e revisão microscópica profissional.";
 
-  finalResult.overallAssessment.mainImpression = limitedConclusion;
+  finalResult.overallAssessment.mainImpression =
+    finalResult.overallAssessment.mainImpression || finalResult.mainFinding;
   finalResult.overallAssessment.requiresHumanReview = true;
   finalResult.overallAssessment.riskCategory = "CLASS_1_LIMITED_FIELD";
 
-  finalResult.confidenceAnalysis.riskClassification =
-    "Campo limitado — revisão de múltiplos campos recomendada";
-}
-
-const hasAtypicalPopulationFinal =
-  !isLimitedFieldFinal &&
-  (
-    finalResult?.normalityBlocked === true ||
-    finalResult?.morphologicRiskClass === "CLASS_2_ATYPICAL_POPULATION" ||
-    finalResult?.morphologicRiskClass === "CLASS_3_HETEROGENEOUS_ATYPICAL_POPULATION" ||
-    finalResult?.morphologicRiskClass === "CLASS_3_SUSPICIOUS_ATYPICAL_POPULATION" ||
-    finalResult?.findings?.monomorphicPopulation === true ||
-    finalResult?.findings?.plasmacytoidCells === true ||
-    finalResult?.findings?.plasmocytes === true ||
-    finalResult?.findings?.plasmablasts === true ||
-    finalResult?.findings?.largeMononuclearCells === true ||
-    finalResult?.findings?.atypicalLymphocytes === true
-  );
-
-if (hasAtypicalPopulationFinal) {
-  finalResult.normalityBlocked = true;
-
-  finalResult.blockNormalReason = [
+  // Do not force positive findings to false. Unknown/not observed remains unknown.
+  finalResult.clinicalCorrelationNeeds = [
     ...new Set([
-      ...(Array.isArray(finalResult.blockNormalReason)
-        ? finalResult.blockNormalReason
+      ...(Array.isArray(finalResult.clinicalCorrelationNeeds)
+        ? finalResult.clinicalCorrelationNeeds
         : []),
-      "Achado morfológico atípico impede classificação como normal.",
+      "Hemograma completo",
+      "Revisão microscópica profissional",
+      "Avaliação de múltiplos campos da lâmina",
     ]),
   ];
-
-  finalResult.overallAssessment.requiresHumanReview = true;
-
-  finalResult.clinicalMeaning =
-    "Achado morfológico atípico identificado. A imagem não permite diagnóstico definitivo. Recomenda-se correlação com hemograma completo, dados clínicos e revisão microscópica profissional.";
-
-  finalResult.interpretiveSynthesis =
-    "Achado morfológico atípico identificado. A interpretação deve permanecer conservadora, sem inferir malignidade, clonalidade ou leucemia apenas pela imagem.";
 }
 
-console.log("================================");
-
-  finalResult = applyLimitedFieldFinalLock(finalResult);
-
-// =====================================================
-// FINAL BLAST / ATYPICAL TEXT OVERRIDE — LAST GATE
-// =====================================================
-
-const rawPositiveFinalSafe =
-  finalResult.rawResponse?.positiveFindings || {};
-
-const visualFinalSafe =
-  finalResult.rawResponse?.visualEvidence ||
-  finalResult.visualEvidence ||
-  {};
-
-const hasStrongBlastVisualEvidence =
-  visualFinalSafe.prominentNucleolus === true ||
-  visualFinalSafe.cellSizeIncrease === true ||
-  visualFinalSafe.abundantBasophilicCytoplasm === true ||
-  /nucl[eé]olo|alta rela[cç][aã]o n\/c|cromatina frouxa|blasto/i.test(
-    JSON.stringify(finalResult.rawResponse || {})
-  );
-
-const shouldClassifyAsBlast =
-  rawPositiveFinalSafe.blastSuspicion === true &&
-  rawPositiveFinalSafe.immatureCells === true &&
-  hasStrongBlastVisualEvidence === true;
-
-const hasAtypicalMonomorphicPopulation =
-  rawPositiveFinalSafe.largeMononuclearCells === true ||
-  rawPositiveFinalSafe.atypicalLymphocytes === true ||
-  rawPositiveFinalSafe.monomorphicPopulation === true ||
-  rawPositiveFinalSafe.downeyLikeCells === true;
-
-if (
-  hasAtypicalMonomorphicPopulation &&
-  shouldClassifyAsBlast !== true
-) {
-  finalResult.finalClassification =
-    rawPositiveFinalSafe.monomorphicPopulation === true
-      ? "CLASS_3_POSSIBLE_CLONALITY"
-      : "CLASS_2_ATYPICAL_POPULATION";
-
-  finalResult.morphologicRiskClass =
-    finalResult.finalClassification;
-
-  finalResult.riskLevel =
-    rawPositiveFinalSafe.monomorphicPopulation === true
-      ? "População mononuclear atípica/monomórfica"
-      : "População mononuclear atípica";
-
-  finalResult.findings = finalResult.findings || {};
-  finalResult.findings.blastSuspicion = false;
-  finalResult.findings.immatureCells =
-    rawPositiveFinalSafe.immatureCells === true;
-  finalResult.findings.largeMononuclearCells =
-    rawPositiveFinalSafe.largeMononuclearCells === true;
-  finalResult.findings.atypicalLymphocytes =
-    rawPositiveFinalSafe.atypicalLymphocytes === true;
-  finalResult.findings.monomorphicPopulation =
-    rawPositiveFinalSafe.monomorphicPopulation === true;
-
-  const safeAtypicalText =
-    "População mononuclear grande e atípica, com padrão relativamente monomórfico. Não há sustentação visual suficiente para classificar como suspeita blástica inequívoca pela imagem isolada. Requer revisão hematológica especializada e correlação com hemograma.";
-
-  finalResult.mainFinding = safeAtypicalText;
-  finalResult.primaryFinding = safeAtypicalText;
-  finalResult.finalConclusion = safeAtypicalText;
-
-  finalResult.morphologyAnalysis = finalResult.morphologyAnalysis || {};
-  finalResult.morphologyAnalysis.summary = safeAtypicalText;
-  finalResult.morphologyAnalysis.overview =
-    "Campo com predomínio de células mononucleares grandes/atípicas, sem critérios visuais suficientes para afirmar blasto inequívoco.";
-  finalResult.morphologyAnalysis.leukocyteReview =
-    "Células mononucleares grandes/atípicas em padrão relativamente monomórfico. A hipótese blástica não deve ser afirmada sem maior sustentação morfológica.";
-  finalResult.morphologyAnalysis.absentFindings =
-    "Bastonetes de Auer não claramente identificados; blastos inequívocos não podem ser confirmados pela imagem isolada.";
-
-  finalResult.structuredReport = finalResult.structuredReport || {};
-  finalResult.structuredReport.conclusion = safeAtypicalText;
-
-  finalResult.overallAssessment = finalResult.overallAssessment || {};
-  finalResult.overallAssessment.mainImpression = safeAtypicalText;
-  finalResult.overallAssessment.requiresHumanReview = true;
-  finalResult.overallAssessment.riskCategory =
-    finalResult.finalClassification;
-
-  finalResult.clinicalMeaning =
-    "Achado morfológico relevante. Pode representar processo reacional exuberante ou população linfoide atípica/monomórfica. Requer correlação com hemograma, revisão microscópica profissional e, se indicado, imunofenotipagem.";
-
-  finalResult.interpretiveSynthesis = safeAtypicalText;
-}
 
 if (
   shouldClassifyAsBlast === true &&
@@ -6822,24 +7572,44 @@ console.log(
 );
 console.log("================================");
 
-finalResult.hideEducationalHypotheses = true;
-finalResult.hideClinicalCorrelations = true;
+// BE/FE-FIX-003 — Clinical Result Pipeline Recovery
+// Preserve educational and correlation payloads produced upstream.
+// Visibility is now derived from actual content instead of being forcibly disabled.
+finalResult.associatedEducationalHypotheses = Array.isArray(
+  finalResult.associatedEducationalHypotheses,
+)
+  ? finalResult.associatedEducationalHypotheses.filter(Boolean)
+  : [];
 
-finalResult.associatedEducationalHypotheses = [];
-finalResult.possibleClinicalCorrelations = [];
-finalResult.clinicalCorrelationNeeds = [];
+finalResult.possibleClinicalCorrelations = Array.isArray(
+  finalResult.possibleClinicalCorrelations,
+)
+  ? finalResult.possibleClinicalCorrelations.filter(Boolean)
+  : [];
 
-finalResult.associatedEducationalHypotheses = [];
-finalResult.possibleClinicalCorrelations = [];
-finalResult.clinicalCorrelationNeeds = [];
+finalResult.clinicalCorrelationNeeds = Array.isArray(
+  finalResult.clinicalCorrelationNeeds,
+)
+  ? finalResult.clinicalCorrelationNeeds.filter(Boolean)
+  : [];
 
-finalResult.hideEducationalHypotheses = true;
-finalResult.hideClinicalCorrelations = true;
+finalResult.hideEducationalHypotheses =
+  finalResult.associatedEducationalHypotheses.length == 0;
+finalResult.hideClinicalCorrelations =
+  finalResult.possibleClinicalCorrelations.length == 0 &&
+  finalResult.clinicalCorrelationNeeds.length == 0;
+
+// BE/FE-FIX-004 — the immutable observation layer is the final authority for
+// descriptive morphology. Safety governors remain authoritative for risk,
+// representativity and what cannot be concluded.
+finalResult = applyMorphologyEvidencePreservation(finalResult);
 
 finalResult =
   applyNarrativeConsistencyLock(
     finalResult
   );
+
+finalResult = applyMorphologyEvidencePreservation(finalResult);
 
 if (
   finalResult.finalClassification === "CLASS_4_BLAST_SUSPICION" ||
@@ -6875,6 +7645,74 @@ if (
   finalResult.interpretiveSynthesis = criticalText;
 }
 
+// ============================================================================
+// BE-FIX-005.4 — FINAL FIELD-SCOPED NEGATIVE FINDINGS LOCK
+// Must run after all legacy recovery/governor/narrative layers.
+// ============================================================================
+finalResult =
+  applyFieldScopedNegativeFindings(
+    finalResult,
+  );
+
+// ============================================================================
+// BE-FIX-005.5.2 — FINAL AMR EVIDENCE LOCK
+// Rebuild from protected LME after all legacy governors and narrative locks.
+// LIMITED_FIELD may change scope, but may not erase academic morphology.
+// ============================================================================
+const finalAcademicMorphologyReasoning =
+  createAcademicMorphologyReasoning({
+    localMorphologyEvidence:
+      finalResult.localMorphologyEvidence || {},
+    fieldAdequacy:
+      finalResult.fieldAdequacy || {},
+    evidenceGovernance:
+      finalResult.evidenceGovernance || {},
+  });
+
+const finalAcademicMorphologyReasoningContract =
+  academicMorphologyReasoningContractStatus(
+    finalAcademicMorphologyReasoning,
+  );
+
+finalResult =
+  attachAcademicMorphologyReasoning(
+    finalResult,
+    finalAcademicMorphologyReasoning,
+  );
+
+finalResult =
+  projectAcademicMorphologyReasoningCompatibility(
+    finalResult,
+    finalAcademicMorphologyReasoning,
+  );
+
+finalResult.academicMorphologyReasoningContract =
+  finalAcademicMorphologyReasoningContract;
+
+console.log(
+  "FINAL AMR-1.0",
+  JSON.stringify(
+    {
+      contract:
+        finalAcademicMorphologyReasoningContract,
+      evidenceAvailable:
+        finalAcademicMorphologyReasoning.evidenceAvailable,
+      reasoningScope:
+        finalAcademicMorphologyReasoning.reasoningScope,
+      whatISee:
+        finalAcademicMorphologyReasoning.whatISee,
+      whatItResembles:
+        finalAcademicMorphologyReasoning.whatItResembles,
+      cannotConfirm:
+        finalAcademicMorphologyReasoning.cannotConfirm,
+      teachingPoints:
+        finalAcademicMorphologyReasoning.teachingPoints,
+    },
+    null,
+    2,
+  ),
+);
+
 return res.json({
 
   success: true,
@@ -6886,6 +7724,9 @@ return res.json({
 
     model:
       OPENAI_MODEL,
+
+    vmeProductionEnforcement:
+      PRODUCTION_VME_ENFORCEMENT_VERSION,
 
     timestamp:
       new Date()
@@ -7422,6 +8263,7 @@ app.listen(
 
     console.log(
       "🚀 PIPELINE ENTERPRISE V6 SAFE HYBRID ONLINE",
+      ` | ${PRODUCTION_VME_ENFORCEMENT_VERSION} / VME-1.0 | ${LOCAL_MORPHOLOGY_ACQUISITION_RECOVERY_VERSION}`,
     );
   },
 );

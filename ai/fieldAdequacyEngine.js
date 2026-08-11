@@ -1,7 +1,16 @@
 // ============================================================================
 // CELLCOUNT ENTERPRISE
-// FIELD ADEQUACY ENGINE V3 — LIMITED FIELD + HEMOPARASITE STRUCTURE SAFE LOCK
+// BE-FIX-005.2 — FIELD ADEQUACY ENGINE FA-4.0
+// Field Adequacy Decoupling
+//
+// Scientific invariant:
+//   LIMITED_FIELD != NO_MORPHOLOGY
+//
+// Field representativity constrains population-level inference and global
+// exclusions. It does not erase direct local morphology evidence (LME-1.0).
 // ============================================================================
+
+export const FIELD_ADEQUACY_CONTRACT_VERSION = "FA-4.0";
 
 function normalizeText(value = "") {
   return String(value || "")
@@ -13,6 +22,72 @@ function normalizeText(value = "") {
 function includesAny(text = "", terms = []) {
   const normalized = normalizeText(text);
   return terms.some((term) => normalized.includes(normalizeText(term)));
+}
+
+function asObject(value) {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? value
+    : {};
+}
+
+function hasLocalMorphologyEvidence(analysis = {}) {
+  const lme = asObject(analysis?.localMorphologyEvidence);
+
+  if (lme.contractVersion === "LME-1.0") return true;
+  if (lme.evidenceAvailable === true) return true;
+
+  return Object.keys(lme).length > 0;
+}
+
+function buildAdequacyContract({
+  visibleLeukocytes,
+  singleCellConcern,
+  parasiteSignal,
+  unusualStructureSignal,
+  localMorphologyEvidenceAvailable,
+}) {
+  const adequateForPopulationAssessment = visibleLeukocytes >= 8;
+  const limitedField = !adequateForPopulationAssessment;
+
+  return {
+    contractVersion: FIELD_ADEQUACY_CONTRACT_VERSION,
+
+    visibleLeukocytes,
+    singleCellConcern,
+    parasiteSignal,
+    unusualStructureSignal,
+
+    adequateForLeukocyteAnalysis:
+      visibleLeukocytes >= 3 || singleCellConcern,
+
+    adequateForBlastScreening:
+      visibleLeukocytes >= 1 || singleCellConcern,
+
+    adequateForPopulationAssessment,
+    limitedField,
+
+    // BE-FIX-005.2 / FA-4.0 decoupling contract.
+    populationInferenceAllowed: adequateForPopulationAssessment,
+
+    // Morphology directly visible in the submitted field may still be described
+    // even when that field is not representative of the whole slide.
+    morphologyDescriptionAllowed: true,
+
+    // This flag is an invariant declaration for downstream governors:
+    // field adequacy must not delete or replace canonical LME-1.0 evidence.
+    localMorphologyEvidencePreserved: true,
+
+    // Global "absent / normal / excluded on the slide" conclusions require
+    // representative sampling. Limited-field negatives are field-scoped only.
+    globalNegativeExclusionAllowed: adequateForPopulationAssessment,
+
+    localMorphologyEvidenceAvailable,
+
+    limitationReason:
+      adequateForPopulationAssessment
+        ? ""
+        : "Campo com baixa representatividade celular; limita inferências populacionais e exclusões globais, sem invalidar a morfologia diretamente observada.",
+  };
 }
 
 export function evaluateFieldAdequacy(analysis = {}) {
@@ -34,13 +109,26 @@ export function evaluateFieldAdequacy(analysis = {}) {
     "basófilo",
   ];
 
-  let visibleLeukocytes = 0;
+  // Prefer an explicit visual count supplied by the morphology model.
+  // The previous implementation capped lexical evidence below the population
+  // threshold, making adequacy mathematically unreachable in some responses.
+  const explicitVisibleLeukocytes = Number(
+    analysis?.fieldAdequacy?.visibleLeukocytes ??
+      analysis?.visualExtraction?.visibleLeukocytes ??
+      analysis?.rawResponse?.fieldAdequacy?.visibleLeukocytes ??
+      NaN,
+  );
 
+  let lexicalLeukocyteSignals = 0;
   for (const term of leukocyteTerms) {
-    if (raw.includes(normalizeText(term))) visibleLeukocytes++;
+    if (raw.includes(normalizeText(term))) lexicalLeukocyteSignals++;
   }
 
-  visibleLeukocytes = Math.min(visibleLeukocytes, 5);
+  const visibleLeukocytes =
+    Number.isFinite(explicitVisibleLeukocytes) &&
+    explicitVisibleLeukocytes >= 0
+      ? Math.round(explicitVisibleLeukocytes)
+      : lexicalLeukocyteSignals;
 
   const unusualStructureSignal = includesAny(raw, [
     "estrutura incomum",
@@ -59,27 +147,28 @@ export function evaluateFieldAdequacy(analysis = {}) {
     "elemento extracelular",
   ]);
 
-  const parasiteSignal = includesAny(raw, [
-    "parasita",
-    "hemoparasita",
-    "protozoario",
-    "protozoário",
-    "plasmodium",
-    "babesia",
-    "trypanosoma",
-    "tripanossoma",
-    "tripomastigota",
-    "microfilaria",
-    "microfilária",
-    "filaria",
-    "filária",
-    "flagelo",
-    "flagelado",
-    "membrana ondulante",
-    "cinetoplasto",
-    "intraeritrocitario",
-    "intraeritrocitário",
-  ]) || unusualStructureSignal;
+  const parasiteSignal =
+    includesAny(raw, [
+      "parasita",
+      "hemoparasita",
+      "protozoario",
+      "protozoário",
+      "plasmodium",
+      "babesia",
+      "trypanosoma",
+      "tripanossoma",
+      "tripomastigota",
+      "microfilaria",
+      "microfilária",
+      "filaria",
+      "filária",
+      "flagelo",
+      "flagelado",
+      "membrana ondulante",
+      "cinetoplasto",
+      "intraeritrocitario",
+      "intraeritrocitário",
+    ]) || unusualStructureSignal;
 
   const singleCellConcern =
     includesAny(raw, [
@@ -95,23 +184,19 @@ export function evaluateFieldAdequacy(analysis = {}) {
       "blasto",
     ]) || parasiteSignal;
 
-  return {
+  return buildAdequacyContract({
     visibleLeukocytes,
     singleCellConcern,
     parasiteSignal,
     unusualStructureSignal,
-    adequateForLeukocyteAnalysis: visibleLeukocytes >= 3 || singleCellConcern,
-    adequateForBlastScreening: visibleLeukocytes >= 1 || singleCellConcern,
-    adequateForPopulationAssessment: visibleLeukocytes >= 8,
-    limitedField: visibleLeukocytes < 8,
-    limitationReason:
-      visibleLeukocytes >= 8
-        ? ""
-        : "Campo com baixa representatividade celular; não permite conclusão morfológica global.",
-  };
+    localMorphologyEvidenceAvailable: hasLocalMorphologyEvidence(analysis),
+  });
 }
 
 export function applyFieldAdequacyRules(analysis = {}) {
+  const preservedLocalMorphologyEvidence =
+    analysis?.localMorphologyEvidence;
+
   const fieldAdequacy = evaluateFieldAdequacy(analysis);
 
   analysis.fieldAdequacy = fieldAdequacy;
@@ -140,7 +225,16 @@ export function applyFieldAdequacyRules(analysis = {}) {
     ...(analysis.structuredReport || {}),
   };
 
-  if (fieldAdequacy.parasiteSignal || fieldAdequacy.unusualStructureSignal) {
+  // Explicitly keep the canonical local evidence reference untouched.
+  // Field Adequacy is not authorized to rewrite LME-1.0.
+  if (preservedLocalMorphologyEvidence !== undefined) {
+    analysis.localMorphologyEvidence = preservedLocalMorphologyEvidence;
+  }
+
+  if (
+    fieldAdequacy.parasiteSignal ||
+    fieldAdequacy.unusualStructureSignal
+  ) {
     analysis.normalityBlocked = true;
     analysis.requiresHumanReview = true;
 
@@ -165,6 +259,7 @@ export function applyFieldAdequacyRules(analysis = {}) {
       "Estrutura incomum/hemoparasitária suspeita deve ser considerada e validada em múltiplos campos.";
 
     analysis.patternRecognition.overallPattern =
+      analysis.patternRecognition.overallPattern ||
       "Estrutura incomum/hemoparasita suspeito";
 
     analysis.overallAssessment.requiresHumanReview = true;
@@ -172,6 +267,7 @@ export function applyFieldAdequacyRules(analysis = {}) {
       "CLASS_2_UNUSUAL_HEMOPARASITE_STRUCTURE";
 
     analysis.structuredReport.recommendation =
+      analysis.structuredReport.recommendation ||
       "Confirmar por revisão microscópica profissional, múltiplos campos, gota espessa/esfregaço seriado e métodos complementares conforme protocolo.";
   }
 
@@ -183,36 +279,52 @@ export function applyFieldAdequacyRules(analysis = {}) {
     analysis?.findings?.plasmacytoidCells === true ||
     analysis?.findings?.plasmablasts === true;
 
-  if (
-    fieldAdequacy.limitedField &&
-    atypicalPopulation
-  ) {
-
-    analysis.normalityBlocked = true;
-
-    analysis.requiresHumanReview = true;
-
-    analysis.blockNormalReason = [
-      ...(analysis.blockNormalReason || []),
-      "Campo limitado contendo população atípica/reacional.",
-    ];
-
-    return analysis;
-  }
-
   if (!fieldAdequacy.limitedField) {
+    // Representative field: population inference and global negative
+    // exclusions may proceed according to downstream engines.
     return analysis;
   }
+
+  // ========================================================================
+  // BE-FIX-005.2 — LIMITED FIELD DECOUPLING
+  // ========================================================================
+  // Limited field is a representativity constraint, not a morphology eraser.
+  // Preserve every positive/observational finding produced upstream and only
+  // block population-wide inference, global negative exclusions and
+  // overconfidence.
+  // ========================================================================
 
   analysis.normalityBlocked = true;
   analysis.requiresHumanReview = true;
-  analysis.finalClassification = "CLASS_1_LIMITED_FIELD";
-  analysis.morphologicRiskClass = "CLASS_1_LIMITED_FIELD";
 
-  analysis.riskLevel =
-    fieldAdequacy.parasiteSignal || fieldAdequacy.unusualStructureSignal
-      ? "Campo limitado com estrutura incomum/hemoparasita suspeito"
+  // Preserve a more specific pre-existing risk class produced by a positive
+  // finding (e.g. unusual structure) instead of blindly downgrading it.
+  if (
+    !analysis.finalClassification ||
+    analysis.finalClassification === "CLASS_0_NORMAL"
+  ) {
+    analysis.finalClassification = atypicalPopulation
+      ? "CLASS_1_LIMITED_FIELD_ATYPICAL_CELL"
+      : "CLASS_1_LIMITED_FIELD";
+  }
+
+  if (
+    !analysis.morphologicRiskClass ||
+    analysis.morphologicRiskClass === "CLASS_0_NORMAL"
+  ) {
+    analysis.morphologicRiskClass = atypicalPopulation
+      ? "CLASS_1_LIMITED_FIELD_ATYPICAL_CELL"
+      : "CLASS_1_LIMITED_FIELD";
+  }
+
+  if (
+    !analysis.riskLevel ||
+    normalizeText(analysis.riskLevel).includes("normal")
+  ) {
+    analysis.riskLevel = atypicalPopulation
+      ? "Campo limitado contendo população atípica/reacional"
       : "Campo limitado";
+  }
 
   analysis.blockNormalReason = [
     ...new Set([
@@ -221,153 +333,127 @@ export function applyFieldAdequacyRules(analysis = {}) {
         : []),
       "Baixa representatividade celular",
       "Campo insuficiente para afirmar normalidade global",
+      "Achados observados permanecem válidos para o campo analisado",
+      ...(atypicalPopulation
+        ? ["Campo limitado contendo população atípica/reacional."]
+        : []),
     ]),
   ];
 
   analysis.findings = {
     ...(analysis.findings || {}),
   };
+  // IMPORTANT: do not convert unknown/not-observed into false in a limited field.
 
-  if (
-    analysis.findings.immatureCells !== true
-  ) {
-    analysis.findings.immatureCells = false;
-  }
-
-  if (
-    analysis.findings.blastSuspicion !== true
-  ) {
-    analysis.findings.blastSuspicion = false;
-  }
+  const morphology = {
+    ...(analysis.morphologyAnalysis || {}),
+  };
 
   analysis.morphologyAnalysis = {
-    ...(analysis.morphologyAnalysis || {}),
+    ...morphology,
+
     overview:
-      "Campo microscópico limitado para conclusão morfológica global. A baixa representatividade celular impede afirmar morfologia preservada, estado hematológico normal ou padrão populacional sustentado.",
+      morphology.overview ||
+      "Campo microscópico limitado para conclusão global; os achados morfológicos observáveis neste campo são preservados e devem ser interpretados sem generalização para toda a lâmina.",
+
     erythrocyteReview:
-      "Hemácias visíveis no campo, porém a imagem isolada não permite afirmar normocitose, normocromia ou preservação eritrocitária global.",
+      morphology.erythrocyteReview ||
+      "Hemácias visíveis no campo podem ser descritas morfologicamente; a representatividade limitada impede generalização do padrão eritrocitário para toda a lâmina.",
+
     leukocyteReview:
-      "Avaliação leucocitária limitada pela representatividade do campo. A imagem isolada não permite caracterização populacional confiável nem exclusão global de células imaturas.",
+      morphology.leukocyteReview ||
+      "Leucócitos visíveis devem ser descritos morfologicamente no campo analisado; a baixa representatividade impede diferencial populacional confiável e exclusões globais.",
+
     plateletReview:
-      "Plaquetas podem ser visualizadas no campo, porém a imagem isolada não permite afirmar número adequado, preservação global ou ausência de alteração plaquetária.",
+      morphology.plateletReview ||
+      "Elementos plaquetários visíveis podem ser descritos no campo; a imagem isolada não sustenta avaliação quantitativa global.",
+
     biologicalInterpretation:
-      fieldAdequacy.parasiteSignal || fieldAdequacy.unusualStructureSignal
-        ? "A baixa representatividade celular limita a interpretação e a presença de estrutura incomum exige exclusão de hemoparasita ou artefato por revisão microscópica profissional."
-        : "A baixa representatividade celular limita a interpretação. O campo analisado não demonstra elementos críticos inequívocos, mas também não permite conclusão global sobre normalidade hematológica.",
-    differentialDiagnosis:
-      fieldAdequacy.parasiteSignal || fieldAdequacy.unusualStructureSignal
-        ? "Estrutura inespecífica possível; considerar artefato, precipitado de corante ou material extracelular. Não classificar automaticamente como hemoparasita sem critérios morfológicos fortes."
-        : "",
+      morphology.biologicalInterpretation ||
+      "A baixa representatividade limita inferências populacionais, mas não invalida achados morfológicos positivos observados no campo.",
+
     summary:
-      fieldAdequacy.parasiteSignal || fieldAdequacy.unusualStructureSignal
-        ? "Campo microscópico limitado com estrutura incomum/hemoparasita suspeito. Recomenda-se revisão de múltiplos campos e confirmação laboratorial."
-        : "Avaliação leucocitária limitada pela representatividade do campo. A imagem isolada não permite caracterização populacional confiável nem exclusão global de células imaturas.",
+      morphology.summary ||
+      "Campo limitado: preservar os achados morfológicos observados, sem afirmar normalidade global ou excluir alterações não representadas na imagem.",
+
     absentFindings:
-      "Blastos inequívocos, bastonetes de Auer e células imaturas críticas não evidenciados neste campo; a baixa representatividade não permite exclusão global.",
+      morphology.absentFindings ||
+      "Elementos não observados neste campo devem ser reportados como não observados no campo avaliável, sem exclusão global na lâmina.",
+  };
+
+  const seen = {
+    ...(analysis.whatAISees || {}),
+  };
+
+  analysis.whatAISees = {
+    ...seen,
+
+    globalField:
+      seen.globalField ||
+      "Campo microscópico com representatividade limitada para avaliação global.",
+
+    imageLimitations:
+      seen.imageLimitations ||
+      "Campo único/limitado: achados observáveis são preservados, porém não devem ser generalizados para toda a lâmina.",
+
+    // Scope the negative statement to the evaluated field instead of claiming
+    // slide-wide absence.
+    negativeFindings:
+      seen.negativeFindings ||
+      "Elementos não visualizados no campo avaliável não podem ser considerados globalmente ausentes na lâmina.",
   };
 
   analysis.patternRecognition = {
     ...(analysis.patternRecognition || {}),
-    erythrocytePattern: "Avaliação limitada",
-    leukocytePattern: "Baixa representatividade leucocitária",
-    plateletPattern: "Avaliação limitada",
-    artifactPattern:
-      fieldAdequacy.parasiteSignal || fieldAdequacy.unusualStructureSignal
-        ? "Artefato permanece no diferencial da estrutura incomum"
-        : analysis.patternRecognition?.artifactPattern || "",
     overallPattern:
-      fieldAdequacy.parasiteSignal || fieldAdequacy.unusualStructureSignal
-        ? "Campo limitado com estrutura incomum/hemoparasita suspeito"
-        : "Campo limitado para conclusão populacional",
-  };
-
-  analysis.whatAISees = {
-    ...(analysis.whatAISees || {}),
-    globalField: "Campo microscópico limitado para avaliação global.",
-    cellularity:
-      "Baixa representatividade leucocitária para análise populacional confiável.",
-    erythrocytes:
-      "Hemácias visíveis, sem base para afirmar padrão eritrocitário global.",
-    leukocytes:
-      "Avaliação leucocitária limitada pela representatividade do campo. A imagem isolada não permite caracterização populacional confiável nem exclusão global de células imaturas.",
-    platelets:
-      "Plaquetas visíveis, porém com avaliação quantitativa limitada.",
-    dominantFinding:
-      fieldAdequacy.parasiteSignal || fieldAdequacy.unusualStructureSignal
-        ? "Estrutura incomum/hemoparasita suspeito em campo limitado."
-        : "Baixa representatividade celular.",
-    unusualStructures:
-      fieldAdequacy.parasiteSignal || fieldAdequacy.unusualStructureSignal
-        ? "Estrutura incomum/hemoparasitária suspeita requer validação específica."
-        : analysis.whatAISees?.unusualStructures || "",
-    negativeFindings:
-      "Blastos inequívocos e bastonetes de Auer não evidenciados neste campo.",
-    imageLimitations:
-      "Campo único/limitado; não permite conclusão hematológica global.",
-    freeNarrative:
-      fieldAdequacy.parasiteSignal || fieldAdequacy.unusualStructureSignal
-        ? "Campo microscópico limitado com estrutura incomum que exige exclusão de hemoparasita ou artefato. Não há blastos inequívocos neste campo. Recomenda-se avaliação de múltiplos campos, hemograma completo e revisão microscópica profissional."
-        : "Campo microscópico limitado. A imagem permite triagem morfológica inicial, mas não permite afirmar morfologia preservada, estado hematológico normal ou padrão populacional sustentado.",
+      analysis.patternRecognition?.overallPattern ||
+      "Campo limitado para conclusão populacional; morfologia observada preservada",
   };
 
   analysis.interpretiveSynthesis =
-    fieldAdequacy.parasiteSignal || fieldAdequacy.unusualStructureSignal
-      ? "A imagem mostra campo limitado com estrutura incomum/hemoparasita suspeito. A interpretação não permite diagnóstico definitivo e exige confirmação por revisão microscópica profissional e métodos complementares."
-      : "A baixa representatividade celular limita a interpretação. O campo analisado não demonstra blastos inequívocos ou células imaturas críticas, porém não permite conclusão global sobre normalidade hematológica.";
+    analysis.interpretiveSynthesis ||
+    "A representatividade limitada reduz a força das conclusões populacionais, sem apagar os achados morfológicos positivos observados no campo.";
 
   analysis.clinicalMeaning =
-    fieldAdequacy.parasiteSignal || fieldAdequacy.unusualStructureSignal
-      ? "Achado suspeito para hemoparasita ou artefato. A imagem isolada não permite identificação definitiva, espécie, parasitemia ou gravidade. Requer correlação clínico-laboratorial."
-      : "Campo limitado. A imagem isolada não permite afirmar estado hematológico normal ou morfologia preservada global. Recomenda-se correlação com hemograma completo, dados clínicos e revisão microscópica profissional.";
-
-  analysis.hematologicReasoning = {
-    whatISee:
-      fieldAdequacy.parasiteSignal || fieldAdequacy.unusualStructureSignal
-        ? "Avaliação leucocitária limitada pela representatividade do campo. A imagem isolada não permite caracterização populacional confiável nem exclusão global de células imaturas."
-        : "Avaliação leucocitária limitada pela representatividade do campo. A imagem isolada não permite caracterização populacional confiável nem exclusão global de células imaturas.",
-    whatItResembles:
-      fieldAdequacy.parasiteSignal || fieldAdequacy.unusualStructureSignal
-        ? "Estrutura incomum que pode corresponder a hemoparasita extracelular/intraeritrocitário ou artefato."
-        : "Campo limitado para avaliação populacional. Não há base suficiente para afirmar padrão normal, reacional ou clonal sustentado.",
-    whatICannotConfirm:
-      "Não é possível confirmar normalidade global, espécie parasitária, parasitemia, clonalidade, malignidade ou diagnóstico definitivo pela imagem isolada.",
-    finalInterpretation:
-      fieldAdequacy.parasiteSignal || fieldAdequacy.unusualStructureSignal
-        ? "Campo limitado com estrutura incomum/hemoparasita suspeito; requer confirmação laboratorial e revisão microscópica profissional."
-        : "Avaliação leucocitária limitada pela representatividade do campo. A imagem isolada não permite caracterização populacional confiável nem exclusão global de células imaturas."
-  };
+    analysis.clinicalMeaning ||
+    "Campo limitado. Os achados morfológicos observados devem ser correlacionados com hemograma completo, múltiplos campos e revisão microscópica profissional.";
 
   analysis.overallAssessment = {
     ...(analysis.overallAssessment || {}),
     requiresHumanReview: true,
+
+    // Keep a more specific positive-risk category if one already exists.
     riskCategory:
-      fieldAdequacy.parasiteSignal || fieldAdequacy.unusualStructureSignal
-        ? "CLASS_2_UNUSUAL_HEMOPARASITE_STRUCTURE"
-        : "CLASS_1_LIMITED_FIELD",
+      analysis.overallAssessment?.riskCategory &&
+      analysis.overallAssessment.riskCategory !== "CLASS_0_NORMAL"
+        ? analysis.overallAssessment.riskCategory
+        : analysis.morphologicRiskClass,
+
     mainImpression:
-      fieldAdequacy.parasiteSignal || fieldAdequacy.unusualStructureSignal
-        ? "Campo microscópico limitado com estrutura incomum/hemoparasita suspeito. Recomenda-se avaliação de múltiplos campos, confirmação laboratorial e revisão microscópica profissional."
-        : "Avaliação leucocitária limitada pela representatividade do campo. A imagem isolada não permite caracterização populacional confiável nem exclusão global de células imaturas."
+      analysis.overallAssessment?.mainImpression ||
+      analysis.morphologyAnalysis.summary,
   };
 
   analysis.structuredReport = {
     ...(analysis.structuredReport || {}),
 
     conclusion:
-      fieldAdequacy.parasiteSignal || fieldAdequacy.unusualStructureSignal
-        ? "Campo microscópico limitado com estrutura incomum/hemoparasita suspeito."
-        : "Avaliação leucocitária limitada pela representatividade do campo. A imagem isolada não permite caracterização populacional confiável nem exclusão global de células imaturas.",
+      analysis.structuredReport?.conclusion ||
+      analysis.morphologyAnalysis.summary,
 
     hematologicMeaning:
-      fieldAdequacy.parasiteSignal || fieldAdequacy.unusualStructureSignal
-        ? "A imagem isolada não permite identificação definitiva da estrutura, espécie parasitária ou relevância clínica."
-        : "A imagem isolada não permite afirmar estado hematológico normal ou morfologia preservada global.",
+      analysis.structuredReport?.hematologicMeaning ||
+      analysis.clinicalMeaning,
 
     recommendation:
-      fieldAdequacy.parasiteSignal || fieldAdequacy.unusualStructureSignal
-        ? "Correlacionar com hemograma completo, gota espessa/esfregaço seriado, métodos complementares conforme protocolo e revisão microscópica profissional."
-        : "Correlacionar com hemograma completo, dados clínicos e revisão microscópica profissional.",
+      analysis.structuredReport?.recommendation ||
+      "Correlacionar com hemograma completo, avaliação de múltiplos campos e revisão microscópica profissional.",
   };
+
+  // Reassert canonical evidence identity after all adequacy transformations.
+  if (preservedLocalMorphologyEvidence !== undefined) {
+    analysis.localMorphologyEvidence = preservedLocalMorphologyEvidence;
+  }
 
   return analysis;
 }

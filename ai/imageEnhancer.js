@@ -347,6 +347,12 @@ export function buildGPTImagePayload(
     options.maxTiles ?? process.env.GPT_IMAGE_TILES ?? 0,
   );
 
+  const includeCenterCrop =
+    options.includeCenterCrop !== false;
+
+  const imageDetail =
+    String(options.detail || process.env.GPT_IMAGE_DETAIL || 'auto').trim();
+
   // ========================================================================
   // ENHANCED MAIN IMAGE
   // ========================================================================
@@ -359,6 +365,8 @@ export function buildGPTImagePayload(
 
       url:
         `data:${mime};base64,${enhancedResult.enhanced.toString('base64')}`,
+
+      detail: imageDetail,
     },
   });
 
@@ -367,6 +375,7 @@ export function buildGPTImagePayload(
   // ========================================================================
 
   if (
+    includeCenterCrop &&
     enhancedResult.centerCrop
   ) {
 
@@ -378,6 +387,8 @@ export function buildGPTImagePayload(
 
         url:
           `data:${mime};base64,${enhancedResult.centerCrop.toString('base64')}`,
+
+        detail: imageDetail,
       },
     });
   }
@@ -396,6 +407,7 @@ export function buildGPTImagePayload(
       image_url: {
         url:
           `data:${mime};base64,${tile.buffer.toString('base64')}`,
+        detail: imageDetail,
       },
     });
   }

@@ -36,6 +36,7 @@ export function sanitizeHematologyLanguage(result = {}) {
     limitedField &&
     !hasPopulationSignal
   ) {
+    // BE-FIX — preserve morphology; sanitize only unsafe global inference.
     result.normalityBlocked = true;
     result.requiresHumanReview = true;
     result.morphologicRiskClass = "CLASS_1_LIMITED_FIELD";
@@ -47,49 +48,33 @@ export function sanitizeHematologyLanguage(result = {}) {
         "Campo microscópico limitado",
         "Baixa representatividade celular",
         "Não afirmar normalidade global",
+        "Não converter não visualização em exclusão global",
       ]),
     ];
 
-    result.riskLevel =
-      result.findings?.parasiteSuspected === true
-        ? "Campo limitado com achado parasitário suspeito"
-        : "Classificação morfológica indeterminada";
+    result.riskLevel = result.riskLevel || "Campo limitado";
 
+    // Keep upstream morphologyAnalysis/whatAISees/hematologicReasoning intact.
+    // Add only missing safety context.
     result.morphologyAnalysis.overview =
-      "Campo microscópico limitado para conclusão morfológica global. A baixa representatividade celular impede afirmar morfologia preservada, estado hematológico normal ou padrão populacional sustentado.";
-
-    result.morphologyAnalysis.erythrocyteReview =
-      "Avaliação eritrocitária limitada ao campo enviado. Não afirmar normocitose, normocromia ou preservação eritrocitária global pela imagem isolada.";
-
-    result.morphologyAnalysis.leukocyteReview =
-      "Avaliação leucocitária limitada pela representatividade do campo. A imagem isolada não permite caracterização populacional confiável nem exclusão global de células imaturas.";
-
-    result.morphologyAnalysis.plateletReview =
-      "Avaliação plaquetária limitada pela representatividade do campo. Não afirmar número adequado ou preservação plaquetária global.";
-
+      result.morphologyAnalysis.overview ||
+      "Campo limitado para conclusão global; preservar os achados morfológicos observados sem generalizá-los para toda a lâmina.";
     result.morphologyAnalysis.summary =
-      "Avaliação leucocitária limitada pela representatividade do campo. A imagem isolada não permite caracterização populacional confiável nem exclusão global de células imaturas."
-    result.interpretiveSynthesis =
-      "A baixa representatividade celular limita a interpretação. O campo analisado não demonstra blastos inequívocos ou células imaturas críticas, porém não permite conclusão global sobre normalidade hematológica.";
+      result.morphologyAnalysis.summary ||
+      "Campo limitado: achados morfológicos observados preservados, com representatividade insuficiente para conclusão populacional global.";
+    result.morphologyAnalysis.absentFindings =
+      result.morphologyAnalysis.absentFindings ||
+      "A não visualização de um elemento neste campo não permite sua exclusão global na lâmina.";
 
-    result.clinicalMeaning =
-      "Campo limitado. A imagem isolada não permite afirmar estado hematológico normal ou morfologia preservada global. Recomenda-se correlação com hemograma completo, dados clínicos e revisão microscópica profissional.";
-
-    result.hematologicReasoning = {
-      whatISee:
-        "Avaliação leucocitária limitada pela representatividade do campo. A imagem isolada não permite caracterização populacional confiável nem exclusão global de células imaturas.",
-      whatItResembles:
-        "Campo limitado para avaliação populacional. Não há base suficiente para afirmar padrão normal, reacional ou clonal sustentado.",
-      whatICannotConfirm:
-        "Não é possível confirmar normalidade global, morfologia preservada, estado hematológico normal, clonalidade, malignidade ou diagnóstico definitivo pela imagem isolada.",
-      finalInterpretation:
-        "Avaliação leucocitária limitada pela representatividade do campo. A imagem isolada não permite caracterização populacional confiável nem exclusão global de células imaturas."
-    };
+    result.interpretiveSynthesis = result.interpretiveSynthesis ||
+      "A baixa representatividade limita inferências populacionais, mas não invalida os achados morfológicos positivos observados no campo.";
+    result.clinicalMeaning = result.clinicalMeaning ||
+      "Campo limitado. Correlacionar os achados observados com hemograma completo, múltiplos campos e revisão microscópica profissional.";
 
     result.overallAssessment.requiresHumanReview = true;
     result.overallAssessment.riskCategory = "CLASS_1_LIMITED_FIELD";
     result.overallAssessment.mainImpression =
-      result.morphologyAnalysis.summary;
+      result.overallAssessment.mainImpression || result.morphologyAnalysis.summary;
   }
 
   if (hasPopulationSignal && !limitedField) {
