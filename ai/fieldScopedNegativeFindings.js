@@ -252,6 +252,10 @@ export function applyFieldScopedNegativeFindings(result = {}) {
     rule:
       "NOT_OBSERVED_IN_EVALUABLE_FIELD != ABSENT_IN_SPECIMEN",
     globalNegativeExclusionAllowed: false,
+    // FA-005.12.1 — presentation-level qualifier. The legacy per-item
+    // qualifier remains intact for BE-FIX-005.5.3 contract compatibility.
+    globalQualifier:
+      "A não identificação desses elementos no campo analisado não permite excluir sua presença em outras áreas da lâmina.",
     items: statuses,
   };
 
