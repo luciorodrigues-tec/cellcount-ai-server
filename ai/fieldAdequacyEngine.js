@@ -39,6 +39,83 @@ function hasLocalMorphologyEvidence(analysis = {}) {
   return Object.keys(lme).length > 0;
 }
 
+// BE-FIX-005.11 — parasite suspicion must be evidence-positive.
+// Lexical mentions such as "no parasites", "hemoparasite not assessable" or
+// generic "unusual structure" are not positive parasite evidence.
+function isNegatedOrIndeterminateParasiteText(value = "") {
+  const text = normalizeText(value);
+  if (!text) return false;
+
+  return [
+    "nao ha",
+    "nao foram",
+    "nao foi",
+    "nao observado",
+    "nao observada",
+    "nao observados",
+    "nao observadas",
+    "nao identificado",
+    "nao identificada",
+    "nao identificaveis",
+    "ausente",
+    "sem evidencia",
+    "not assessable",
+    "not_assessable",
+    "not observed",
+    "not_observed",
+    "indeterminado",
+    "indeterminada",
+  ].some((term) => text.includes(term));
+}
+
+function hasExplicitPositiveParasiteEvidence(analysis = {}) {
+  const lme = asObject(analysis?.localMorphologyEvidence);
+  const critical = asObject(lme?.criticalMorphology);
+  const findings = asObject(analysis?.findings);
+
+  if (critical.parasites === "OBSERVED") return true;
+
+  // A structured upstream positive flag remains valid only when it is not
+  // contradicted by canonical LME tri-state evidence.
+  if (
+    findings.parasiteSuspected === true &&
+    critical.parasites !== "NOT_OBSERVED_IN_EVALUABLE_FIELD" &&
+    critical.parasites !== "NOT_ASSESSABLE"
+  ) {
+    return true;
+  }
+
+  const positiveSources = [
+    ...(Array.isArray(lme?.positiveEvidence) ? lme.positiveEvidence : []),
+    ...(Array.isArray(lme?.erythrocytes?.positiveFindings)
+      ? lme.erythrocytes.positiveFindings
+      : []),
+    ...(Array.isArray(lme?.leukocytes?.positiveFindings)
+      ? lme.leukocytes.positiveFindings
+      : []),
+  ];
+
+  return positiveSources.some((value) => {
+    const text = String(value || "");
+    if (isNegatedOrIndeterminateParasiteText(text)) return false;
+    return includesAny(text, [
+      "parasita",
+      "hemoparasita",
+      "plasmodium",
+      "babesia",
+      "trypanosoma",
+      "tripanossoma",
+      "tripomastigota",
+      "microfilaria",
+      "microfilária",
+      "cinetoplasto",
+      "membrana ondulante",
+      "intraeritrocitario",
+      "intraeritrocitário",
+    ]);
+  });
+}
+
 function buildAdequacyContract({
   visibleLeukocytes,
   singleCellConcern,
@@ -147,28 +224,12 @@ export function evaluateFieldAdequacy(analysis = {}) {
     "elemento extracelular",
   ]);
 
+  // BE-FIX-005.11:
+  // unusualStructureSignal and parasiteSignal are independent dimensions.
+  // Atypia/artifact/unusual structure may require review, but cannot be
+  // promoted to hemoparasite suspicion without explicit positive evidence.
   const parasiteSignal =
-    includesAny(raw, [
-      "parasita",
-      "hemoparasita",
-      "protozoario",
-      "protozoário",
-      "plasmodium",
-      "babesia",
-      "trypanosoma",
-      "tripanossoma",
-      "tripomastigota",
-      "microfilaria",
-      "microfilária",
-      "filaria",
-      "filária",
-      "flagelo",
-      "flagelado",
-      "membrana ondulante",
-      "cinetoplasto",
-      "intraeritrocitario",
-      "intraeritrocitário",
-    ]) || unusualStructureSignal;
+    hasExplicitPositiveParasiteEvidence(analysis);
 
   const singleCellConcern =
     includesAny(raw, [
@@ -238,11 +299,15 @@ export function applyFieldAdequacyRules(analysis = {}) {
     analysis.normalityBlocked = true;
     analysis.requiresHumanReview = true;
 
-    analysis.findings.parasiteSuspected = true;
-    analysis.findings.unusualStructureSuspected = true;
+    analysis.findings.parasiteSuspected =
+      fieldAdequacy.parasiteSignal === true;
+    analysis.findings.unusualStructureSuspected =
+      fieldAdequacy.unusualStructureSignal === true;
 
     analysis.riskLevel =
-      "Campo com estrutura incomum/hemoparasita suspeito";
+      fieldAdequacy.parasiteSignal
+        ? "Campo com evidência positiva suspeita para hemoparasita"
+        : "Campo com estrutura incomum/artefato a esclarecer";
 
     analysis.blockNormalReason = [
       ...new Set([
@@ -264,7 +329,9 @@ export function applyFieldAdequacyRules(analysis = {}) {
 
     analysis.overallAssessment.requiresHumanReview = true;
     analysis.overallAssessment.riskCategory =
-      "CLASS_2_UNUSUAL_HEMOPARASITE_STRUCTURE";
+      fieldAdequacy.parasiteSignal
+        ? "CLASS_2_HEMOPARASITE_SUSPICION"
+        : "CLASS_2_UNUSUAL_STRUCTURE";
 
     analysis.structuredReport.recommendation =
       analysis.structuredReport.recommendation ||

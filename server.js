@@ -155,6 +155,11 @@ import {
 } from "./ai/fieldScopedNegativeFindings.js";
 
 import {
+  applyEvidenceConsistentFinalMorphologySynthesis,
+  EVIDENCE_CONSISTENT_MORPHOLOGY_SYNTHESIS_VERSION,
+} from "./ai/evidenceConsistentMorphologySynthesis.js";
+
+import {
   PRODUCTION_VME_ENFORCEMENT_VERSION,
   LOCAL_MORPHOLOGY_ACQUISITION_RECOVERY_VERSION,
   assessVisualMorphologyEvidenceAcquisition,
@@ -6203,6 +6208,8 @@ app.get("/runtime-version", (_req, res) => {
     localMorphologyAcquisitionRecoveryVersion:
       LOCAL_MORPHOLOGY_ACQUISITION_RECOVERY_VERSION,
     finalAnalysisAssemblyRecoveryVersion: "BE-FIX-005.10",
+    evidenceConsistentMorphologySynthesisVersion:
+      EVIDENCE_CONSISTENT_MORPHOLOGY_SYNTHESIS_VERSION,
     vmeContract: "VME-1.0",
     model: OPENAI_MODEL,
     defaults: {
@@ -7690,6 +7697,15 @@ finalResult =
   projectAcademicMorphologyReasoningCompatibility(
     finalResult,
     finalAcademicMorphologyReasoning,
+  );
+
+// ============================================================================
+// BE-FIX-005.11 — FINAL EVIDENCE-CONSISTENT MORPHOLOGY SYNTHESIS
+// Canonical LME-1.0 is projected after all legacy narrative/governor layers.
+// ============================================================================
+finalResult =
+  applyEvidenceConsistentFinalMorphologySynthesis(
+    finalResult,
   );
 
 finalResult.academicMorphologyReasoningContract =
