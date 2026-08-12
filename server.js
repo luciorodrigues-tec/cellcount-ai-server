@@ -177,6 +177,11 @@ import {
 } from "./ai/reactiveLymphoidEvidenceSentinel.js";
 
 import {
+  CRA_001_1_VERSION,
+  attachClinicalResultV2,
+} from "./ai/clinicalResultV2/index.js";
+
+import {
   PRODUCTION_VME_ENFORCEMENT_VERSION,
   LOCAL_MORPHOLOGY_ACQUISITION_RECOVERY_VERSION,
   assessVisualMorphologyEvidenceAcquisition,
@@ -6156,6 +6161,8 @@ app.get("/runtime-version", (_req, res) => {
       PARASITE_EVIDENCE_SENTINEL_VERSION,
     reactiveLymphoidEvidenceSentinelVersion:
       REACTIVE_LYMPHOID_EVIDENCE_SENTINEL_VERSION,
+    canonicalClinicalResultArchitectureVersion:
+      CRA_001_1_VERSION,
     vmeContract: "VME-1.0",
     model: OPENAI_MODEL,
     defaults: {
@@ -7690,6 +7697,38 @@ finalResult =
   applyFieldScopedNegativeFindings(
     finalResult,
   );
+
+// ============================================================================
+// CRA-001.1 — CANONICAL CLINICAL TRUTH FOUNDATION
+// Runs only after 005.11 → 005.13 → 005.14 → 005.15 and the final field-
+// scoped negative rebuild. The legacy payload is preserved for compatibility;
+// clinicalResultV2 is the new additive canonical contract.
+// ============================================================================
+try {
+  finalResult =
+    attachClinicalResultV2(
+      finalResult,
+      {
+        specimenType,
+        analysisSource,
+      },
+    );
+} catch (craError) {
+  console.error(
+    "CRA-001.1 CANONICAL TRUTH BLOCKED DELIVERY:",
+    craError?.validation || craError,
+  );
+
+  return res.status(422).json({
+    success: false,
+    error:
+      "A validação canônica do resultado clínico bloqueou a entrega por inconsistência interna.",
+    errorCode:
+      craError?.code || "CRA_CANONICAL_TRUTH_INVALID",
+    clinicalResultV2Validation:
+      craError?.validation || null,
+  });
+}
 
 finalResult.academicMorphologyReasoningContract =
   finalAcademicMorphologyReasoningContract;
