@@ -56,6 +56,10 @@ function stateFromCanonicalStatus(value, {
     return ClinicalEvidenceState.OBSERVED;
   }
 
+  if (["SUSPICIOUS", "SUSPECTED", "POSSIBLE", "SUSPICIOUS_INDETERMINATE"].includes(token)) {
+    return ClinicalEvidenceState.SUSPICIOUS_INDETERMINATE;
+  }
+
   if (
     [
       "NOT_OBSERVED",
@@ -151,20 +155,33 @@ function buildBlastTruth(result) {
   const finding = findStructuredItem(result, [
     "blastLike",
     "blasts",
-    "blastSuspicion",
     "blastLikeCells",
   ]);
 
   const findingObject = asObject(finding);
 
+  // BE-FIX-005.16 — do not collapse suspicion into confirmed observation.
+  const sentinelState = normalizeToken(sentinel.evidenceState);
   const observed =
-    sentinel.triggered === true ||
-    sentinel.alert === true ||
-    result.findings?.blastSuspicion === true ||
-    result.findings?.immatureCells === true && result.finalClassification === "CLASS_4_BLAST_SUSPICION" ||
+    sentinelState === "OBSERVED" ||
+    sentinel.certainty === "USER_RECORDED_BLAST" ||
+    sentinel.certainty === "VISUAL_BLAST_LIKE_MORPHOLOGY" ||
     finding === true ||
     findingObject.observed === true ||
     normalizeToken(findingObject.state || findingObject.status) === "OBSERVED";
+
+  const suspicious =
+    sentinelState === "SUSPICIOUS_INDETERMINATE" ||
+    result.findings?.blastSuspicion === true ||
+    result.blastSuspicion === true ||
+    ["SUSPICIOUS", "SUSPECTED", "POSSIBLE", "SUSPICIOUS_INDETERMINATE"].includes(
+      normalizeToken(
+        findingObject.state ||
+        findingObject.status ||
+        result.findings?.blastEvidenceState ||
+        result.blastEvidenceState,
+      ),
+    );
 
   const adequate =
     result.fieldAdequacy?.adequateForBlastScreening === true ||
@@ -178,14 +195,18 @@ function buildBlastTruth(result) {
       normalizeToken(findingObject.state || findingObject.status),
     );
 
-  const state = stateFromCanonicalStatus(
-    findingObject.state || findingObject.status,
-    {
-      observedBooleans: [observed],
-      notObservedBooleans: [explicitNotObserved],
-      assessable: adequate,
-    },
-  );
+  const state = observed
+    ? ClinicalEvidenceState.OBSERVED
+    : suspicious
+      ? ClinicalEvidenceState.SUSPICIOUS_INDETERMINATE
+      : stateFromCanonicalStatus(
+          findingObject.state || findingObject.status || result.findings?.blastEvidenceState || result.blastEvidenceState,
+          {
+            observedBooleans: [observed],
+            notObservedBooleans: [explicitNotObserved],
+            assessable: adequate,
+          },
+        );
 
   return createEvidenceItem({
     state,
@@ -201,10 +222,12 @@ function buildBlastTruth(result) {
       lme.positiveEvidence,
     ),
     scope: "FIELD_LOCAL",
-    requiresReview: state === ClinicalEvidenceState.OBSERVED,
+    requiresReview: [ClinicalEvidenceState.OBSERVED, ClinicalEvidenceState.SUSPICIOUS_INDETERMINATE].includes(state),
     severity:
       state === ClinicalEvidenceState.OBSERVED
         ? ClinicalSeverity.CRITICAL
+        : state === ClinicalEvidenceState.SUSPICIOUS_INDETERMINATE
+          ? ClinicalSeverity.HIGH
         : state === ClinicalEvidenceState.NOT_ASSESSABLE
           ? ClinicalSeverity.INDETERMINATE
           : ClinicalSeverity.NONE,
@@ -462,7 +485,7 @@ export function buildCanonicalClinicalTruth(result = {}, {
       field.adequateForLeukocyteAnalysis === true ||
       Boolean(wbcDescription),
     positive:
-      blastLike.state === ClinicalEvidenceState.OBSERVED ||
+      [ClinicalEvidenceState.OBSERVED, ClinicalEvidenceState.SUSPICIOUS_INDETERMINATE].includes(blastLike.state) ||
       result.findings?.atypicalLymphocytes === true ||
       result.findings?.largeMononuclearCells === true ||
       result.findings?.reactiveLymphocytes === true ||
@@ -507,6 +530,8 @@ export function buildCanonicalClinicalTruth(result = {}, {
   const severity =
     blastLike.state === ClinicalEvidenceState.OBSERVED
       ? ClinicalSeverity.CRITICAL
+      : blastLike.state === ClinicalEvidenceState.SUSPICIOUS_INDETERMINATE
+        ? ClinicalSeverity.HIGH
       : parasiteArtifact.parasite.state === ClinicalEvidenceState.OBSERVED
         ? ClinicalSeverity.HIGH
         : result.morphologicRiskClass === "CLASS_5_HIGH_NEOPLASTIC_SUSPICION"

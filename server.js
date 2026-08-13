@@ -1611,8 +1611,11 @@ function normalizeMedicalResponse(
     );
   }
 
+  const blastEvidenceState = String(findings?.blastEvidenceState || data?.blastEvidenceState || '').toUpperCase();
+
   if (
-    findings?.blastSuspicion !== true
+    findings?.blastSuspicion !== true &&
+    !['OBSERVED', 'SUSPICIOUS_INDETERMINATE', 'SUSPICIOUS', 'SUSPECTED'].includes(blastEvidenceState)
   ) {
     negativeFindingsStructured.push(
       "Blastos inequívocos não identificados entre as células suficientemente avaliáveis neste campo. Esta observação não permite exclusão global na lâmina."
@@ -1787,6 +1790,10 @@ function normalizeMedicalResponse(
 
       blastSuspicion:
         normalizeBoolean(findings.blastSuspicion),
+
+      blastEvidenceState:
+        String(findings.blastEvidenceState || data.blastEvidenceState || '').trim().toUpperCase() ||
+        (normalizeBoolean(findings.blastSuspicion) ? 'SUSPICIOUS_INDETERMINATE' : 'NOT_ASSESSABLE'),
     },
 
     morphologyAnalysis: {
@@ -3515,10 +3522,16 @@ Responda SOMENTE JSON válido em português do Brasil.
     6. ATYPICAL_LYMPHOCYTE_UNCLASSIFIED:
     célula mononuclear atípica sem elementos suficientes para subtipo seguro, especialmente em campo limitado.
 
-    DIFERENCIAÇÃO CONTRA BLASTO:
-    Só marcar blastSuspicion=true se houver conjunto convincente:
-    alta relação núcleo/citoplasma, cromatina frouxa, nucléolos evidentes, contorno nuclear imaturo e ausência de maturação.
-    Na dúvida, marcar blastSuspicion=false e usar ATYPICAL_LYMPHOCYTE_UNCLASSIFIED.
+    DIFERENCIAÇÃO CONTRA BLASTO — REGRA DE SEGURANÇA:
+    Avaliar explicitamente cada célula mononuclear atípica contra blasto/blastoide.
+    Usar blastEvidenceState com exatamente um destes valores:
+    OBSERVED, SUSPICIOUS_INDETERMINATE, NOT_OBSERVED_IN_EVALUABLE_FIELD, NOT_ASSESSABLE.
+    OBSERVED: morfologia blástica/blastoide diretamente sustentada.
+    SUSPICIOUS_INDETERMINATE: há traços imaturos/blastoides ou a distinção entre linfócito reacional/atípico e blasto não é segura, inclusive quando cromatina, nucléolos, relação N:C ou maturação não são plenamente avaliáveis.
+    NOT_OBSERVED_IN_EVALUABLE_FIELD: somente quando as células relevantes estão suficientemente avaliáveis e não há sinal blástico/blastoide nem dúvida morfológica pertinente.
+    NOT_ASSESSABLE: qualidade/representatividade não permite pesquisa adequada.
+    blastSuspicion=true para OBSERVED ou SUSPICIOUS_INDETERMINATE.
+    Nunca converter dúvida blástica em blastSuspicion=false. Nunca usar ATYPICAL_LYMPHOCYTE_UNCLASSIFIED para apagar um diferencial blástico ainda aberto.
 
     Avaliar:
     1. Qualidade da imagem.
@@ -3735,7 +3748,7 @@ Responda SOMENTE JSON válido em português do Brasil.
     Nunca inferir características não visualizadas.
 
     Dentro de findings incluir obrigatoriamente:
-    reactiveLymphocytes, atypicalLymphocytes, largeMononuclearCells, atypicalLymphocyteSubtype, downeyLikeCells, downeyType, plasmacytoidCells, plasmocytes, plasmablasts, monomorphicPopulation, immatureCells, blastSuspicion.
+    reactiveLymphocytes, atypicalLymphocytes, largeMononuclearCells, atypicalLymphocyteSubtype, downeyLikeCells, downeyType, plasmacytoidCells, plasmocytes, plasmablasts, monomorphicPopulation, immatureCells, blastSuspicion, blastEvidenceState.
 
     Valores aceitos para atypicalLymphocyteSubtype:
     none, REACTIVE_LYMPHOCYTE_TYPICAL, DOWNEY_TYPE_I, DOWNEY_TYPE_II, DOWNEY_TYPE_III_IMMUNOBLASTOID, PLASMACYTOID_LYMPHOCYTE, ATYPICAL_LYMPHOCYTE_UNCLASSIFIED.

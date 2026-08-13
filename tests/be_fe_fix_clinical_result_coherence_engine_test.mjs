@@ -44,7 +44,7 @@ const narrative = {
   recommendedNextSteps: ["Revisão microscópica por profissional habilitado."],
 };
 
-test("PASS 0 — CRCE version registered", () => assert.equal(CLINICAL_RESULT_COHERENCE_ENGINE_VERSION, "CRCE-1.3"));
+test("PASS 0 — CRCE version registered", () => assert.equal(CLINICAL_RESULT_COHERENCE_ENGINE_VERSION, "CRCE-1.4"));
 test("PASS 1 — artifact cannot promote parasite", () => {
   const p = buildClinicalResultCoherenceProjection(truth(), narrative);
   assert.equal(p.criticalFindings.parasiteSuspicionAllowed, false);
@@ -147,4 +147,40 @@ test("PASS 12 — governed reactive sentinel cannot be overridden by legacy reac
   });
   assert.equal(canonical.patternInterpretation.reactiveLymphoid.supported, false);
   assert.equal(canonical.patternInterpretation.mononucleosisPattern.supported, false);
+});
+
+test("PASS 13 — suspicious blast-like evidence is preserved and never rendered as negative", () => {
+  const canonical = buildCanonicalClinicalTruth({
+    fieldAdequacy: { limitedField: true, adequateForBlastScreening: true, visibleLeukocytes: 6 },
+    findings: {
+      atypicalLymphocytes: true,
+      largeMononuclearCells: true,
+      blastSuspicion: true,
+      blastEvidenceState: "SUSPICIOUS_INDETERMINATE",
+    },
+    singleBlastSentinel: {
+      active: true,
+      certainty: "VISUAL_BLAST_SUSPICION",
+      evidenceState: "SUSPICIOUS_INDETERMINATE",
+    },
+    requiresHumanReview: true,
+  });
+  assert.equal(canonical.criticalFindings.blastLike.state, ClinicalEvidenceState.SUSPICIOUS_INDETERMINATE);
+  assert.equal(canonical.criticalFindings.blastLike.requiresReview, true);
+  const p = buildClinicalResultCoherenceProjection(canonical, narrative);
+  assert.equal(p.criticalFindings.blastLike, "SUSPICIOUS_INDETERMINATE");
+  assert.equal(p.morphologyClass.code, "SUSPICIOUS_BLAST_LIKE_FINDING");
+  assert.equal(p.riskTier.level, "HIGH");
+  assert.ok(!p.criticalNegatives.items.some((item) => /blasto/i.test(item)));
+});
+
+test("PASS 14 — explicit evaluable negative remains negative when no suspicion exists", () => {
+  const canonical = buildCanonicalClinicalTruth({
+    fieldAdequacy: { adequateForBlastScreening: true, visibleLeukocytes: 6 },
+    findings: {
+      blastSuspicion: false,
+      blastEvidenceState: "NOT_OBSERVED_IN_EVALUABLE_FIELD",
+    },
+  });
+  assert.equal(canonical.criticalFindings.blastLike.state, ClinicalEvidenceState.NOT_OBSERVED_IN_EVALUABLE_FIELD);
 });

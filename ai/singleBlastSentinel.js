@@ -99,6 +99,7 @@ function detectSingleBlastSignal(result = {}) {
       source: "MANUAL_OR_HYBRID_COUNT",
       observedCount: manualBlastCount,
       certainty: "USER_RECORDED_BLAST",
+      evidenceState: "OBSERVED",
     };
   }
 
@@ -109,6 +110,7 @@ function detectSingleBlastSignal(result = {}) {
       observedCount: 1,
       minimumObservedCount: 1,
       certainty: "VISUAL_BLAST_LIKE_MORPHOLOGY",
+      evidenceState: "OBSERVED",
     };
   }
 
@@ -121,6 +123,7 @@ function detectSingleBlastSignal(result = {}) {
       observedCount: null,
       minimumObservedCount: 1,
       certainty: "VISUAL_BLAST_SUSPICION",
+      evidenceState: "SUSPICIOUS_INDETERMINATE",
     };
   }
 
@@ -136,6 +139,7 @@ function detectSingleBlastSignal(result = {}) {
       observedCount: null,
       minimumObservedCount: 1,
       certainty: "VISUAL_BLAST_SUSPICION",
+      evidenceState: "SUSPICIOUS_INDETERMINATE",
     };
   }
 
@@ -147,6 +151,7 @@ function detectSingleBlastSignal(result = {}) {
       observedCount: Math.trunc(yoloBlastCount),
       minimumObservedCount: 1,
       certainty: "COMPUTER_VISION_BLAST_SUSPICION",
+      evidenceState: "SUSPICIOUS_INDETERMINATE",
     };
   }
 
@@ -156,6 +161,7 @@ function detectSingleBlastSignal(result = {}) {
     observedCount: manualBlastCount,
     minimumObservedCount: 0,
     certainty: "NO_POSITIVE_BLAST_SIGNAL",
+    evidenceState: null,
   };
 }
 
@@ -171,6 +177,7 @@ export function applySingleBlastSentinel(result = {}) {
     observedCount: signal.observedCount,
     minimumObservedCount: signal.minimumObservedCount ?? 0,
     certainty: signal.certainty,
+    evidenceState: signal.evidenceState,
     rule: "ONE_BLAST_OR_BLAST_LIKE_SIGNAL_TRIGGERS_ALERT",
     diagnosticConclusionAllowed: false,
   };

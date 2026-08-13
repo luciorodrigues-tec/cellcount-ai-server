@@ -82,7 +82,7 @@ export function validateCanonicalClinicalTruth(truth = {}) {
   }
 
   if (
-    truth.criticalFindings?.blastLike?.state === ClinicalEvidenceState.OBSERVED &&
+    [ClinicalEvidenceState.OBSERVED, ClinicalEvidenceState.SUSPICIOUS_INDETERMINATE].includes(truth.criticalFindings?.blastLike?.state) &&
     truth.review?.required !== true
   ) {
     errors.push(issue(
@@ -93,7 +93,7 @@ export function validateCanonicalClinicalTruth(truth = {}) {
   }
 
   if (
-    truth.criticalFindings?.blastLike?.state === ClinicalEvidenceState.OBSERVED &&
+    [ClinicalEvidenceState.OBSERVED, ClinicalEvidenceState.SUSPICIOUS_INDETERMINATE].includes(truth.criticalFindings?.blastLike?.state) &&
     !["URGENT", "PRIORITY"].includes(truth.review?.urgency)
   ) {
     errors.push(issue(

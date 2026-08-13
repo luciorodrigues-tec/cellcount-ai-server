@@ -12,7 +12,7 @@ import {
   ClinicalSeverity,
 } from "./clinicalEvidenceState.js";
 
-export const CLINICAL_RESULT_COHERENCE_ENGINE_VERSION = "CRCE-1.3";
+export const CLINICAL_RESULT_COHERENCE_ENGINE_VERSION = "CRCE-1.4";
 
 function clean(value) {
   return typeof value === "string" ? value.replace(/\s+/g, " ").trim() : "";
@@ -26,6 +26,8 @@ function evidenceLabel(item) {
   switch (item?.state) {
     case ClinicalEvidenceState.OBSERVED:
       return "OBSERVED";
+    case ClinicalEvidenceState.SUSPICIOUS_INDETERMINATE:
+      return "SUSPICIOUS_INDETERMINATE";
     case ClinicalEvidenceState.NOT_OBSERVED_IN_EVALUABLE_FIELD:
       return "NOT_OBSERVED_IN_EVALUABLE_FIELD";
     default:
@@ -46,6 +48,15 @@ function morphologyClass(truth) {
       label: "Achado blástico/blastoide",
       category: "CRITICAL_FINDING",
       severity: ClinicalSeverity.CRITICAL,
+    };
+  }
+
+  if (blast?.state === ClinicalEvidenceState.SUSPICIOUS_INDETERMINATE) {
+    return {
+      code: "SUSPICIOUS_BLAST_LIKE_FINDING",
+      label: "Suspeita blástica/blastoide",
+      category: "CRITICAL_DIFFERENTIAL",
+      severity: ClinicalSeverity.HIGH,
     };
   }
 
@@ -104,6 +115,7 @@ function morphologyClass(truth) {
 
 function highestSeverity(truth, morphology) {
   if (morphology.code === "CRITICAL_BLAST_LIKE_FINDING") return ClinicalSeverity.CRITICAL;
+  if (morphology.code === "SUSPICIOUS_BLAST_LIKE_FINDING") return ClinicalSeverity.HIGH;
   if (
     morphology.code === "STRUCTURED_PARASITE_EVIDENCE" ||
     morphology.code === "SUSTAINED_ATYPICAL_POPULATION"
