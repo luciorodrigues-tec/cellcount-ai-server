@@ -1,6 +1,6 @@
 // ============================================================================
 // GLOBAL PATTERN ENGINE
-// CELLCOUNT HEMATOLOGY AI — V2 / BE-FIX-005.15
+// CELLCOUNT HEMATOLOGY AI — V2 / BE-FIX-005.16
 // Evidence-grounded global pattern classification.
 // ============================================================================
 
@@ -27,7 +27,14 @@ export function analyzeGlobalPattern(result = {}) {
     evaluateReactiveLymphoidEvidence(result);
 
   const reactivePattern =
-    reactiveEvidence.reactivePatternSupported === true;
+    reactiveEvidence.reactivePatternSupported === true &&
+    reactiveEvidence.reactiveClassificationAllowed !== false;
+
+  const blastAssessmentIndeterminate =
+    reactiveEvidence.blastAssessable === false ||
+    result.singleBlastSentinel?.negativeEvidenceState === "NOT_ASSESSABLE" ||
+    result.localMorphologyEvidence?.criticalMorphology?.blastLikeMorphology ===
+      "NOT_ASSESSABLE";
 
   const atypical =
     findings.atypicalLymphocytes === true ||
@@ -74,6 +81,12 @@ export function analyzeGlobalPattern(result = {}) {
 
   if (blastLike) {
     dominantPattern = "IMMATURE_OR_BLAST_LIKE_PATTERN";
+  } else if (
+    blastAssessmentIndeterminate &&
+    (atypical || reactiveEvidence.reactivePatternSupported === true)
+  ) {
+    dominantPattern =
+      "ATYPICAL_MONONUCLEAR_PATTERN_BLAST_ASSESSMENT_INDETERMINATE";
   } else if (monomorphic) {
     dominantPattern = "MONOMORPHIC_MONONUCLEAR_POPULATION";
   } else if (reactivePattern) {
@@ -92,18 +105,24 @@ export function analyzeGlobalPattern(result = {}) {
     normalityBlocked: !physiologicAppearance,
     normalityReason: reasons,
     reactiveEvidence,
+    blastAssessmentIndeterminate,
     globalSummary: physiologicAppearance
       ? "Padrão global sem alterações morfológicas relevantes no campo analisado."
       : (
-          reactivePattern
-            ? "Padrão linfoide reacional morfologicamente sustentado no campo analisado; etiologia específica depende de correlação."
-            : "A avaliação global identifica alteração morfológica não plenamente fisiológica, sem promover padrão reacional além da evidência visual disponível."
+          blastAssessmentIndeterminate &&
+          (atypical || reactiveEvidence.reactivePatternSupported === true)
+            ? "Alteração mononuclear atípica/reacional possível, porém a exclusão morfológica de blastos é indeterminada neste campo."
+            : (
+                reactivePattern
+                  ? "Padrão linfoide reacional morfologicamente sustentado no campo analisado; etiologia específica depende de correlação."
+                  : "A avaliação global identifica alteração morfológica não plenamente fisiológica, sem promover padrão reacional além da evidência visual disponível."
+              )
         ),
     globalInterpretation:
       morphology.overview ||
       morphology.summary ||
       "",
-    ruleVersion: "GLOBAL_PATTERN_ENGINE_V2_BE_FIX_005_15",
+    ruleVersion: "GLOBAL_PATTERN_ENGINE_V2_BE_FIX_005_16",
   };
 }
 

@@ -13,6 +13,7 @@
 // ============================================================================
 
 export const REACTIVE_LYMPHOID_EVIDENCE_SENTINEL_VERSION = "BE-FIX-005.15";
+export const REACTIVE_BLAST_ASSESSABILITY_GATE_VERSION = "BE-FIX-005.16";
 
 function asObject(value) {
   return value && typeof value === "object" && !Array.isArray(value)
@@ -153,6 +154,21 @@ export function evaluateReactiveLymphoidEvidence(result = {}) {
       explicitAtypical
     );
 
+  const blastAssessability =
+    asObject(result.fieldAdequacy?.blastAssessability);
+
+  const blastAssessable =
+    blastAssessability.adequateForBlastScreening === true ||
+    result.fieldAdequacy?.adequateForBlastScreening === true ||
+    result.localMorphologyEvidence?.criticalMorphology
+      ?.blastAssessability?.adequateForBlastScreening === true;
+
+  // BE-FIX-005.16: reactive morphology may be described, but a reactive
+  // population classification must not become an implicit blast exclusion
+  // when fine nuclear detail is not assessable.
+  const reactiveClassificationAllowed =
+    reactivePatternSupported && blastAssessable;
+
   return {
     version: REACTIVE_LYMPHOID_EVIDENCE_SENTINEL_VERSION,
     explicitReactive,
@@ -165,6 +181,10 @@ export function evaluateReactiveLymphoidEvidence(result = {}) {
     reactivePatternSupported,
     mononucleosisPatternSupported,
     isolatedAtypicalMononuclearSignal,
+    blastAssessabilityGateVersion:
+      REACTIVE_BLAST_ASSESSABILITY_GATE_VERSION,
+    blastAssessable,
+    reactiveClassificationAllowed,
   };
 }
 
@@ -243,7 +263,10 @@ export function applyReactiveLymphoidEvidenceSentinel(result = {}) {
   result.overallAssessment = asObject(result.overallAssessment);
   result.structuredReport = asObject(result.structuredReport);
 
-  if (assessment.reactivePatternSupported) {
+  if (
+    assessment.reactivePatternSupported &&
+    assessment.reactiveClassificationAllowed
+  ) {
     result.reactiveLymphoidPattern = true;
 
     if (!assessment.mononucleosisPatternSupported) {
@@ -263,6 +286,65 @@ export function applyReactiveLymphoidEvidenceSentinel(result = {}) {
         );
     }
 
+    return result;
+  }
+
+  // BE-FIX-005.16: morphology can look reactive while blast exclusion remains
+  // non-assessable. Keep the observation, but do not promote a population-level
+  // reactive classification that could falsely reassure downstream consumers.
+  if (
+    assessment.reactivePatternSupported &&
+    !assessment.reactiveClassificationAllowed
+  ) {
+    result.reactiveLymphoidPattern = false;
+    result.mononucleosisSuspicion = false;
+    result.normalityBlocked = true;
+    result.requiresHumanReview = true;
+    result.overallAssessment = asObject(result.overallAssessment);
+    result.overallAssessment.requiresHumanReview = true;
+    result.blastAssessabilityReactiveGate = {
+      version: REACTIVE_BLAST_ASSESSABILITY_GATE_VERSION,
+      active: true,
+      reason:
+        "Morfologia reacional possível, porém detalhe nuclear insuficiente para exclusão morfológica segura de blastos.",
+    };
+
+    result.patternRecognition = asObject(result.patternRecognition);
+    result.patternRecognition.leukocytePattern =
+      "Reactive-appearing atypical mononuclear morphology with blast assessment indeterminate";
+    result.patternRecognition.overallPattern =
+      "Atypical/reactive-appearing mononuclear finding with blast assessment indeterminate";
+
+    const gatedText =
+      "Morfologia mononuclear com características reacionais pode estar presente, porém o campo não é avaliável com segurança para exclusão morfológica de blastos; requer revisão microscópica de múltiplos campos.";
+
+    result.interpretiveSynthesis = gatedText;
+    result.clinicalMeaning = gatedText;
+    result.mainFinding = gatedText;
+    result.primaryFinding = gatedText;
+    result.finalConclusion = gatedText;
+
+    result.structuredReport = asObject(result.structuredReport);
+    result.structuredReport.conclusion = gatedText;
+    result.structuredReport.hematologicMeaning = gatedText;
+
+    if (
+      !result.finalClassification ||
+      result.finalClassification === "CLASS_0_NORMAL" ||
+      String(result.finalClassification).includes("REACTIVE")
+    ) {
+      result.finalClassification =
+        "CLASS_1_LIMITED_FIELD_ATYPICAL_CELL_BLAST_INDETERMINATE";
+    }
+    if (
+      !result.morphologicRiskClass ||
+      result.morphologicRiskClass === "CLASS_0_NORMAL" ||
+      String(result.morphologicRiskClass).includes("REACTIVE")
+    ) {
+      result.morphologicRiskClass =
+        "CLASS_1_LIMITED_FIELD_ATYPICAL_CELL_BLAST_INDETERMINATE";
+    }
+    result.overallAssessment.riskCategory = result.morphologicRiskClass;
     return result;
   }
 

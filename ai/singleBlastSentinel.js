@@ -14,6 +14,7 @@
 // ============================================================================
 
 export const SINGLE_BLAST_SENTINEL_VERSION = "BE-FIX-005.13";
+export const BLAST_ASSESSABILITY_SENTINEL_VERSION = "BE-FIX-005.16";
 
 function asObject(value) {
   return value && typeof value === "object" && !Array.isArray(value)
@@ -169,6 +170,24 @@ export function applySingleBlastSentinel(result = {}) {
   if (!result || typeof result !== "object") return result;
 
   const signal = detectSingleBlastSignal(result);
+  const critical = asObject(result.localMorphologyEvidence?.criticalMorphology);
+  const fieldGate = asObject(result.fieldAdequacy?.blastAssessability);
+  const lmeGate = asObject(critical.blastAssessability);
+
+  const blastAssessable =
+    fieldGate.adequateForBlastScreening === true ||
+    lmeGate.adequateForBlastScreening === true ||
+    result.fieldAdequacy?.adequateForBlastScreening === true;
+
+  const blastNegativeState =
+    signal.active
+      ? signal.evidenceState
+      : (
+          critical.blastLikeMorphology === "NOT_OBSERVED_IN_EVALUABLE_FIELD" &&
+          blastAssessable
+            ? "NOT_OBSERVED_IN_EVALUABLE_FIELD"
+            : "NOT_ASSESSABLE"
+        );
 
   result.singleBlastSentinel = {
     version: SINGLE_BLAST_SENTINEL_VERSION,
@@ -180,9 +199,31 @@ export function applySingleBlastSentinel(result = {}) {
     evidenceState: signal.evidenceState,
     rule: "ONE_BLAST_OR_BLAST_LIKE_SIGNAL_TRIGGERS_ALERT",
     diagnosticConclusionAllowed: false,
+    assessabilityVersion: BLAST_ASSESSABILITY_SENTINEL_VERSION,
+    blastAssessable,
+    negativeEvidenceState: blastNegativeState,
+    negativeBlastConclusionAllowed:
+      !signal.active &&
+      blastAssessable &&
+      blastNegativeState === "NOT_OBSERVED_IN_EVALUABLE_FIELD",
   };
 
-  if (!signal.active) return result;
+  if (!signal.active) {
+    if (!blastAssessable) {
+      result.requiresHumanReview = true;
+      result.normalityBlocked = true;
+      result.blockNormalReason = Array.isArray(result.blockNormalReason)
+        ? result.blockNormalReason
+        : [];
+      result.blockNormalReason = [
+        ...new Set([
+          ...result.blockNormalReason,
+          "Triagem morfológica de blastos não avaliável com segurança neste campo",
+        ]),
+      ];
+    }
+    return result;
+  }
 
   result.findings = asObject(result.findings);
   result.findings.blastSuspicion = true;

@@ -11,6 +11,7 @@
 // ============================================================================
 
 export const FIELD_ADEQUACY_CONTRACT_VERSION = "FA-4.0";
+export const BLAST_ASSESSABILITY_GATE_VERSION = "BE-FIX-005.16";
 
 function normalizeText(value = "") {
   return String(value || "")
@@ -39,81 +40,117 @@ function hasLocalMorphologyEvidence(analysis = {}) {
   return Object.keys(lme).length > 0;
 }
 
-// BE-FIX-005.11 — parasite suspicion must be evidence-positive.
-// Lexical mentions such as "no parasites", "hemoparasite not assessable" or
-// generic "unusual structure" are not positive parasite evidence.
-function isNegatedOrIndeterminateParasiteText(value = "") {
+function meaningfulMorphologyText(value) {
   const text = normalizeText(value);
   if (!text) return false;
 
-  return [
-    "nao ha",
-    "nao foram",
-    "nao foi",
-    "nao observado",
-    "nao observada",
-    "nao observados",
-    "nao observadas",
-    "nao identificado",
-    "nao identificada",
-    "nao identificaveis",
-    "ausente",
-    "sem evidencia",
+  return ![
+    "nao avaliavel",
+    "não avaliável",
     "not assessable",
-    "not_assessable",
-    "not observed",
-    "not_observed",
     "indeterminado",
     "indeterminada",
-  ].some((term) => text.includes(term));
+    "nao determinado",
+    "não determinado",
+    "insuficiente",
+    "nao visivel",
+    "não visível",
+  ].some((term) => text.includes(normalizeText(term)));
 }
 
-function hasExplicitPositiveParasiteEvidence(analysis = {}) {
-  const lme = asObject(analysis?.localMorphologyEvidence);
-  const critical = asObject(lme?.criticalMorphology);
-  const findings = asObject(analysis?.findings);
+function evaluateBlastAssessability(analysis = {}, visibleLeukocytes = 0) {
+  const explicitField = asObject(analysis?.fieldAdequacy);
+  const rawField = asObject(analysis?.rawResponse?.fieldAdequacy);
+  const lmeWbc = asObject(analysis?.localMorphologyEvidence?.leukocytes);
+  const rawLmeWbc = asObject(
+    analysis?.rawResponse?.localMorphologyEvidence?.leukocytes,
+  );
 
-  if (critical.parasites === "OBSERVED") return true;
+  const explicitAdequacy =
+    typeof explicitField.adequateForBlastScreening === "boolean"
+      ? explicitField.adequateForBlastScreening
+      : (
+          typeof rawField.adequateForBlastScreening === "boolean"
+            ? rawField.adequateForBlastScreening
+            : null
+        );
 
-  // A structured upstream positive flag remains valid only when it is not
-  // contradicted by canonical LME tri-state evidence.
-  if (
-    findings.parasiteSuspected === true &&
-    critical.parasites !== "NOT_OBSERVED_IN_EVALUABLE_FIELD" &&
-    critical.parasites !== "NOT_ASSESSABLE"
+  const wbc = Object.keys(lmeWbc).length ? lmeWbc : rawLmeWbc;
+
+  const detailSignals = {
+    chromatin: meaningfulMorphologyText(wbc.chromatin),
+    nucleoli: meaningfulMorphologyText(wbc.nucleoli),
+    ncRatio: meaningfulMorphologyText(wbc.ncRatio ?? wbc.ncRatioFeatures),
+    blastLikeFeatures: meaningfulMorphologyText(wbc.blastLikeFeatures),
+    nuclearMorphology: meaningfulMorphologyText(wbc.nuclearMorphology),
+  };
+
+  const detailedNuclearFeatureCount = Object.values(detailSignals)
+    .filter(Boolean).length;
+
+  const technicalText = normalizeText([
+    explicitField.limitationReason,
+    rawField.limitationReason,
+    analysis?.localMorphologyEvidence?.field?.technicalQuality,
+    ...(Array.isArray(
+      analysis?.localMorphologyEvidence?.field?.technicalLimitations
+    )
+      ? analysis.localMorphologyEvidence.field.technicalLimitations
+      : []),
+  ].filter(Boolean).join(" | "));
+
+  const nuclearDetailLimited = includesAny(technicalText, [
+    "detalhes nucleares finos nao sao avaliaveis",
+    "detalhe nuclear insuficiente",
+    "resolucao insuficiente para detalhes nucleares",
+    "cromatina nao avaliavel",
+    "nucleolos nao avaliaveis",
+    "relacao n:c nao avaliavel",
+    "foco insuficiente",
+    "desfocad",
+  ]);
+
+  let adequateForBlastScreening = false;
+  let state = "NOT_ASSESSABLE";
+  let reason =
+    "A exclusão morfológica de blastos requer detalhe nuclear/citoplasmático avaliável; a simples presença de leucócitos não é suficiente.";
+
+  if (explicitAdequacy === false) {
+    adequateForBlastScreening = false;
+    state = "NOT_ASSESSABLE";
+    reason =
+      "O modelo visual marcou explicitamente o campo como inadequado para triagem/exclusão morfológica de blastos.";
+  } else if (
+    explicitAdequacy === true &&
+    !nuclearDetailLimited
   ) {
-    return true;
+    adequateForBlastScreening = true;
+    state = "EVALUABLE";
+    reason =
+      "O campo foi explicitamente marcado como avaliável para triagem de blastos e não há limitação nuclear conflitante.";
+  } else if (
+    visibleLeukocytes >= 1 &&
+    detailedNuclearFeatureCount >= 2 &&
+    !nuclearDetailLimited
+  ) {
+    adequateForBlastScreening = true;
+    state = "EVALUABLE";
+    reason =
+      "Há leucócito(s) visível(is) com pelo menos dois descritores nucleares/citoplasmáticos diretamente avaliáveis.";
   }
 
-  const positiveSources = [
-    ...(Array.isArray(lme?.positiveEvidence) ? lme.positiveEvidence : []),
-    ...(Array.isArray(lme?.erythrocytes?.positiveFindings)
-      ? lme.erythrocytes.positiveFindings
-      : []),
-    ...(Array.isArray(lme?.leukocytes?.positiveFindings)
-      ? lme.leukocytes.positiveFindings
-      : []),
-  ];
-
-  return positiveSources.some((value) => {
-    const text = String(value || "");
-    if (isNegatedOrIndeterminateParasiteText(text)) return false;
-    return includesAny(text, [
-      "parasita",
-      "hemoparasita",
-      "plasmodium",
-      "babesia",
-      "trypanosoma",
-      "tripanossoma",
-      "tripomastigota",
-      "microfilaria",
-      "microfilária",
-      "cinetoplasto",
-      "membrana ondulante",
-      "intraeritrocitario",
-      "intraeritrocitário",
-    ]);
-  });
+  return {
+    version: BLAST_ASSESSABILITY_GATE_VERSION,
+    state,
+    adequateForBlastScreening,
+    explicitAdequacy,
+    visibleLeukocytes,
+    detailedNuclearFeatureCount,
+    detailSignals,
+    nuclearDetailLimited,
+    negativeBlastConclusionAllowed: adequateForBlastScreening,
+    reason,
+  };
 }
 
 function buildAdequacyContract({
@@ -122,6 +159,7 @@ function buildAdequacyContract({
   parasiteSignal,
   unusualStructureSignal,
   localMorphologyEvidenceAvailable,
+  blastAssessability,
 }) {
   const adequateForPopulationAssessment = visibleLeukocytes >= 8;
   const limitedField = !adequateForPopulationAssessment;
@@ -138,7 +176,15 @@ function buildAdequacyContract({
       visibleLeukocytes >= 3 || singleCellConcern,
 
     adequateForBlastScreening:
-      visibleLeukocytes >= 1 || singleCellConcern,
+      blastAssessability?.adequateForBlastScreening === true,
+
+    blastAssessability:
+      blastAssessability || {
+        version: BLAST_ASSESSABILITY_GATE_VERSION,
+        state: "NOT_ASSESSABLE",
+        adequateForBlastScreening: false,
+        negativeBlastConclusionAllowed: false,
+      },
 
     adequateForPopulationAssessment,
     limitedField,
@@ -224,12 +270,28 @@ export function evaluateFieldAdequacy(analysis = {}) {
     "elemento extracelular",
   ]);
 
-  // BE-FIX-005.11:
-  // unusualStructureSignal and parasiteSignal are independent dimensions.
-  // Atypia/artifact/unusual structure may require review, but cannot be
-  // promoted to hemoparasite suspicion without explicit positive evidence.
   const parasiteSignal =
-    hasExplicitPositiveParasiteEvidence(analysis);
+    includesAny(raw, [
+      "parasita",
+      "hemoparasita",
+      "protozoario",
+      "protozoário",
+      "plasmodium",
+      "babesia",
+      "trypanosoma",
+      "tripanossoma",
+      "tripomastigota",
+      "microfilaria",
+      "microfilária",
+      "filaria",
+      "filária",
+      "flagelo",
+      "flagelado",
+      "membrana ondulante",
+      "cinetoplasto",
+      "intraeritrocitario",
+      "intraeritrocitário",
+    ]) || unusualStructureSignal;
 
   const singleCellConcern =
     includesAny(raw, [
@@ -245,12 +307,16 @@ export function evaluateFieldAdequacy(analysis = {}) {
       "blasto",
     ]) || parasiteSignal;
 
+  const blastAssessability =
+    evaluateBlastAssessability(analysis, visibleLeukocytes);
+
   return buildAdequacyContract({
     visibleLeukocytes,
     singleCellConcern,
     parasiteSignal,
     unusualStructureSignal,
     localMorphologyEvidenceAvailable: hasLocalMorphologyEvidence(analysis),
+    blastAssessability,
   });
 }
 
@@ -299,15 +365,11 @@ export function applyFieldAdequacyRules(analysis = {}) {
     analysis.normalityBlocked = true;
     analysis.requiresHumanReview = true;
 
-    analysis.findings.parasiteSuspected =
-      fieldAdequacy.parasiteSignal === true;
-    analysis.findings.unusualStructureSuspected =
-      fieldAdequacy.unusualStructureSignal === true;
+    analysis.findings.parasiteSuspected = true;
+    analysis.findings.unusualStructureSuspected = true;
 
     analysis.riskLevel =
-      fieldAdequacy.parasiteSignal
-        ? "Campo com evidência positiva suspeita para hemoparasita"
-        : "Campo com estrutura incomum/artefato a esclarecer";
+      "Campo com estrutura incomum/hemoparasita suspeito";
 
     analysis.blockNormalReason = [
       ...new Set([
@@ -329,9 +391,7 @@ export function applyFieldAdequacyRules(analysis = {}) {
 
     analysis.overallAssessment.requiresHumanReview = true;
     analysis.overallAssessment.riskCategory =
-      fieldAdequacy.parasiteSignal
-        ? "CLASS_2_HEMOPARASITE_SUSPICION"
-        : "CLASS_2_UNUSUAL_STRUCTURE";
+      "CLASS_2_UNUSUAL_HEMOPARASITE_STRUCTURE";
 
     analysis.structuredReport.recommendation =
       analysis.structuredReport.recommendation ||
