@@ -49,6 +49,14 @@ export function buildExpertHematologyNarrative(truth = {}, source = {}) {
     priorityFindings.push(
       "Sinal blástico/blastoide identificado no campo analisado. Por segurança, um único elemento positivo é suficiente para acionar revisão hematológica prioritária; a imagem isolada não define linhagem nem diagnóstico.",
     );
+  } else if (blast?.state === ClinicalEvidenceState.SUSPICIOUS_INDETERMINATE) {
+    priorityFindings.push(
+      "Há suspeita blástica/blastoide não resolvida no campo analisado; esse estado exige revisão prioritária e nunca deve ser apresentado como ausência.",
+    );
+  } else if (blast?.state === ClinicalEvidenceState.INDETERMINATE) {
+    priorityFindings.push(
+      "A pesquisa de elementos blásticos permanece indeterminada neste campo; não há base para registrá-la como negativa.",
+    );
   } else if (blast?.state === ClinicalEvidenceState.NOT_ASSESSABLE) {
     priorityFindings.push(
       "A pesquisa de elementos blásticos não é suficientemente avaliável neste material/campo; não deve ser exibida como ausência.",

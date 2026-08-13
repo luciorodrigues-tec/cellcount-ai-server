@@ -12,7 +12,7 @@ import {
   ClinicalSeverity,
 } from "./clinicalEvidenceState.js";
 
-export const CLINICAL_RESULT_COHERENCE_ENGINE_VERSION = "CRCE-1.4";
+export const CLINICAL_RESULT_COHERENCE_ENGINE_VERSION = "CRCE-1.5";
 
 function clean(value) {
   return typeof value === "string" ? value.replace(/\s+/g, " ").trim() : "";
@@ -30,6 +30,8 @@ function evidenceLabel(item) {
       return "SUSPICIOUS_INDETERMINATE";
     case ClinicalEvidenceState.NOT_OBSERVED_IN_EVALUABLE_FIELD:
       return "NOT_OBSERVED_IN_EVALUABLE_FIELD";
+    case ClinicalEvidenceState.INDETERMINATE:
+      return "INDETERMINATE";
     default:
       return "NOT_ASSESSABLE";
   }
@@ -219,24 +221,47 @@ function reviewStatus(truth, riskTier) {
   };
 }
 
-function criticalNegatives(truth) {
+function criticalEvidenceGroups(truth) {
   const labels = {
-    blastLike: "Blastos/blastoides inequívocos",
+    blastLike: "Blastos/blastoides",
     auerRods: "Bastonetes de Auer",
     schistocytes: "Esquizócitos clinicamente relevantes",
     parasites: "Hemoparasitas com evidência estruturada",
   };
 
-  const items = [];
+  const groups = {
+    observed: [],
+    suspicious: [],
+    indeterminate: [],
+    notAssessable: [],
+    notObserved: [],
+  };
+
   for (const [key, label] of Object.entries(labels)) {
-    if (
-      truth.criticalFindings?.[key]?.state ===
-      ClinicalEvidenceState.NOT_OBSERVED_IN_EVALUABLE_FIELD
-    ) {
-      items.push(label);
+    const item = truth.criticalFindings?.[key];
+    switch (item?.state) {
+      case ClinicalEvidenceState.OBSERVED:
+        groups.observed.push(label);
+        break;
+      case ClinicalEvidenceState.SUSPICIOUS_INDETERMINATE:
+        groups.suspicious.push(label);
+        break;
+      case ClinicalEvidenceState.INDETERMINATE:
+        groups.indeterminate.push(label);
+        break;
+      case ClinicalEvidenceState.NOT_ASSESSABLE:
+        groups.notAssessable.push(label);
+        break;
+      case ClinicalEvidenceState.NOT_OBSERVED_IN_EVALUABLE_FIELD:
+        groups.notObserved.push(label);
+        break;
+      default:
+        groups.notAssessable.push(label);
+        break;
     }
   }
-  return items;
+
+  return groups;
 }
 
 function lineageProjection(lineage, fallback) {
@@ -318,7 +343,7 @@ export function buildClinicalResultCoherenceProjection(truth = {}, narrative = {
   const riskTier = canonicalRiskBand(highestSeverity(truth, morphology));
   const representation = representativity(truth);
   const review = reviewStatus(truth, riskTier);
-  const negatives = criticalNegatives(truth);
+  const evidenceGroups = criticalEvidenceGroups(truth);
 
   const parasite = truth.parasiteArtifact?.parasite;
   const blast = truth.criticalFindings?.blastLike;
@@ -392,9 +417,27 @@ export function buildClinicalResultCoherenceProjection(truth = {}, narrative = {
         truth.scope?.globalNegativeExclusionAllowed === true,
     },
 
+    evidenceGroups: {
+      observed: evidenceGroups.observed,
+      suspicious: evidenceGroups.suspicious,
+      indeterminate: evidenceGroups.indeterminate,
+      notAssessable: evidenceGroups.notAssessable,
+      notObserved: evidenceGroups.notObserved,
+      negativeQualifier: evidenceGroups.notObserved.length > 0
+        ? "A não identificação desses elementos restringe-se ao campo suficientemente avaliável e não permite exclusão global em outras áreas da lâmina."
+        : "",
+      uncertaintyQualifier:
+        evidenceGroups.suspicious.length > 0 ||
+        evidenceGroups.indeterminate.length > 0 ||
+        evidenceGroups.notAssessable.length > 0
+          ? "Elementos suspeitos, indeterminados ou não avaliáveis não podem ser exibidos como achados negativos."
+          : "",
+    },
+
+    // Compatibility alias. Only true field-scoped negatives are exposed here.
     criticalNegatives: {
-      items: negatives,
-      qualifier: negatives.length > 0
+      items: evidenceGroups.notObserved,
+      qualifier: evidenceGroups.notObserved.length > 0
         ? "A não identificação desses elementos restringe-se ao campo suficientemente avaliável e não permite exclusão global em outras áreas da lâmina."
         : "",
     },

@@ -73,12 +73,16 @@ function stateFromCanonicalStatus(value, {
     return ClinicalEvidenceState.NOT_OBSERVED_IN_EVALUABLE_FIELD;
   }
 
+  if (["INDETERMINATE", "UNKNOWN"].includes(token)) {
+    return assessable === false
+      ? ClinicalEvidenceState.NOT_ASSESSABLE
+      : ClinicalEvidenceState.INDETERMINATE;
+  }
+
   if (
     [
       "NOT_ASSESSABLE",
       "NOTASSESSABLE",
-      "INDETERMINATE",
-      "UNKNOWN",
       "UNEVALUABLE",
       "NOT_EVALUABLE",
     ].includes(token)
@@ -98,7 +102,9 @@ function stateFromCanonicalStatus(value, {
     return ClinicalEvidenceState.NOT_OBSERVED_IN_EVALUABLE_FIELD;
   }
 
-  return ClinicalEvidenceState.NOT_ASSESSABLE;
+  return assessable
+    ? ClinicalEvidenceState.INDETERMINATE
+    : ClinicalEvidenceState.NOT_ASSESSABLE;
 }
 
 function findStructuredItem(result, keys = []) {
@@ -146,6 +152,83 @@ function evidenceStrings(...values) {
   }
 
   return [...new Set(output.filter(Boolean))];
+}
+
+
+function buildStructuredCriticalTruth(result, {
+  keys = [],
+  assessable = false,
+  confidence = 0,
+  label = "",
+} = {}) {
+  const finding = findStructuredItem(result, keys);
+  const findingObject = asObject(finding);
+  const status = findingObject.state || findingObject.status;
+
+  const observed =
+    finding === true ||
+    findingObject.observed === true ||
+    ["OBSERVED", "PRESENT", "POSITIVE", "DETECTED"].includes(
+      normalizeToken(status),
+    );
+
+  const suspicious =
+    ["SUSPICIOUS", "SUSPECTED", "POSSIBLE", "SUSPICIOUS_INDETERMINATE"].includes(
+      normalizeToken(status),
+    );
+
+  const notObserved =
+    finding === false ||
+    findingObject.observed === false ||
+    [
+      "NOT_OBSERVED",
+      "NOTOBSERVED",
+      "ABSENT_IN_FIELD",
+      "NEGATIVE",
+      "NOT_DETECTED",
+      "NOT_OBSERVED_IN_EVALUABLE_FIELD",
+    ].includes(normalizeToken(status));
+
+  let state;
+  if (observed) {
+    state = ClinicalEvidenceState.OBSERVED;
+  } else if (suspicious) {
+    state = ClinicalEvidenceState.SUSPICIOUS_INDETERMINATE;
+  } else if (notObserved && assessable) {
+    state = ClinicalEvidenceState.NOT_OBSERVED_IN_EVALUABLE_FIELD;
+  } else if (normalizeToken(status) === "INDETERMINATE" && assessable) {
+    state = ClinicalEvidenceState.INDETERMINATE;
+  } else if (finding === undefined && assessable) {
+    // CRCE-1.5 invariant: assessability alone never creates a negative.
+    state = ClinicalEvidenceState.INDETERMINATE;
+  } else {
+    state = ClinicalEvidenceState.NOT_ASSESSABLE;
+  }
+
+  return createEvidenceItem({
+    state,
+    confidence: findingObject.confidence ?? confidence,
+    evidence: evidenceStrings(
+      findingObject.evidence,
+      findingObject.description,
+      findingObject.summary,
+    ),
+    scope: "FIELD_LOCAL",
+    requiresReview: [
+      ClinicalEvidenceState.OBSERVED,
+      ClinicalEvidenceState.SUSPICIOUS_INDETERMINATE,
+      ClinicalEvidenceState.INDETERMINATE,
+    ].includes(state),
+    severity:
+      state === ClinicalEvidenceState.OBSERVED
+        ? ClinicalSeverity.HIGH
+        : state === ClinicalEvidenceState.SUSPICIOUS_INDETERMINATE
+          ? ClinicalSeverity.HIGH
+          : state === ClinicalEvidenceState.INDETERMINATE
+            ? ClinicalSeverity.INDETERMINATE
+            : ClinicalSeverity.NONE,
+    notes: label ? [label] : [],
+  });
 }
 
 function buildBlastTruth(result) {
@@ -271,8 +354,7 @@ function buildParasiteTruth(result) {
     structuredObject.observed === false ||
     ["NOT_OBSERVED", "NOT_OBSERVED_IN_EVALUABLE_FIELD"].includes(
       normalizeToken(structuredObject.state || structuredObject.status),
-    ) ||
-    (!observed && result.findings?.parasiteSuspected === false);
+    );
 
   const assessable =
     lme.evidenceAvailable === true ||
@@ -581,21 +663,17 @@ export function buildCanonicalClinicalTruth(result = {}, {
     },
     criticalFindings: {
       blastLike,
-      auerRods: createEvidenceItem({
-        state:
-          field.adequateForBlastScreening === true
-            ? ClinicalEvidenceState.NOT_OBSERVED_IN_EVALUABLE_FIELD
-            : ClinicalEvidenceState.NOT_ASSESSABLE,
+      auerRods: buildStructuredCriticalTruth(result, {
+        keys: ["auerRods", "auerRod", "auerSticks"],
+        assessable: field.adequateForBlastScreening === true,
         confidence,
-        scope: "FIELD_LOCAL",
+        label: "Bastonetes de Auer",
       }),
-      schistocytes: createEvidenceItem({
-        state:
-          erythrocytes.description
-            ? ClinicalEvidenceState.NOT_OBSERVED_IN_EVALUABLE_FIELD
-            : ClinicalEvidenceState.NOT_ASSESSABLE,
+      schistocytes: buildStructuredCriticalTruth(result, {
+        keys: ["schistocytes", "schistocyte", "clinicallyRelevantSchistocytes"],
+        assessable: Boolean(erythrocytes.description),
         confidence,
-        scope: "FIELD_LOCAL",
+        label: "Esquizócitos clinicamente relevantes",
       }),
       parasites: parasiteArtifact.parasite,
     },
