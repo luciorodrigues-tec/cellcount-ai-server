@@ -1,6 +1,6 @@
 // ============================================================================
 // CELLCOUNT HEMATOLOGY ENTERPRISE
-// CRCE-1.3 — CANONICAL PRESENTATION LOCK
+// CRCE-1.7 — CLINICAL SYNTHESIS & PRESENTATION GOVERNANCE
 //
 // Downstream of canonical clinical truth. This module separates:
 //   morphologyClass != riskTier != representativity != reviewStatus
@@ -12,7 +12,7 @@ import {
   ClinicalSeverity,
 } from "./clinicalEvidenceState.js";
 
-export const CLINICAL_RESULT_COHERENCE_ENGINE_VERSION = "CRCE-1.6";
+export const CLINICAL_RESULT_COHERENCE_ENGINE_VERSION = "CRCE-1.7";
 
 function clean(value) {
   return typeof value === "string" ? value.replace(/\s+/g, " ").trim() : "";
@@ -353,6 +353,65 @@ function canonicalIntegratedInterpretation(truth, morphology) {
   return "A interpretação é restrita à evidência morfológica estruturada disponível, sem promoção além do que foi diretamente sustentado.";
 }
 
+
+function canonicalSlideJudgement(truth, morphology, riskTier) {
+  const limited = truth.scope?.limitedField === true;
+  const prefix = limited ? "Campo de representatividade limitada. " : "";
+
+  switch (morphology.code) {
+    case "CRITICAL_BLAST_LIKE_FINDING":
+      return `${prefix}Achado blástico/blastoide observado e clinicamente prioritário; a lâmina requer revisão hematológica imediata.`;
+    case "SUSPICIOUS_BLAST_LIKE_FINDING":
+      return `${prefix}Há suspeita morfológica relevante de imaturidade/blastoidia, não confirmável pela imagem isolada; revisão hematológica prioritária é indicada.`;
+    case "STRUCTURED_PARASITE_EVIDENCE":
+      return `${prefix}Há evidência parasitária estruturada no material avaliável, exigindo confirmação microscópica/laboratorial.`;
+    case "SUSTAINED_ATYPICAL_POPULATION":
+      return `${prefix}A lâmina apresenta população mononuclear atípica sustentada e requer caracterização hematológica especializada.`;
+    case "SUPPORTED_REACTIVE_LYMPHOID_PATTERN":
+      return `${prefix}A morfologia sustenta padrão linfoide reacional, sem definição etiológica pela imagem isolada.`;
+    case "FOCAL_MONONUCLEAR_ATYPIA":
+      return `${prefix}A lâmina apresenta atipia mononuclear focal, sem evidência suficiente para definir padrão populacional sustentado.`;
+    case "LIMITED_FIELD_MORPHOLOGY":
+      return "A avaliação é morfologicamente informativa apenas no campo observado; não há base para generalização populacional ou exclusão global.";
+    default:
+      return riskTier.level === "NO_ALERT"
+        ? `${prefix}Não há alerta morfológico relevante sustentado pela evidência avaliável.`
+        : `${prefix}Há achados que justificam correlação clínico-laboratorial e revisão conforme o risco canônico.`;
+  }
+}
+
+function presentationGovernance(truth, morphology, riskTier, narrative, evidenceGroups) {
+  const judgement = canonicalSlideJudgement(truth, morphology, riskTier);
+  const details = canonicalIntegratedInterpretation(truth, morphology);
+  const priorities = unique(narrative.priorityFindings || [])
+    .filter((item) => !sameClinicalMeaning(item, judgement) && !sameClinicalMeaning(item, details))
+    .slice(0, 3);
+
+  return {
+    authority: "CRCE-1.7",
+    slideJudgement: judgement,
+    synopsis: judgement,
+    detailInterpretation: details,
+    priorityFindings: priorities,
+    showGlobalNegativeDisclaimer: evidenceGroups.notObserved.length > 0,
+    limitedField: truth.scope?.limitedField === true,
+  };
+}
+
+function sameClinicalMeaning(a, b) {
+  const normalize = (value) => clean(value)
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9 ]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  const x = normalize(a);
+  const y = normalize(b);
+  if (!x || !y) return false;
+  return x === y || (x.length > 45 && y.includes(x)) || (y.length > 45 && x.includes(y));
+}
+
 export function buildClinicalResultCoherenceProjection(truth = {}, narrative = {}) {
   const morphology = morphologyClass(truth);
   const riskTier = canonicalRiskBand(highestSeverity(truth, morphology));
@@ -367,6 +426,8 @@ export function buildClinicalResultCoherenceProjection(truth = {}, narrative = {
     canonicalExecutiveConclusion(truth, morphology, riskTier);
   const integratedInterpretation =
     canonicalIntegratedInterpretation(truth, morphology);
+  const governance =
+    presentationGovernance(truth, morphology, riskTier, narrative, evidenceGroups);
 
   return {
     version: CLINICAL_RESULT_COHERENCE_ENGINE_VERSION,
@@ -380,13 +441,12 @@ export function buildClinicalResultCoherenceProjection(truth = {}, narrative = {
     representativity: representation,
     reviewStatus: review,
 
-    executiveConclusion,
-    integratedInterpretation,
+    executiveConclusion: governance.slideJudgement,
+    integratedInterpretation: governance.detailInterpretation,
+    presentationGovernance: governance,
 
     // Narrative compression: priority items stay short and unique.
-    priorityFindings: unique([
-      ...(narrative.priorityFindings || []),
-    ]).slice(0, 3),
+    priorityFindings: governance.priorityFindings,
 
     lineages: {
       erythrocytes: lineageProjection(

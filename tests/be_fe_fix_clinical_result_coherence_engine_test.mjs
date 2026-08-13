@@ -8,7 +8,7 @@ import {
   CLINICAL_RESULT_COHERENCE_ENGINE_VERSION,
 } from "../ai/clinicalResultV2/index.js";
 
-const EXPECTED_CRCE_VERSION = "CRCE-1.6";
+const EXPECTED_CRCE_VERSION = "CRCE-1.7";
 
 const LABELS = Object.freeze({
   BLASTS: "Blastos/blastoides",
