@@ -51,7 +51,7 @@ export function buildExpertHematologyNarrative(truth = {}, source = {}) {
     );
   } else if (blast?.state === ClinicalEvidenceState.SUSPICIOUS_INDETERMINATE) {
     priorityFindings.push(
-      "Há suspeita blástica/blastoide não resolvida no campo analisado; esse estado exige revisão prioritária e nunca deve ser apresentado como ausência.",
+      "Elemento(s) com características de imaturidade/blastoidia foram identificados no campo analisado, sem critérios suficientes para confirmação como blasto; a suspeita exige revisão hematológica prioritária e nunca deve ser apresentada como ausência ou simples não avaliabilidade.",
     );
   } else if (blast?.state === ClinicalEvidenceState.INDETERMINATE) {
     priorityFindings.push(
@@ -92,9 +92,12 @@ export function buildExpertHematologyNarrative(truth = {}, source = {}) {
   if (truth.risk?.severity === ClinicalSeverity.CRITICAL) {
     executiveSynthesis =
       "Achado morfológico crítico no campo analisado, com necessidade de revisão hematológica prioritária. A classificação final permanece limitada à evidência visual e não constitui diagnóstico etiológico.";
+  } else if (blast?.state === ClinicalEvidenceState.SUSPICIOUS_INDETERMINATE) {
+    executiveSynthesis = truth.scope?.limitedField === true
+      ? "Campo com elemento(s) morfologicamente suspeito(s) para imaturidade/blastoidia, sem critérios suficientes para confirmação. A representatividade limitada impede caracterização populacional; revisão hematológica prioritária é recomendada."
+      : "Campo com elemento(s) morfologicamente suspeito(s) para imaturidade/blastoidia, sem critérios suficientes para confirmação; revisão hematológica prioritária é recomendada.";
   } else if (priorityFindings.length > 0) {
-    executiveSynthesis =
-      "O campo apresenta achados morfológicos que requerem interpretação dirigida, preservando a distinção entre evidência positiva, ausência restrita ao campo e elementos não avaliáveis.";
+    executiveSynthesis = priorityFindings[0];
   } else if (truth.scope?.limitedField === true) {
     executiveSynthesis =
       "Avaliação morfológica de campo limitado: a descrição celular local é preservada, mas não há suporte para generalização populacional ou afirmação de normalidade global.";

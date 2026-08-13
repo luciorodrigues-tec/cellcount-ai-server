@@ -12,7 +12,7 @@ import {
   ClinicalSeverity,
 } from "./clinicalEvidenceState.js";
 
-export const CLINICAL_RESULT_COHERENCE_ENGINE_VERSION = "CRCE-1.5";
+export const CLINICAL_RESULT_COHERENCE_ENGINE_VERSION = "CRCE-1.6";
 
 function clean(value) {
   return typeof value === "string" ? value.replace(/\s+/g, " ").trim() : "";
@@ -280,6 +280,11 @@ function canonicalExecutiveConclusion(truth, morphology, riskTier) {
     case "CRITICAL_BLAST_LIKE_FINDING":
       return "Sinal blástico/blastoide identificado no campo analisado; revisão hematológica prioritária é necessária, sem atribuição de linhagem pela imagem isolada.";
 
+    case "SUSPICIOUS_BLAST_LIKE_FINDING":
+      return limited
+        ? "Elemento(s) com características de imaturidade/blastoidia foram identificados no campo analisado, sem critérios suficientes para confirmação. A representatividade limitada impede caracterização populacional; revisão hematológica prioritária é recomendada."
+        : "Elemento(s) com características de imaturidade/blastoidia foram identificados, sem critérios suficientes para confirmação. Revisão hematológica prioritária é recomendada.";
+
     case "STRUCTURED_PARASITE_EVIDENCE":
       return "Evidência parasitária estruturada identificada no campo analisado; confirmação microscópica e laboratorial é necessária.";
 
@@ -325,6 +330,16 @@ function canonicalIntegratedInterpretation(truth, morphology) {
 
   if (morphology.code === "CRITICAL_BLAST_LIKE_FINDING") {
     return "A identificação de sinal blástico/blastoide tem prioridade sobre inferências reacionais e exige revisão especializada do esfregaço.";
+  }
+
+  if (morphology.code === "SUSPICIOUS_BLAST_LIKE_FINDING") {
+    return [
+      "Há elemento(s) morfologicamente suspeito(s) para imaturidade/blastoidia no campo analisado, sem evidência suficiente para confirmação como blasto.",
+      "A suspeita positiva deve ser preservada e não pode ser convertida em ausência ou simples não avaliabilidade.",
+      limited
+        ? "A representatividade limitada impede estimar frequência, distribuição ou significado populacional na lâmina."
+        : "A confirmação requer revisão microscópica especializada e correlação com o hemograma.",
+    ].filter(Boolean).join(" ");
   }
 
   if (morphology.code === "STRUCTURED_PARASITE_EVIDENCE") {

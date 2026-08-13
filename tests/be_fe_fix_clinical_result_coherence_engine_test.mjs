@@ -8,7 +8,16 @@ import {
   CLINICAL_RESULT_COHERENCE_ENGINE_VERSION,
 } from "../ai/clinicalResultV2/index.js";
 
-const EXPECTED_CRCE_VERSION = "CRCE-1.5";
+const EXPECTED_CRCE_VERSION = "CRCE-1.6";
+
+const LABELS = Object.freeze({
+  BLASTS: "Blastos/blastoides",
+  AUER_RODS: "Bastonetes de Auer",
+  SCHISTOCYTES: "Esquizócitos clinicamente relevantes",
+  PARASITES: "Hemoparasitas com evidência estruturada",
+});
+
+const STATES = ClinicalEvidenceState;
 
 function buildBaseTruth(overrides = {}) {
   const base = {
@@ -20,22 +29,22 @@ function buildBaseTruth(overrides = {}) {
 
     criticalFindings: {
       blastLike: {
-        state: ClinicalEvidenceState.NOT_OBSERVED_IN_EVALUABLE_FIELD,
+        state: STATES.NOT_OBSERVED_IN_EVALUABLE_FIELD,
       },
       auerRods: {
-        state: ClinicalEvidenceState.NOT_OBSERVED_IN_EVALUABLE_FIELD,
+        state: STATES.NOT_OBSERVED_IN_EVALUABLE_FIELD,
       },
       schistocytes: {
-        state: ClinicalEvidenceState.NOT_OBSERVED_IN_EVALUABLE_FIELD,
+        state: STATES.NOT_OBSERVED_IN_EVALUABLE_FIELD,
       },
       parasites: {
-        state: ClinicalEvidenceState.NOT_OBSERVED_IN_EVALUABLE_FIELD,
+        state: STATES.NOT_OBSERVED_IN_EVALUABLE_FIELD,
       },
     },
 
     parasiteArtifact: {
       parasite: {
-        state: ClinicalEvidenceState.NOT_OBSERVED_IN_EVALUABLE_FIELD,
+        state: STATES.NOT_OBSERVED_IN_EVALUABLE_FIELD,
       },
       parasiteSuspicionAllowed: false,
       artifactLikelihood: "FAVORED",
@@ -56,7 +65,7 @@ function buildBaseTruth(overrides = {}) {
     lineages: {
       erythrocytes: {
         assessment: {
-          state: ClinicalEvidenceState.OBSERVED,
+          state: STATES.OBSERVED,
         },
         description:
           "Contornos crenados em parte das hemácias visíveis.",
@@ -64,7 +73,7 @@ function buildBaseTruth(overrides = {}) {
 
       leukocytes: {
         assessment: {
-          state: ClinicalEvidenceState.OBSERVED,
+          state: STATES.OBSERVED,
         },
         description:
           "Célula mononuclear grande isolada, sem padrão populacional sustentado.",
@@ -72,7 +81,7 @@ function buildBaseTruth(overrides = {}) {
 
       platelets: {
         assessment: {
-          state: ClinicalEvidenceState.NOT_ASSESSABLE,
+          state: STATES.NOT_ASSESSABLE,
         },
         description:
           "Avaliação plaquetária limitada.",
@@ -106,11 +115,27 @@ function buildBaseTruth(overrides = {}) {
     parasiteArtifact: {
       ...base.parasiteArtifact,
       ...(overrides.parasiteArtifact ?? {}),
+      parasite: {
+        ...base.parasiteArtifact.parasite,
+        ...(overrides.parasiteArtifact?.parasite ?? {}),
+      },
     },
 
     patternInterpretation: {
       ...base.patternInterpretation,
       ...(overrides.patternInterpretation ?? {}),
+      reactiveLymphoid: {
+        ...base.patternInterpretation.reactiveLymphoid,
+        ...(overrides.patternInterpretation?.reactiveLymphoid ?? {}),
+      },
+      mononucleosisPattern: {
+        ...base.patternInterpretation.mononucleosisPattern,
+        ...(overrides.patternInterpretation?.mononucleosisPattern ?? {}),
+      },
+      clonalityConcern: {
+        ...base.patternInterpretation.clonalityConcern,
+        ...(overrides.patternInterpretation?.clonalityConcern ?? {}),
+      },
     },
 
     lineages: {
@@ -134,9 +159,9 @@ const canonicalNarrative = Object.freeze({
   executiveSynthesis:
     "Avaliação morfológica de campo limitado, sem promoção de achados além da evidência disponível.",
 
-  priorityFindings: [
+  priorityFindings: Object.freeze([
     "Estrutura incomum favorecendo artefato; sem base estruturada para hemoparasita.",
-  ],
+  ]),
 
   integratedInterpretation:
     "Campo limitado para inferência populacional.",
@@ -144,9 +169,9 @@ const canonicalNarrative = Object.freeze({
   qualityAndConfidence:
     "Representatividade limitada.",
 
-  recommendedNextSteps: [
+  recommendedNextSteps: Object.freeze([
     "Revisão microscópica por profissional habilitado.",
-  ],
+  ]),
 });
 
 function project(truthOverrides = {}) {
@@ -156,11 +181,35 @@ function project(truthOverrides = {}) {
   );
 }
 
+function assertNotNegative(projection, pattern, message) {
+  assert.ok(
+    !projection.criticalNegatives.items.some((item) =>
+      pattern.test(String(item || "")),
+    ),
+    message,
+  );
+}
+
+function assertCanonicalRiskPresentation(
+  projection,
+  {
+    level,
+    colorToken,
+    representativity,
+    reviewRequired,
+  },
+) {
+  assert.equal(projection.riskTier.level, level);
+  assert.equal(projection.riskTier.colorToken, colorToken);
+  assert.equal(projection.representativity.level, representativity);
+  assert.equal(projection.reviewStatus.required, reviewRequired);
+}
+
 /* -------------------------------------------------------------------------- */
 /* VERSION                                                                    */
 /* -------------------------------------------------------------------------- */
 
-test("PASS 0 — CRCE version registered", () => {
+test("PASS 0 — CRCE-1.6 version is registered", () => {
   assert.equal(
     CLINICAL_RESULT_COHERENCE_ENGINE_VERSION,
     EXPECTED_CRCE_VERSION,
@@ -181,7 +230,7 @@ test("PASS 1 — artifact cannot promote parasite", () => {
 
   assert.equal(
     projection.criticalFindings.parasites,
-    "NOT_OBSERVED_IN_EVALUABLE_FIELD",
+    STATES.NOT_OBSERVED_IN_EVALUABLE_FIELD,
   );
 });
 
@@ -217,6 +266,7 @@ test(
 
     assert.equal(projection.scope.limitedField, true);
     assert.equal(projection.scope.populationInferenceAllowed, false);
+    assert.equal(projection.scope.globalNegativeExclusionAllowed, false);
   },
 );
 
@@ -260,11 +310,11 @@ test("PASS 5 — critical negatives use one global qualifier", () => {
 /* BLAST PRIORITY                                                             */
 /* -------------------------------------------------------------------------- */
 
-test("PASS 6 — one blast becomes critical classification", () => {
+test("PASS 6 — one observed blast-like signal becomes critical", () => {
   const projection = project({
     criticalFindings: {
       blastLike: {
-        state: ClinicalEvidenceState.OBSERVED,
+        state: STATES.OBSERVED,
       },
     },
   });
@@ -288,7 +338,7 @@ test("PASS 7 — structured parasite OBSERVED remains allowed", () => {
   const projection = project({
     parasiteArtifact: {
       parasite: {
-        state: ClinicalEvidenceState.OBSERVED,
+        state: STATES.OBSERVED,
       },
       parasiteSuspicionAllowed: true,
       artifactLikelihood: "NOT_FAVORED",
@@ -296,7 +346,7 @@ test("PASS 7 — structured parasite OBSERVED remains allowed", () => {
 
     criticalFindings: {
       parasites: {
-        state: ClinicalEvidenceState.OBSERVED,
+        state: STATES.OBSERVED,
       },
     },
   });
@@ -367,25 +417,12 @@ test(
       "FOCAL_MONONUCLEAR_ATYPIA",
     );
 
-    assert.equal(
-      projection.riskTier.level,
-      "REVIEW",
-    );
-
-    assert.equal(
-      projection.riskTier.colorToken,
-      "YELLOW",
-    );
-
-    assert.equal(
-      projection.representativity.level,
-      "LIMITED",
-    );
-
-    assert.equal(
-      projection.reviewStatus.required,
-      true,
-    );
+    assertCanonicalRiskPresentation(projection, {
+      level: "REVIEW",
+      colorToken: "YELLOW",
+      representativity: "LIMITED",
+      reviewRequired: true,
+    });
   },
 );
 
@@ -403,15 +440,12 @@ test(
       true,
     );
 
-    assert.equal(
-      projection.riskTier.level,
-      "REVIEW",
-    );
-
-    assert.equal(
-      projection.riskTier.colorToken,
-      "YELLOW",
-    );
+    assertCanonicalRiskPresentation(projection, {
+      level: "REVIEW",
+      colorToken: "YELLOW",
+      representativity: "LIMITED",
+      reviewRequired: true,
+    });
 
     assert.notEqual(
       projection.riskTier.colorToken,
@@ -425,7 +459,7 @@ test(
 /* -------------------------------------------------------------------------- */
 
 test(
-  "PASS 11 — canonical narrative is compressed and avoids legacy risk-label conflation",
+  "PASS 11 — canonical narrative is compressed and avoids risk-label conflation",
   () => {
     const projection = project({
       morphologySignals: {
@@ -453,7 +487,7 @@ test(
 /* -------------------------------------------------------------------------- */
 
 test(
-  "PASS 12 — governed reactive sentinel cannot be overridden by legacy reactive flags",
+  "PASS 12 — governed reactive sentinel cannot be overridden by legacy flags",
   () => {
     const canonical = buildCanonicalClinicalTruth({
       fieldAdequacy: {
@@ -497,7 +531,7 @@ test(
 /* -------------------------------------------------------------------------- */
 
 test(
-  "PASS 13 — suspicious blast-like evidence is preserved and never rendered as negative",
+  "PASS 13 — suspicious blast-like evidence is preserved, escalated and never rendered as negative",
   () => {
     const canonical = buildCanonicalClinicalTruth({
       fieldAdequacy: {
@@ -510,13 +544,15 @@ test(
         atypicalLymphocytes: true,
         largeMononuclearCells: true,
         blastSuspicion: true,
-        blastEvidenceState: "SUSPICIOUS_INDETERMINATE",
+        blastEvidenceState:
+          "SUSPICIOUS_INDETERMINATE",
       },
 
       singleBlastSentinel: {
         active: true,
         certainty: "VISUAL_BLAST_SUSPICION",
-        evidenceState: "SUSPICIOUS_INDETERMINATE",
+        evidenceState:
+          "SUSPICIOUS_INDETERMINATE",
       },
 
       requiresHumanReview: true,
@@ -524,7 +560,7 @@ test(
 
     assert.equal(
       canonical.criticalFindings.blastLike.state,
-      ClinicalEvidenceState.SUSPICIOUS_INDETERMINATE,
+      STATES.SUSPICIOUS_INDETERMINATE,
     );
 
     assert.equal(
@@ -533,10 +569,10 @@ test(
     );
 
     const projection =
-        buildClinicalResultCoherenceProjection(
-      canonical,
-      canonicalNarrative,
-    );
+      buildClinicalResultCoherenceProjection(
+        canonical,
+        canonicalNarrative,
+      );
 
     assert.equal(
       projection.criticalFindings.blastLike,
@@ -553,11 +589,15 @@ test(
       "HIGH",
     );
 
-    assert.ok(
-      !projection.criticalNegatives.items.some(
-        (item) => /blasto/i.test(item),
-      ),
-      "Suspicious blast evidence must never be rendered inside critical negatives.",
+    assert.equal(
+      projection.reviewStatus.required,
+      true,
+    );
+
+    assertNotNegative(
+      projection,
+      /blasto/i,
+      "Suspicious blast-like evidence must never be rendered inside critical negatives.",
     );
   },
 );
@@ -584,12 +624,12 @@ test(
 
     assert.equal(
       canonical.criticalFindings.blastLike.state,
-      ClinicalEvidenceState.NOT_OBSERVED_IN_EVALUABLE_FIELD,
+      STATES.NOT_OBSERVED_IN_EVALUABLE_FIELD,
     );
 
     assert.notEqual(
       canonical.criticalFindings.blastLike.state,
-      ClinicalEvidenceState.SUSPICIOUS_INDETERMINATE,
+      STATES.SUSPICIOUS_INDETERMINATE,
     );
   },
 );
