@@ -285,9 +285,9 @@ export function applyFinalClinicalGovernor(result = {}) {
     requiresHumanReview = true;
   } else if (reactivePattern) {
     finalClass = "CLASS_2_ATYPICAL_REACTIVE_PATTERN";
-    riskLevel = "Padrão linfoide reacional/atípico";
+    riskLevel = "Possível padrão linfoide reacional";
     mainFinding =
-      "Achado compatível com ativação linfoide reacional/atípica no campo analisado, sem critérios inequívocos de blasto entre as células avaliáveis.";
+      "Achados compatíveis com possível reatividade linfoide no campo analisado, sem elementos suficientes para caracterizar população linfoide atípica sustentada ou suspeita blástica.";
     requiresHumanReview = true;
   } else if (sustainedAtypicalPopulation) {
     finalClass = "CLASS_3_SUSPICIOUS_ATYPICAL_POPULATION";

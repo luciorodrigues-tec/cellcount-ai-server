@@ -26,3 +26,8 @@ export {
   projectClinicalResultV2,
   attachClinicalResultV2,
 } from "./clinicalResultV2Projector.js";
+
+export {
+  CLINICAL_RESULT_COHERENCE_ENGINE_VERSION,
+  buildClinicalResultCoherenceProjection,
+} from "./clinicalResultCoherenceEngine.js";

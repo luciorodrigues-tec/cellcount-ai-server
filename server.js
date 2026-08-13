@@ -178,6 +178,7 @@ import {
 
 import {
   CRA_001_1_VERSION,
+  CLINICAL_RESULT_COHERENCE_ENGINE_VERSION,
   attachClinicalResultV2,
 } from "./ai/clinicalResultV2/index.js";
 
@@ -6163,6 +6164,8 @@ app.get("/runtime-version", (_req, res) => {
       REACTIVE_LYMPHOID_EVIDENCE_SENTINEL_VERSION,
     canonicalClinicalResultArchitectureVersion:
       CRA_001_1_VERSION,
+    clinicalResultCoherenceEngineVersion:
+      CLINICAL_RESULT_COHERENCE_ENGINE_VERSION,
     vmeContract: "VME-1.0",
     model: OPENAI_MODEL,
     defaults: {

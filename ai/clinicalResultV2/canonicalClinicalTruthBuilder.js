@@ -325,16 +325,21 @@ function buildParasiteTruth(result) {
 function buildReactiveTruth(result) {
   const sentinel = asObject(result.reactiveLymphoidEvidenceSentinel);
   const assessment = asObject(result.reactiveLymphoidEvidenceAssessment);
-  const supported =
-    sentinel.reactivePatternSupported === true ||
-    assessment.reactivePatternSupported === true ||
-    result.reactiveLymphoidPattern === true ||
-    result.lymphoidPatternAnalysis?.lymphoidPattern === "LYMPHOID_REACTIVE";
+  // CRCE-1.3 — once the evidence sentinel/assessment exists, legacy flags are
+  // no longer allowed to re-promote a reactive population pattern downstream.
+  const hasGovernedReactiveEvidence =
+    Object.keys(sentinel).length > 0 || Object.keys(assessment).length > 0;
 
-  const monoSupported =
-    sentinel.mononucleosisPatternSupported === true ||
-    assessment.mononucleosisPatternSupported === true ||
-    result.mononucleosisSuspicion === true;
+  const supported = hasGovernedReactiveEvidence
+    ? sentinel.reactivePatternSupported === true ||
+      assessment.reactivePatternSupported === true
+    : result.reactiveLymphoidPattern === true ||
+      result.lymphoidPatternAnalysis?.lymphoidPattern === "LYMPHOID_REACTIVE";
+
+  const monoSupported = hasGovernedReactiveEvidence
+    ? sentinel.mononucleosisPatternSupported === true ||
+      assessment.mononucleosisPatternSupported === true
+    : result.mononucleosisSuspicion === true;
 
   const evidence = evidenceStrings(
     sentinel.evidence,
@@ -483,6 +488,22 @@ export function buildCanonicalClinicalTruth(result = {}, {
     parasiteArtifact.parasite.requiresReview === true ||
     fieldLimited;
 
+  const morphologySignals = {
+    focalMononuclearAtypia:
+      result.findings?.atypicalLymphocytes === true ||
+      result.findings?.largeMononuclearCells === true,
+    atypicalLymphocytesObserved:
+      result.findings?.atypicalLymphocytes === true,
+    largeMononuclearCellsObserved:
+      result.findings?.largeMononuclearCells === true,
+    reactiveLymphocytesObserved:
+      result.findings?.reactiveLymphocytes === true,
+    immatureCellsObserved:
+      result.findings?.immatureCells === true,
+    monomorphicPopulationObserved:
+      result.findings?.monomorphicPopulation === true,
+  };
+
   const severity =
     blastLike.state === ClinicalEvidenceState.OBSERVED
       ? ClinicalSeverity.CRITICAL
@@ -560,6 +581,7 @@ export function buildCanonicalClinicalTruth(result = {}, {
     },
     parasiteArtifact,
     patternInterpretation,
+    morphologySignals,
     risk: {
       severity,
       legacyClass:

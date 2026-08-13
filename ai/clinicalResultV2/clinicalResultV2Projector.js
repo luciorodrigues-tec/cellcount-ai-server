@@ -9,6 +9,7 @@ import {
   validateCanonicalClinicalTruth,
 } from "./canonicalClinicalTruthValidator.js";
 import { buildExpertHematologyNarrative } from "./expertHematologyNarrative.js";
+import { buildClinicalResultCoherenceProjection } from "./clinicalResultCoherenceEngine.js";
 
 export function projectClinicalResultV2(result = {}, context = {}) {
   const truth = buildCanonicalClinicalTruth(result, context);
@@ -27,10 +28,12 @@ export function projectClinicalResultV2(result = {}, context = {}) {
   assertCanonicalClinicalTruth(truth);
 
   const narrative = buildExpertHematologyNarrative(truth, result);
+  const presentation = buildClinicalResultCoherenceProjection(truth, narrative);
 
   return {
     ...truth,
     narrative,
+    presentation,
     validation: {
       valid: true,
       deliveryAllowed: true,
