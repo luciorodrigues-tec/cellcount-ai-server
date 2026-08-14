@@ -3348,6 +3348,7 @@ function applyBoneMarrowLanguageGuard(result = {}) {
 // BE-FIX-005.21 — VME LENGTH-EXHAUSTION RECOVERY & STRUCTURED OUTPUT BUDGET
 // ============================================================================
 const VME_LENGTH_EXHAUSTION_RECOVERY_VERSION = "BE-FIX-005.21";
+const VME_REASONING_COMPATIBILITY_VERSION = "BE-FIX-005.21.1";
 
 // ============================================================================
 // OPENAI ANALYSIS
@@ -3985,7 +3986,7 @@ Não usar false para representar "não avaliável".
         version: PRODUCTION_VME_ENFORCEMENT_VERSION,
         structuredOutput: isPeripheralVisualAcquisition,
         reasoningEffort: isPeripheralVisualAcquisition
-          ? (process.env.OPENAI_VISION_REASONING_EFFORT || "minimal")
+          ? (process.env.OPENAI_VISION_REASONING_EFFORT || "none")
           : "model-default",
         systemPromptLength: selectedPrompt.length,
         acquisitionContextLength: acquisitionContext.length,
@@ -4034,7 +4035,7 @@ Não usar false para representar "não avaliável".
 
     if (isPeripheralVisualAcquisition) {
       completionRequest.reasoning_effort =
-        process.env.OPENAI_VISION_REASONING_EFFORT || "minimal";
+        process.env.OPENAI_VISION_REASONING_EFFORT || "none";
 
       if (process.env.OPENAI_VISION_SERVICE_TIER) {
         completionRequest.service_tier =
@@ -4137,7 +4138,7 @@ Não usar false para representar "não avaliável".
         const repairCompletion = await openai.chat.completions.create({
           model: OPENAI_MODEL,
           reasoning_effort:
-            process.env.OPENAI_VISION_REPAIR_REASONING_EFFORT || "minimal",
+            process.env.OPENAI_VISION_REPAIR_REASONING_EFFORT || "none",
           max_completion_tokens: Number(
             process.env.OPENAI_VISION_REPAIR_MAX_COMPLETION_TOKENS || 3600,
           ),
@@ -5190,13 +5191,41 @@ if (
   } catch (error) {
     console.error("TURBO PIPELINE ERROR:", error);
 
+    // ======================================================================
+    // BE-FIX-005.21.1 — GPT-5.5 REASONING COMPATIBILITY & HARD FAILURE
+    // A technical failure before valid VME acquisition is not morphology.
+    // Never allow it to continue through clinical normalization/governors.
+    // ======================================================================
     return {
       success: false,
-      summary: "Erro interno no pipeline hematológico turbo.",
-      riskLevel: "Erro",
-      observations: error.message,
+      errorCode: "VISUAL_ACQUISITION_TECHNICAL_FAILURE",
+      error:
+        "A aquisição morfológica visual foi interrompida por uma falha técnica antes da formação de evidência válida.",
+      requiresRetry: true,
+      requiresHumanReview: true,
+      visualEvidenceAcquisitionIncomplete: true,
       safetyValidation: { safeDiagnosticGate: false },
-      pipeline: { failed: true, version: "V8_TURBO_ENTERPRISE" },
+      metadata: {
+        requestId,
+        safeFailureMode: true,
+        reportSuppressed: true,
+        reasoningCompatibilityVersion:
+          VME_REASONING_COMPATIBILITY_VERSION,
+        upstreamErrorCode:
+          error?.code || error?.error?.code || null,
+        upstreamErrorParam:
+          error?.param || error?.error?.param || null,
+      },
+      pipeline: {
+        failed: true,
+        failedClosed: true,
+        visualAcquisitionOnly: true,
+        version: "V8_TURBO_ENTERPRISE",
+        vmeLengthExhaustionRecoveryVersion:
+          VME_LENGTH_EXHAUSTION_RECOVERY_VERSION,
+        vmeReasoningCompatibilityVersion:
+          VME_REASONING_COMPATIBILITY_VERSION,
+      },
     };
   }
 }
@@ -6213,6 +6242,8 @@ app.get("/runtime-version", (_req, res) => {
       LOCAL_MORPHOLOGY_ACQUISITION_RECOVERY_VERSION,
     vmeLengthExhaustionRecoveryVersion:
       VME_LENGTH_EXHAUSTION_RECOVERY_VERSION,
+    vmeReasoningCompatibilityVersion:
+      VME_REASONING_COMPATIBILITY_VERSION,
     finalAnalysisAssemblyRecoveryVersion: "BE-FIX-005.10",
     evidenceConsistentMorphologySynthesisVersion:
       EVIDENCE_CONSISTENT_MORPHOLOGY_SYNTHESIS_VERSION,
@@ -6230,11 +6261,11 @@ app.get("/runtime-version", (_req, res) => {
     model: OPENAI_MODEL,
     defaults: {
       reasoningEffort:
-        process.env.OPENAI_VISION_REASONING_EFFORT || "minimal",
+        process.env.OPENAI_VISION_REASONING_EFFORT || "none",
       maxCompletionTokens:
         Number(process.env.OPENAI_VISION_MAX_COMPLETION_TOKENS || 3200),
       repairReasoningEffort:
-        process.env.OPENAI_VISION_REPAIR_REASONING_EFFORT || "minimal",
+        process.env.OPENAI_VISION_REPAIR_REASONING_EFFORT || "none",
       repairMaxCompletionTokens:
         Number(process.env.OPENAI_VISION_REPAIR_MAX_COMPLETION_TOKENS || 3600),
       lengthRecoveryPrimaryBudgetMs:
@@ -6539,8 +6570,12 @@ app.post(
 
       if (
         structured?.success === false &&
-        structured?.errorCode === "INCOMPLETE_VISUAL_EVIDENCE"
+        (
+          structured?.errorCode === "INCOMPLETE_VISUAL_EVIDENCE" ||
+          structured?.errorCode === "VISUAL_ACQUISITION_TECHNICAL_FAILURE"
+        )
       ) {
+        // BE-FIX-005.21.1 — failed acquisition cannot enter clinical governors.
         return res.status(422).json(structured);
       }
 
