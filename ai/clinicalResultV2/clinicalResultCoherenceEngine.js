@@ -14,6 +14,7 @@ import {
 
 export const CLINICAL_RESULT_COHERENCE_ENGINE_VERSION = "CRCE-1.7";
 export const CRITICAL_BLAST_PRESENTATION_GOVERNANCE_VERSION = "BE-FIX-005.18";
+export const CLINICAL_FINDING_FIRST_NARRATIVE_GOVERNANCE_VERSION = "BE-FIX-005.19";
 
 function clean(value) {
   return typeof value === "string" ? value.replace(/\s+/g, " ").trim() : "";
@@ -290,8 +291,8 @@ function canonicalExecutiveConclusion(truth, morphology, riskTier) {
 
     case "SUSPICIOUS_BLAST_LIKE_FINDING":
       return limited
-        ? "Elemento(s) com características de imaturidade/blastoidia foram identificados no campo analisado, sem critérios suficientes para confirmação. A representatividade limitada impede caracterização populacional; revisão hematológica prioritária é recomendada."
-        : "Elemento(s) com características de imaturidade/blastoidia foram identificados, sem critérios suficientes para confirmação. Revisão hematológica prioritária é recomendada.";
+        ? "SUSPEITA BLÁSTICA/BLASTOIDE: foram identificados elemento(s) com características morfológicas suspeitas para imaturidade/blastoidia no campo analisado, sem critérios suficientes para confirmação como blasto. O achado é de alta relevância e requer revisão hematológica prioritária. A representatividade limitada impede estimar frequência ou distribuição na lâmina, mas não invalida a suspeita observada."
+        : "SUSPEITA BLÁSTICA/BLASTOIDE: foram identificados elemento(s) com características morfológicas suspeitas para imaturidade/blastoidia, sem critérios suficientes para confirmação como blasto. O achado é de alta relevância e requer revisão hematológica prioritária.";
 
     case "STRUCTURED_PARASITE_EVIDENCE":
       return "Evidência parasitária estruturada identificada no campo analisado; confirmação microscópica e laboratorial é necessária.";
@@ -379,7 +380,9 @@ function canonicalSlideJudgement(truth, morphology, riskTier) {
         ? "ALERTA HEMATOLÓGICO CRÍTICO: blasto/blastoide observado no campo analisado. A limitação de representatividade não invalida o achado positivo; revisão hematológica urgente é necessária."
         : "ALERTA HEMATOLÓGICO CRÍTICO: blasto/blastoide observado no campo analisado; revisão hematológica urgente é necessária.";
     case "SUSPICIOUS_BLAST_LIKE_FINDING":
-      return `${prefix}Há suspeita morfológica relevante de imaturidade/blastoidia, não confirmável pela imagem isolada; revisão hematológica prioritária é indicada.`;
+      return limited
+        ? "SUSPEITA BLÁSTICA/BLASTOIDE: foram identificados elemento(s) com características morfológicas suspeitas para imaturidade/blastoidia no campo analisado, sem critérios suficientes para confirmação como blasto. O achado é de alta relevância e requer revisão hematológica prioritária. A representatividade limitada impede estimar frequência ou distribuição na lâmina, mas não invalida a suspeita observada."
+        : "SUSPEITA BLÁSTICA/BLASTOIDE: foram identificados elemento(s) com características morfológicas suspeitas para imaturidade/blastoidia, sem critérios suficientes para confirmação como blasto. O achado é de alta relevância e requer revisão hematológica prioritária.";
     case "STRUCTURED_PARASITE_EVIDENCE":
       return `${prefix}Há evidência parasitária estruturada no material avaliável, exigindo confirmação microscópica/laboratorial.`;
     case "SUSTAINED_ATYPICAL_POPULATION":
@@ -408,6 +411,8 @@ function presentationGovernance(truth, morphology, riskTier, narrative, evidence
     authority: "CRCE-1.7",
     criticalBlastPresentationGovernanceVersion:
       CRITICAL_BLAST_PRESENTATION_GOVERNANCE_VERSION,
+    clinicalFindingFirstNarrativeGovernanceVersion:
+      CLINICAL_FINDING_FIRST_NARRATIVE_GOVERNANCE_VERSION,
     clinicalPriority:
       morphology.code === "CRITICAL_BLAST_LIKE_FINDING"
         ? "CRITICAL_BLAST_CONFIRMED"

@@ -119,8 +119,11 @@ function evidenceAvailable(result = {}) {
   );
 }
 
+// FA-005.12 / BE-FIX-005.20.1:
+// Keep each canonical item purely local. The cross-field/global exclusion
+// warning is emitted exactly once through negativeFindingScope.globalQualifier.
 function scopedSentence(label) {
-  return `${label} não identificados entre os elementos suficientemente avaliáveis neste campo. Esta observação não permite exclusão global na lâmina.`;
+  return `${label} não identificados entre os elementos suficientemente avaliáveis neste campo.`;
 }
 
 function notAssessableSentence(label) {
@@ -233,9 +236,6 @@ export function applyFieldScopedNegativeFindings(result = {}) {
 
   const limitedField = isLimitedField(result);
 
-  // In BE-FIX-005.4 all negative observations remain field-scoped.
-  // Adequate fields may later receive a separate validated population-level
-  // exclusion contract, but this engine never creates global absence claims.
   const statuses = Object.entries(DEFINITIONS).map(([key, definition]) =>
     buildStatus(result, key, definition),
   );
@@ -252,8 +252,6 @@ export function applyFieldScopedNegativeFindings(result = {}) {
     rule:
       "NOT_OBSERVED_IN_EVALUABLE_FIELD != ABSENT_IN_SPECIMEN",
     globalNegativeExclusionAllowed: false,
-    // FA-005.12.1 — presentation-level qualifier. The legacy per-item
-    // qualifier remains intact for BE-FIX-005.5.3 contract compatibility.
     globalQualifier:
       "A não identificação desses elementos no campo analisado não permite excluir sua presença em outras áreas da lâmina.",
     items: statuses,
@@ -278,8 +276,6 @@ export function applyFieldScopedNegativeFindings(result = {}) {
   result.whatAISees.negativeFindings =
     result.negativeFindingsStructured.join("\n");
 
-  // Sanitize legacy unsafe wording everywhere except the canonical local
-  // evidence namespaces, which remain read-only.
   sanitizeNegativeNarratives(
     result,
     statuses,

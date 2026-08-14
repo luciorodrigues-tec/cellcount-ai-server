@@ -98,8 +98,8 @@ export function buildExpertHematologyNarrative(truth = {}, source = {}) {
       "Achado morfológico crítico no campo analisado, com necessidade de revisão hematológica urgente. A classificação final permanece limitada à evidência visual e não constitui diagnóstico etiológico.";
   } else if (blast?.state === ClinicalEvidenceState.SUSPICIOUS_INDETERMINATE) {
     executiveSynthesis = truth.scope?.limitedField === true
-      ? "Campo com elemento(s) morfologicamente suspeito(s) para imaturidade/blastoidia, sem critérios suficientes para confirmação. A representatividade limitada impede caracterização populacional; revisão hematológica prioritária é recomendada."
-      : "Campo com elemento(s) morfologicamente suspeito(s) para imaturidade/blastoidia, sem critérios suficientes para confirmação; revisão hematológica prioritária é recomendada.";
+      ? "SUSPEITA BLÁSTICA/BLASTOIDE: foram identificados elemento(s) com características morfológicas suspeitas para imaturidade/blastoidia no campo analisado, sem critérios suficientes para confirmação como blasto. O achado é de alta relevância e requer revisão hematológica prioritária. A representatividade limitada impede estimar frequência ou distribuição na lâmina, mas não invalida a suspeita observada."
+      : "SUSPEITA BLÁSTICA/BLASTOIDE: foram identificados elemento(s) com características morfológicas suspeitas para imaturidade/blastoidia, sem critérios suficientes para confirmação como blasto. O achado é de alta relevância e requer revisão hematológica prioritária.";
   } else if (priorityFindings.length > 0) {
     executiveSynthesis = priorityFindings[0];
   } else if (truth.scope?.limitedField === true) {
