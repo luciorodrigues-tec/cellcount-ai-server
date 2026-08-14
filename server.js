@@ -3345,6 +3345,11 @@ function applyBoneMarrowLanguageGuard(result = {}) {
 }
 
 // ============================================================================
+// BE-FIX-005.21 — VME LENGTH-EXHAUSTION RECOVERY & STRUCTURED OUTPUT BUDGET
+// ============================================================================
+const VME_LENGTH_EXHAUSTION_RECOVERY_VERSION = "BE-FIX-005.21";
+
+// ============================================================================
 // OPENAI ANALYSIS
 // ============================================================================
 
@@ -3980,7 +3985,7 @@ Não usar false para representar "não avaliável".
         version: PRODUCTION_VME_ENFORCEMENT_VERSION,
         structuredOutput: isPeripheralVisualAcquisition,
         reasoningEffort: isPeripheralVisualAcquisition
-          ? (process.env.OPENAI_VISION_REASONING_EFFORT || "low")
+          ? (process.env.OPENAI_VISION_REASONING_EFFORT || "minimal")
           : "model-default",
         systemPromptLength: selectedPrompt.length,
         acquisitionContextLength: acquisitionContext.length,
@@ -3993,7 +3998,9 @@ Não usar false para representar "não avaliável".
         version: LOCAL_MORPHOLOGY_ACQUISITION_RECOVERY_VERSION,
         primaryImages: imagesPayload.length,
         maxCompletionTokens:
-          Number(process.env.OPENAI_VISION_MAX_COMPLETION_TOKENS || 1800),
+          Number(process.env.OPENAI_VISION_MAX_COMPLETION_TOKENS || 3200),
+        lengthExhaustionRecoveryVersion:
+          VME_LENGTH_EXHAUSTION_RECOVERY_VERSION,
         imageDetail:
           process.env.VME_IMAGE_DETAIL || "high",
         centerCrop:
@@ -4005,7 +4012,7 @@ Não usar false para representar "não avaliável".
     const completionRequest = {
       model: OPENAI_MODEL,
       max_completion_tokens: isPeripheralVisualAcquisition
-        ? Number(process.env.OPENAI_VISION_MAX_COMPLETION_TOKENS || 1800)
+        ? Number(process.env.OPENAI_VISION_MAX_COMPLETION_TOKENS || 3200)
         : 4000,
       response_format: isPeripheralVisualAcquisition
         ? buildVisualMorphologyAcquisitionResponseFormat()
@@ -4027,7 +4034,7 @@ Não usar false para representar "não avaliável".
 
     if (isPeripheralVisualAcquisition) {
       completionRequest.reasoning_effort =
-        process.env.OPENAI_VISION_REASONING_EFFORT || "low";
+        process.env.OPENAI_VISION_REASONING_EFFORT || "minimal";
 
       if (process.env.OPENAI_VISION_SERVICE_TIER) {
         completionRequest.service_tier =
@@ -4073,10 +4080,40 @@ Não usar false para representar "não avaliável".
 
     let visualMorphologyRepairAttempted = false;
 
+    // BE-FIX-005.21 — a completion that ended by token exhaustion is a
+    // transport/output-budget failure, not evidence that the image lacks
+    // morphology. In that narrow condition, one bounded repair pass is
+    // automatically authorized even when the general repair switch is off.
+    const primaryFinishReason =
+      completion?.choices?.[0]?.finish_reason || null;
+    const lengthExhausted =
+      primaryFinishReason === "length" &&
+      visualMorphologyEvidenceAcquisition.complete !== true;
+
     const visualRepairEnabled =
       String(process.env.VME_REPAIR_ENABLED || "false").toLowerCase() === "true";
     const visualRepairBudgetMs = Number(
       process.env.VME_REPAIR_PRIMARY_BUDGET_MS || 45000,
+    );
+    const lengthRecoveryBudgetMs = Number(
+      process.env.VME_LENGTH_RECOVERY_PRIMARY_BUDGET_MS || 65000,
+    );
+    const effectiveRepairEnabled =
+      visualRepairEnabled || lengthExhausted;
+    const effectiveRepairBudgetMs =
+      lengthExhausted ? lengthRecoveryBudgetMs : visualRepairBudgetMs;
+
+    console.log(
+      "BE-FIX-005.21 — VME LENGTH-EXHAUSTION GOVERNANCE",
+      JSON.stringify({
+        version: VME_LENGTH_EXHAUSTION_RECOVERY_VERSION,
+        primaryFinishReason,
+        lengthExhausted,
+        generalRepairEnabled: visualRepairEnabled,
+        effectiveRepairEnabled,
+        primaryElapsedMs: visualTiming,
+        effectiveRepairBudgetMs,
+      }),
     );
 
     if (
@@ -4084,8 +4121,8 @@ Não usar false para representar "não avaliável".
       shouldAttemptVisualMorphologyRepair({
         acquisition: visualMorphologyEvidenceAcquisition,
         primaryElapsedMs: visualTiming,
-        repairEnabled: visualRepairEnabled,
-        latencyBudgetMs: visualRepairBudgetMs,
+        repairEnabled: effectiveRepairEnabled,
+        latencyBudgetMs: effectiveRepairBudgetMs,
       })
     ) {
       visualMorphologyRepairAttempted = true;
@@ -4100,9 +4137,9 @@ Não usar false para representar "não avaliável".
         const repairCompletion = await openai.chat.completions.create({
           model: OPENAI_MODEL,
           reasoning_effort:
-            process.env.OPENAI_VISION_REPAIR_REASONING_EFFORT || "low",
+            process.env.OPENAI_VISION_REPAIR_REASONING_EFFORT || "minimal",
           max_completion_tokens: Number(
-            process.env.OPENAI_VISION_REPAIR_MAX_COMPLETION_TOKENS || 2400,
+            process.env.OPENAI_VISION_REPAIR_MAX_COMPLETION_TOKENS || 3600,
           ),
           response_format: buildVisualMorphologyAcquisitionResponseFormat(),
           messages: [
@@ -4115,7 +4152,7 @@ Não usar false para representar "não avaliável".
               content: [
                 {
                   type: "text",
-                  text: "Reanalise as mesmas imagens apenas para adquirir a morfologia visual ausente. Não produza relatório clínico final.",
+                  text: "Reanalise as mesmas imagens somente para preencher o schema VME obrigatório. Priorize primeiro os campos ausentes, use descrições morfológicas objetivas e concisas, use null/NOT_ASSESSABLE quando não avaliável e não produza relatório clínico final.",
                 },
                 ...imagesPayload,
               ],
@@ -4168,8 +4205,10 @@ Não usar false para representar "não avaliável".
         "BE-FIX-005.9 — VME INCOMPLETE: repair skipped by latency budget/default production policy",
         JSON.stringify({
           primaryElapsedMs: visualTiming,
-          repairEnabled: visualRepairEnabled,
-          latencyBudgetMs: visualRepairBudgetMs,
+          primaryFinishReason,
+          lengthExhausted,
+          repairEnabled: effectiveRepairEnabled,
+          latencyBudgetMs: effectiveRepairBudgetMs,
           missingRequirements:
             visualMorphologyEvidenceAcquisition.missingRequirements,
         }),
@@ -4179,6 +4218,10 @@ Não usar false para representar "não avaliável".
     parsed.visualMorphologyEvidenceAcquisition = {
       ...visualMorphologyEvidenceAcquisition,
       repairAttempted: visualMorphologyRepairAttempted,
+      lengthExhaustionRecoveryVersion:
+        VME_LENGTH_EXHAUSTION_RECOVERY_VERSION,
+      primaryFinishReason,
+      lengthExhausted,
       contractStatus: visualMorphologyEvidenceAcquisitionContractStatus(
         visualMorphologyEvidenceAcquisition,
       ),
@@ -4210,6 +4253,8 @@ Não usar false para representar "não avaliável".
             PRODUCTION_VME_ENFORCEMENT_VERSION,
           localMorphologyAcquisitionRecoveryVersion:
             LOCAL_MORPHOLOGY_ACQUISITION_RECOVERY_VERSION,
+          vmeLengthExhaustionRecoveryVersion:
+            VME_LENGTH_EXHAUSTION_RECOVERY_VERSION,
           failedClosed: true,
           visualAcquisitionOnly: true,
         },
@@ -6166,6 +6211,8 @@ app.get("/runtime-version", (_req, res) => {
       PRODUCTION_VME_ENFORCEMENT_VERSION,
     localMorphologyAcquisitionRecoveryVersion:
       LOCAL_MORPHOLOGY_ACQUISITION_RECOVERY_VERSION,
+    vmeLengthExhaustionRecoveryVersion:
+      VME_LENGTH_EXHAUSTION_RECOVERY_VERSION,
     finalAnalysisAssemblyRecoveryVersion: "BE-FIX-005.10",
     evidenceConsistentMorphologySynthesisVersion:
       EVIDENCE_CONSISTENT_MORPHOLOGY_SYNTHESIS_VERSION,
@@ -6183,9 +6230,15 @@ app.get("/runtime-version", (_req, res) => {
     model: OPENAI_MODEL,
     defaults: {
       reasoningEffort:
-        process.env.OPENAI_VISION_REASONING_EFFORT || "low",
+        process.env.OPENAI_VISION_REASONING_EFFORT || "minimal",
       maxCompletionTokens:
-        Number(process.env.OPENAI_VISION_MAX_COMPLETION_TOKENS || 1800),
+        Number(process.env.OPENAI_VISION_MAX_COMPLETION_TOKENS || 3200),
+      repairReasoningEffort:
+        process.env.OPENAI_VISION_REPAIR_REASONING_EFFORT || "minimal",
+      repairMaxCompletionTokens:
+        Number(process.env.OPENAI_VISION_REPAIR_MAX_COMPLETION_TOKENS || 3600),
+      lengthRecoveryPrimaryBudgetMs:
+        Number(process.env.VME_LENGTH_RECOVERY_PRIMARY_BUDGET_MS || 65000),
       primaryTiles:
         Number(process.env.VME_PRIMARY_TILES || 0),
       includeCenterCrop:

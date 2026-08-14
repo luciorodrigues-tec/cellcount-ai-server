@@ -1,0 +1,70 @@
+CELLCOUNT ENTERPRISE
+BE-FIX-005.21 — VME Length-Exhaustion Recovery & Structured Output Budget Governance
+
+ARQUIVO A SUBSTITUIR
+-------------------
+backend\server.js
+
+ARQUIVO DE TESTE NOVO
+---------------------
+Copiar:
+be_fix_005_21_vme_length_exhaustion_recovery_test.mjs
+para:
+backend\tests\be_fix_005_21_vme_length_exhaustion_recovery_test.mjs
+
+OBJETIVO
+--------
+1. Tratar finish_reason="length" como exaustão de orçamento de saída, não como ausência morfológica.
+2. Autorizar automaticamente UMA recuperação VME quando a aquisição estiver incompleta por length, mesmo com VME_REPAIR_ENABLED=false.
+3. Manter o repair geral opt-in para outras causas de aquisição incompleta.
+4. Reduzir o reasoning padrão do VME para "minimal".
+5. Aumentar o orçamento estruturado primário de 1800 para 3200 tokens.
+6. Usar repair focalizado com reasoning "minimal" e 3600 tokens.
+7. Preservar o fail-closed: se o repair não completar o VME, o relatório continua suprimido.
+8. Não altera LME-1.0, FA-4.0, governança de blastos ou CRCE.
+
+NOVOS DEFAULTS (podem ser sobrescritos por ENV)
+------------------------------------------------
+OPENAI_VISION_REASONING_EFFORT=minimal
+OPENAI_VISION_MAX_COMPLETION_TOKENS=3200
+OPENAI_VISION_REPAIR_REASONING_EFFORT=minimal
+OPENAI_VISION_REPAIR_MAX_COMPLETION_TOKENS=3600
+VME_LENGTH_RECOVERY_PRIMARY_BUDGET_MS=65000
+
+VALIDAÇÃO LOCAL
+---------------
+cd /d C:\CELLCOUNT_V1.0.0-beta.4_10_08\backend
+
+node --check server.js
+node --test tests\be_fix_005_21_vme_length_exhaustion_recovery_test.mjs
+node --test tests\be_fix_005_19_clinical_finding_first_narrative_layout_governance_test.mjs
+node --test tests\fa_005_12_clinical_result_consistency_narrative_deduplication_test.mjs
+node --test tests\crce_1_6_suspicious_blast_synthesis_test.mjs
+node --test tests\be_fe_fix_clinical_result_coherence_engine_test.mjs
+node --test tests\be_fix_005_18_critical_blast_presentation_priority_governance_test.mjs
+node --test tests\be_fix_005_17_single_blast_confirmation_critical_alert_governance_test.mjs
+node --test tests\be_fix_005_16_blast_assessability_limited_field_reactive_gate_test.mjs
+node --test tests\be_fix_005_15_evidence_grounded_reactive_lymphoid_sentinel_test.mjs
+node --test tests\be_fix_005_13_single_blast_sentinel_test.mjs
+
+NÃO FAZER COMMIT/PUSH antes da validação completa.
+
+VALIDAÇÃO EM PRODUÇÃO APÓS COMMIT/PUSH
+--------------------------------------
+curl -H "Cache-Control: no-cache" "https://api.rodrigueslucio.com/runtime-version?t=be-fix-00521"
+
+Esperado no runtime-version:
+vmeLengthExhaustionRecoveryVersion: "BE-FIX-005.21"
+defaults.reasoningEffort: "minimal"
+defaults.maxCompletionTokens: 3200
+defaults.repairReasoningEffort: "minimal"
+defaults.repairMaxCompletionTokens: 3600
+
+No caso que antes falhava por finishReason="length", o log esperado é:
+BE-FIX-005.21 — VME LENGTH-EXHAUSTION GOVERNANCE
+lengthExhausted: true
+effectiveRepairEnabled: true
+seguido de:
+VME-1.0 MORPHOLOGY REPAIR
+
+Se o repair ainda for incompleto, REPORT SUPPRESSED deve permanecer ativo.
