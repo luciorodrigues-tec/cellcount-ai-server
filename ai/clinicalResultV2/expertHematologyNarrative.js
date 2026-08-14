@@ -47,7 +47,7 @@ export function buildExpertHematologyNarrative(truth = {}, source = {}) {
 
   if (blast?.state === ClinicalEvidenceState.OBSERVED) {
     priorityFindings.push(
-      "Sinal blástico/blastoide identificado no campo analisado. Por segurança, um único elemento positivo é suficiente para acionar revisão hematológica prioritária; a imagem isolada não define linhagem nem diagnóstico.",
+      "ALERTA HEMATOLÓGICO CRÍTICO: blasto/blastoide observado no campo analisado. Um único elemento positivo é suficiente para exigir revisão hematológica urgente; a imagem isolada não define linhagem nem diagnóstico.",
     );
   } else if (blast?.state === ClinicalEvidenceState.SUSPICIOUS_INDETERMINATE) {
     priorityFindings.push(
@@ -89,9 +89,13 @@ export function buildExpertHematologyNarrative(truth = {}, source = {}) {
   const plt = compact(truth.lineages?.platelets?.description);
 
   let executiveSynthesis = "";
-  if (truth.risk?.severity === ClinicalSeverity.CRITICAL) {
+  if (blast?.state === ClinicalEvidenceState.OBSERVED) {
+    executiveSynthesis = truth.scope?.limitedField === true
+      ? "ALERTA HEMATOLÓGICO CRÍTICO: blasto/blastoide observado no campo analisado. A representatividade limitada impede estimar frequência ou distribuição global, mas não invalida o achado positivo; revisão hematológica urgente é necessária."
+      : "ALERTA HEMATOLÓGICO CRÍTICO: blasto/blastoide observado no campo analisado; revisão hematológica urgente é necessária.";
+  } else if (truth.risk?.severity === ClinicalSeverity.CRITICAL) {
     executiveSynthesis =
-      "Achado morfológico crítico no campo analisado, com necessidade de revisão hematológica prioritária. A classificação final permanece limitada à evidência visual e não constitui diagnóstico etiológico.";
+      "Achado morfológico crítico no campo analisado, com necessidade de revisão hematológica urgente. A classificação final permanece limitada à evidência visual e não constitui diagnóstico etiológico.";
   } else if (blast?.state === ClinicalEvidenceState.SUSPICIOUS_INDETERMINATE) {
     executiveSynthesis = truth.scope?.limitedField === true
       ? "Campo com elemento(s) morfologicamente suspeito(s) para imaturidade/blastoidia, sem critérios suficientes para confirmação. A representatividade limitada impede caracterização populacional; revisão hematológica prioritária é recomendada."
@@ -125,7 +129,7 @@ export function buildExpertHematologyNarrative(truth = {}, source = {}) {
       ? "Avaliação de múltiplos campos representativos da lâmina."
       : "",
     blast?.state === ClinicalEvidenceState.OBSERVED
-      ? "Considerar investigação hematológica complementar conforme revisão profissional, incluindo imunofenotipagem quando indicada."
+      ? "Revisão hematológica urgente e investigação complementar conforme avaliação profissional, incluindo imunofenotipagem quando indicada."
       : "",
     parasite?.state === ClinicalEvidenceState.OBSERVED
       ? "Confirmar a suspeita parasitária com metodologia laboratorial apropriada."

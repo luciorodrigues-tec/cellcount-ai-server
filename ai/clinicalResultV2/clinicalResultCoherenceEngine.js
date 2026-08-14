@@ -13,6 +13,7 @@ import {
 } from "./clinicalEvidenceState.js";
 
 export const CLINICAL_RESULT_COHERENCE_ENGINE_VERSION = "CRCE-1.7";
+export const CRITICAL_BLAST_PRESENTATION_GOVERNANCE_VERSION = "BE-FIX-005.18";
 
 function clean(value) {
   return typeof value === "string" ? value.replace(/\s+/g, " ").trim() : "";
@@ -200,11 +201,16 @@ function representativity(truth) {
 
 function reviewStatus(truth, riskTier) {
   const required = truth.review?.required === true || riskTier.level !== "NO_ALERT";
-  const urgency = truth.review?.urgency || (
-    riskTier.level === "CRITICAL" ? "URGENT" :
-    riskTier.level === "HIGH" ? "PRIORITY" :
-    required ? "RECOMMENDED" : "ROUTINE"
-  );
+
+  // BE-FIX-005.18 — critical blast presentation has absolute priority.
+  // A legacy PRIORITY/RECOMMENDED review flag can never downgrade CRITICAL.
+  const urgency =
+    riskTier.level === "CRITICAL"
+      ? "URGENT"
+      : riskTier.level === "HIGH"
+        ? "PRIORITY"
+        : truth.review?.urgency ||
+          (required ? "RECOMMENDED" : "ROUTINE");
 
   return {
     required,
@@ -278,7 +284,9 @@ function canonicalExecutiveConclusion(truth, morphology, riskTier) {
 
   switch (morphology.code) {
     case "CRITICAL_BLAST_LIKE_FINDING":
-      return "Sinal blástico/blastoide identificado no campo analisado; revisão hematológica prioritária é necessária, sem atribuição de linhagem pela imagem isolada.";
+      return limited
+        ? "ALERTA HEMATOLÓGICO CRÍTICO: blasto/blastoide observado no campo analisado. A representatividade limitada impede estimar frequência ou distribuição global, mas não invalida o achado positivo. Revisão hematológica urgente é necessária; a imagem isolada não define linhagem nem diagnóstico."
+        : "ALERTA HEMATOLÓGICO CRÍTICO: blasto/blastoide observado no campo analisado. Um único elemento positivo é suficiente para acionar revisão hematológica urgente; a imagem isolada não define linhagem nem diagnóstico.";
 
     case "SUSPICIOUS_BLAST_LIKE_FINDING":
       return limited
@@ -329,7 +337,14 @@ function canonicalIntegratedInterpretation(truth, morphology) {
   }
 
   if (morphology.code === "CRITICAL_BLAST_LIKE_FINDING") {
-    return "A identificação de sinal blástico/blastoide tem prioridade sobre inferências reacionais e exige revisão especializada do esfregaço.";
+    return [
+      "Foi observado ao menos um elemento com morfologia blástica/blastoide no campo analisado.",
+      "Esse achado positivo tem prioridade clínica absoluta sobre inferências reacionais e sobre limitações de representatividade.",
+      limited
+        ? "O campo limitado impede quantificar frequência ou distribuição na lâmina, mas não pode rebaixar ou apagar o achado observado."
+        : "",
+      "É necessária revisão hematológica urgente do esfregaço; a imagem isolada não estabelece linhagem ou diagnóstico etiológico.",
+    ].filter(Boolean).join(" ");
   }
 
   if (morphology.code === "SUSPICIOUS_BLAST_LIKE_FINDING") {
@@ -360,7 +375,9 @@ function canonicalSlideJudgement(truth, morphology, riskTier) {
 
   switch (morphology.code) {
     case "CRITICAL_BLAST_LIKE_FINDING":
-      return `${prefix}Achado blástico/blastoide observado e clinicamente prioritário; a lâmina requer revisão hematológica imediata.`;
+      return limited
+        ? "ALERTA HEMATOLÓGICO CRÍTICO: blasto/blastoide observado no campo analisado. A limitação de representatividade não invalida o achado positivo; revisão hematológica urgente é necessária."
+        : "ALERTA HEMATOLÓGICO CRÍTICO: blasto/blastoide observado no campo analisado; revisão hematológica urgente é necessária.";
     case "SUSPICIOUS_BLAST_LIKE_FINDING":
       return `${prefix}Há suspeita morfológica relevante de imaturidade/blastoidia, não confirmável pela imagem isolada; revisão hematológica prioritária é indicada.`;
     case "STRUCTURED_PARASITE_EVIDENCE":
@@ -389,6 +406,14 @@ function presentationGovernance(truth, morphology, riskTier, narrative, evidence
 
   return {
     authority: "CRCE-1.7",
+    criticalBlastPresentationGovernanceVersion:
+      CRITICAL_BLAST_PRESENTATION_GOVERNANCE_VERSION,
+    clinicalPriority:
+      morphology.code === "CRITICAL_BLAST_LIKE_FINDING"
+        ? "CRITICAL_BLAST_CONFIRMED"
+        : morphology.code === "SUSPICIOUS_BLAST_LIKE_FINDING"
+          ? "BLAST_SUSPICION_PRIORITY"
+          : "STANDARD",
     slideJudgement: judgement,
     synopsis: judgement,
     detailInterpretation: details,
