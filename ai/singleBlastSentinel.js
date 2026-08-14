@@ -1,287 +1,96 @@
 // ============================================================================
 // CELLCOUNT ENTERPRISE
-// BE-FIX-005.13 — SINGLE BLAST SENTINEL / ZERO-TOLERANCE BLAST ALERT
+// BE-FIX-005.17 — SINGLE BLAST CONFIRMATION & CRITICAL ALERT GOVERNANCE
 // ============================================================================
-// Clinical safety invariant
-// -------------------------
-// A single explicitly observed/suspected blast-like element is sufficient to
-// activate a critical blast review pathway. This mirrors the manual counter's
-// clinical sensitivity without converting visual suspicion into a definitive
-// diagnosis.
-//
-// 1 OBSERVED/SUSPECTED BLAST-LIKE CELL != CONFIRMED BLAST DIAGNOSIS
-// 1 OBSERVED/SUSPECTED BLAST-LIKE CELL => BLAST ALERT + HUMAN REVIEW
+// Invariants
+// 1. One OBSERVED blast/blast-like cell => CRITICAL alert + mandatory review.
+// 2. One SUSPICIOUS blast-like signal => HIGH-priority alert + mandatory review.
+// 3. Limited field never suppresses a positive focal blast finding.
+// 4. Reactive morphology never downgrades blast evidence.
+// 5. NOT_ASSESSABLE is never converted into a negative blast conclusion.
 // ============================================================================
 
 export const SINGLE_BLAST_SENTINEL_VERSION = "BE-FIX-005.13";
+export const SINGLE_BLAST_CONFIRMATION_GOVERNANCE_VERSION = "BE-FIX-005.17";
 export const BLAST_ASSESSABILITY_SENTINEL_VERSION = "BE-FIX-005.16";
 
 function asObject(value) {
-  return value && typeof value === "object" && !Array.isArray(value)
-    ? value
-    : {};
+  return value && typeof value === "object" && !Array.isArray(value) ? value : {};
 }
-
 function finiteNumber(value) {
   if (value === null || value === undefined || value === "") return null;
   const n = Number(value);
   return Number.isFinite(n) ? n : null;
 }
-
 function normalize(value = "") {
-  return String(value || "")
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .trim();
+  return String(value || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
 }
-
 function isPositivePresence(value) {
   if (value === true) return true;
-  const text = normalize(value);
-  return [
-    "observed",
-    "present",
-    "presente",
-    "identificado",
-    "identificada",
-    "identificados",
-    "identificadas",
-    "suspected",
-    "suspeito",
-    "suspeita",
-  ].includes(text);
+  return ["observed","present","presente","identificado","identificada","suspected","suspeito","suspeita"].includes(normalize(value));
 }
-
 function readManualBlastCount(result = {}) {
-  const counts = asObject(result.counts);
-  const manual = asObject(result.manualCounts);
-  const raw = asObject(result.rawResponse);
-  const rawCounts = asObject(raw.counts);
-
-  const candidates = [
-    counts.Blasto,
-    counts.blasto,
-    counts.blast,
-    counts.blasts,
-    manual.Blasto,
-    manual.blasto,
-    manual.blast,
-    manual.blasts,
-    rawCounts.Blasto,
-    rawCounts.blasto,
-    rawCounts.blast,
-    rawCounts.blasts,
-  ];
-
-  for (const value of candidates) {
-    const n = finiteNumber(value);
-    if (n !== null) return Math.max(0, Math.trunc(n));
+  const counts = asObject(result.counts); const manual = asObject(result.manualCounts);
+  const rawCounts = asObject(asObject(result.rawResponse).counts);
+  for (const value of [counts.Blasto,counts.blasto,counts.blast,counts.blasts,manual.Blasto,manual.blasto,manual.blast,manual.blasts,rawCounts.Blasto,rawCounts.blasto,rawCounts.blast,rawCounts.blasts]) {
+    const n = finiteNumber(value); if (n !== null) return Math.max(0, Math.trunc(n));
   }
-
   return null;
 }
-
-function detectSingleBlastSignal(result = {}) {
+function classifySignal(result = {}) {
   const findings = asObject(result.findings);
-  const lme = asObject(result.localMorphologyEvidence);
-  const critical = asObject(lme.criticalMorphology);
-  const raw = asObject(result.rawResponse);
-  const rawPositive = asObject(raw.positiveFindings);
+  const critical = asObject(result.localMorphologyEvidence?.criticalMorphology);
   const visualExtraction = asObject(result.visualExtraction);
   const leukocyteFindings = asObject(result.leukocyteFindings);
-  const yoloFusion = asObject(result.yoloFusion);
-  const blastSpatial = asObject(yoloFusion.blastSpatialSignal);
-
-  const manualBlastCount = readManualBlastCount(result);
-  if (manualBlastCount !== null && manualBlastCount >= 1) {
-    return {
-      active: true,
-      source: "MANUAL_OR_HYBRID_COUNT",
-      observedCount: manualBlastCount,
-      certainty: "USER_RECORDED_BLAST",
-      evidenceState: "OBSERVED",
-    };
-  }
-
-  if (critical.blastLikeMorphology === "OBSERVED") {
-    return {
-      active: true,
-      source: "LME_CRITICAL_MORPHOLOGY",
-      observedCount: 1,
-      minimumObservedCount: 1,
-      certainty: "VISUAL_BLAST_LIKE_MORPHOLOGY",
-      evidenceState: "OBSERVED",
-    };
-  }
-
-  if (findings.blastSuspicion === true || rawPositive.blastSuspicion === true) {
-    return {
-      active: true,
-      source: findings.blastSuspicion === true
-        ? "FINAL_FINDINGS_BLAST_SUSPICION"
-        : "RAW_POSITIVE_BLAST_SUSPICION",
-      observedCount: null,
-      minimumObservedCount: 1,
-      certainty: "VISUAL_BLAST_SUSPICION",
-      evidenceState: "SUSPICIOUS_INDETERMINATE",
-    };
-  }
-
-  if (
-    isPositivePresence(visualExtraction.suspectedBlasts) ||
-    isPositivePresence(visualExtraction.blastosSuspeitos) ||
-    isPositivePresence(leukocyteFindings.suspectedBlasts) ||
-    isPositivePresence(leukocyteFindings.blastosSuspeitos)
-  ) {
-    return {
-      active: true,
-      source: "STRUCTURED_VISUAL_BLAST_SIGNAL",
-      observedCount: null,
-      minimumObservedCount: 1,
-      certainty: "VISUAL_BLAST_SUSPICION",
-      evidenceState: "SUSPICIOUS_INDETERMINATE",
-    };
-  }
-
-  const yoloBlastCount = finiteNumber(blastSpatial.yoloBlastCount);
-  if (blastSpatial.present === true && yoloBlastCount !== null && yoloBlastCount >= 1) {
-    return {
-      active: true,
-      source: "YOLO_BLAST_SPATIAL_SIGNAL",
-      observedCount: Math.trunc(yoloBlastCount),
-      minimumObservedCount: 1,
-      certainty: "COMPUTER_VISION_BLAST_SUSPICION",
-      evidenceState: "SUSPICIOUS_INDETERMINATE",
-    };
-  }
-
-  return {
-    active: false,
-    source: null,
-    observedCount: manualBlastCount,
-    minimumObservedCount: 0,
-    certainty: "NO_POSITIVE_BLAST_SIGNAL",
-    evidenceState: null,
-  };
+  const blastSpatial = asObject(asObject(result.yoloFusion).blastSpatialSignal);
+  const manualCount = readManualBlastCount(result);
+  if (manualCount !== null && manualCount >= 1) return {active:true,state:"OBSERVED",source:"MANUAL_OR_HYBRID_COUNT",observedCount:manualCount,certainty:"USER_RECORDED_BLAST"};
+  const lmeCount = finiteNumber(critical.observedBlastLikeCount);
+  if (critical.blastLikeMorphology === "OBSERVED" || (lmeCount !== null && lmeCount >= 1)) return {active:true,state:"OBSERVED",source:"LME_CRITICAL_MORPHOLOGY",observedCount:lmeCount ?? 1,certainty:"VISUAL_BLAST_LIKE_MORPHOLOGY"};
+  if (critical.blastLikeMorphology === "SUSPICIOUS_INDETERMINATE" || findings.blastEvidenceState === "SUSPICIOUS_INDETERMINATE" || findings.blastSuspicion === true) return {active:true,state:"SUSPICIOUS_INDETERMINATE",source:"STRUCTURED_BLAST_SUSPICION",observedCount:null,certainty:"VISUAL_BLAST_SUSPICION"};
+  if (isPositivePresence(visualExtraction.suspectedBlasts) || isPositivePresence(visualExtraction.blastosSuspeitos) || isPositivePresence(leukocyteFindings.suspectedBlasts) || isPositivePresence(leukocyteFindings.blastosSuspeitos)) return {active:true,state:"SUSPICIOUS_INDETERMINATE",source:"STRUCTURED_VISUAL_BLAST_SIGNAL",observedCount:null,certainty:"VISUAL_BLAST_SUSPICION"};
+  const yoloCount = finiteNumber(blastSpatial.yoloBlastCount);
+  if (blastSpatial.present === true && yoloCount !== null && yoloCount >= 1) return {active:true,state:"SUSPICIOUS_INDETERMINATE",source:"YOLO_BLAST_SPATIAL_SIGNAL",observedCount:Math.trunc(yoloCount),certainty:"COMPUTER_VISION_BLAST_SUSPICION"};
+  return {active:false,state:null,source:null,observedCount:manualCount,certainty:"NO_POSITIVE_BLAST_SIGNAL"};
 }
+function pushUnique(arr, value) { return [...new Set([...(Array.isArray(arr)?arr:[]), value])]; }
 
 export function applySingleBlastSentinel(result = {}) {
   if (!result || typeof result !== "object") return result;
-
-  const signal = detectSingleBlastSignal(result);
+  const signal = classifySignal(result);
   const critical = asObject(result.localMorphologyEvidence?.criticalMorphology);
   const fieldGate = asObject(result.fieldAdequacy?.blastAssessability);
   const lmeGate = asObject(critical.blastAssessability);
-
-  const blastAssessable =
-    fieldGate.adequateForBlastScreening === true ||
-    lmeGate.adequateForBlastScreening === true ||
-    result.fieldAdequacy?.adequateForBlastScreening === true;
-
-  const blastNegativeState =
-    signal.active
-      ? signal.evidenceState
-      : (
-          critical.blastLikeMorphology === "NOT_OBSERVED_IN_EVALUABLE_FIELD" &&
-          blastAssessable
-            ? "NOT_OBSERVED_IN_EVALUABLE_FIELD"
-            : "NOT_ASSESSABLE"
-        );
-
+  const blastAssessable = fieldGate.adequateForBlastScreening === true || lmeGate.adequateForBlastScreening === true || result.fieldAdequacy?.adequateForBlastScreening === true;
+  const negativeState = signal.active ? signal.state : (critical.blastLikeMorphology === "NOT_OBSERVED_IN_EVALUABLE_FIELD" && blastAssessable ? "NOT_OBSERVED_IN_EVALUABLE_FIELD" : "NOT_ASSESSABLE");
+  const observed = signal.state === "OBSERVED";
+  const suspicious = signal.state === "SUSPICIOUS_INDETERMINATE";
   result.singleBlastSentinel = {
-    version: SINGLE_BLAST_SENTINEL_VERSION,
-    active: signal.active,
-    source: signal.source,
-    observedCount: signal.observedCount,
-    minimumObservedCount: signal.minimumObservedCount ?? 0,
-    certainty: signal.certainty,
-    evidenceState: signal.evidenceState,
-    rule: "ONE_BLAST_OR_BLAST_LIKE_SIGNAL_TRIGGERS_ALERT",
-    diagnosticConclusionAllowed: false,
-    assessabilityVersion: BLAST_ASSESSABILITY_SENTINEL_VERSION,
-    blastAssessable,
-    negativeEvidenceState: blastNegativeState,
-    negativeBlastConclusionAllowed:
-      !signal.active &&
-      blastAssessable &&
-      blastNegativeState === "NOT_OBSERVED_IN_EVALUABLE_FIELD",
+    version:SINGLE_BLAST_SENTINEL_VERSION, governanceVersion:SINGLE_BLAST_CONFIRMATION_GOVERNANCE_VERSION, active:signal.active, source:signal.source, observedCount:signal.observedCount, minimumObservedCount:signal.active?1:0, certainty:signal.certainty, evidenceState:signal.state,
+    alertLevel: observed ? "CRITICAL" : suspicious ? "HIGH" : "NONE", confirmedMorphologicObservation: observed, diagnosticConclusionAllowed:false,
+    rule:"ONE_OBSERVED_BLAST_TRIGGERS_CRITICAL_ALERT; ONE_SUSPICIOUS_BLAST_TRIGGERS_HIGH_PRIORITY_REVIEW", assessabilityVersion:BLAST_ASSESSABILITY_SENTINEL_VERSION, blastAssessable, negativeEvidenceState:negativeState,
+    negativeBlastConclusionAllowed:!signal.active && blastAssessable && negativeState === "NOT_OBSERVED_IN_EVALUABLE_FIELD",
   };
-
   if (!signal.active) {
-    if (!blastAssessable) {
-      result.requiresHumanReview = true;
-      result.normalityBlocked = true;
-      result.blockNormalReason = Array.isArray(result.blockNormalReason)
-        ? result.blockNormalReason
-        : [];
-      result.blockNormalReason = [
-        ...new Set([
-          ...result.blockNormalReason,
-          "Triagem morfológica de blastos não avaliável com segurança neste campo",
-        ]),
-      ];
-    }
+    if (!blastAssessable) { result.requiresHumanReview=true; result.normalityBlocked=true; result.blockNormalReason=pushUnique(result.blockNormalReason,"Triagem morfológica de blastos não avaliável com segurança neste campo"); }
     return result;
   }
-
-  result.findings = asObject(result.findings);
-  result.findings.blastSuspicion = true;
-  result.findings.immatureCells = true;
-
-  result.normalityBlocked = true;
-  result.requiresHumanReview = true;
-  result.finalClassification = "CLASS_4_BLAST_SUSPICION";
-  result.morphologicRiskClass = "CLASS_4_BLAST_SUSPICION";
-  result.riskLevel = "ALERTA CRÍTICO — suspeita de célula blástica/imatura";
-
-  const manualConfirmed = signal.certainty === "USER_RECORDED_BLAST";
-  const countText = signal.observedCount && signal.observedCount >= 1
-    ? `${signal.observedCount}`
-    : "pelo menos 1";
-
-  const criticalText = manualConfirmed
-    ? `${countText} blasto(s) informado(s) na contagem manual/híbrida. Achado crítico que requer revisão microscópica imediata e correlação com hemograma.`
-    : `Pelo menos 1 elemento com morfologia blastoide/suspeita de blasto foi identificado no campo analisado. O achado deve ser sinalizado mesmo em campo limitado e requer revisão microscópica imediata e correlação com hemograma.`;
-
-  result.mainFinding = criticalText;
-  result.primaryFinding = criticalText;
-  result.finalConclusion = criticalText;
-  result.interpretiveSynthesis = criticalText;
-
-  result.overallAssessment = asObject(result.overallAssessment);
-  result.overallAssessment.requiresHumanReview = true;
-  result.overallAssessment.riskCategory = "CLASS_4_BLAST_SUSPICION";
-  result.overallAssessment.mainImpression = criticalText;
-
-  result.morphologyAnalysis = asObject(result.morphologyAnalysis);
-  result.morphologyAnalysis.summary = criticalText;
-  result.morphologyAnalysis.overview =
-    "Alerta crítico por presença de pelo menos um elemento blastoide/suspeito de blasto no campo analisado.";
-  result.morphologyAnalysis.leukocyteReview =
-    "Elemento(s) blastoide(s)/imaturo(s) suspeito(s) observado(s). A hipótese blástica não pode ser suprimida por padrão reacional concomitante nem por baixa representatividade do campo.";
-
-  result.structuredReport = asObject(result.structuredReport);
-  result.structuredReport.conclusion = criticalText;
-
-  result.whatAISees = asObject(result.whatAISees);
-  result.whatAISees.dominantFinding =
-    "Elemento blastoide/suspeito de blasto identificado — alerta crítico.";
-
-  result.clinicalMeaning =
-    "Achado morfológico crítico: qualquer elemento blastoide/suspeito de blasto deve ser destacado e submetido a revisão microscópica profissional; a imagem isolada não estabelece diagnóstico definitivo.";
-
-  result.blockNormalReason = Array.isArray(result.blockNormalReason)
-    ? result.blockNormalReason
-    : [];
-  result.blockNormalReason = [
-    ...new Set([
-      ...result.blockNormalReason,
-      "Presença de pelo menos um elemento blastoide/suspeito de blasto",
-    ]),
-  ];
-
+  result.findings=asObject(result.findings); result.findings.blastSuspicion=true; result.findings.immatureCells=true; result.findings.blastEvidenceState=signal.state;
+  if (observed) result.findings.observedBlastLikeCount=Math.max(1, signal.observedCount || 1);
+  result.normalityBlocked=true; result.requiresHumanReview=true; result.finalClassification="CLASS_4_BLAST_SUSPICION"; result.morphologicRiskClass="CLASS_4_BLAST_SUSPICION";
+  result.riskLevel=observed ? "ALERTA CRÍTICO — blasto/blastoide observado" : "ALTO RISCO — suspeita de célula blástica/blastoide";
+  const countText = observed ? String(Math.max(1, signal.observedCount || 1)) : "Pelo menos 1";
+  const criticalText = observed
+    ? `${countText} blasto/blastoide observado — ${countText} elemento(s) com morfologia blástica/blastoide foi(ram) observado(s). Achado crítico: requer revisão microscópica imediata e correlação com hemograma; a imagem isolada não define etiologia.`
+    : "Pelo menos 1 elemento com morfologia suspeita de blasto/blastoide foi identificado. Achado de alta prioridade: requer revisão microscópica imediata; suspeita visual não equivale a confirmação diagnóstica.";
+  result.mainFinding=criticalText; result.primaryFinding=criticalText; result.finalConclusion=criticalText; result.interpretiveSynthesis=criticalText;
+  result.overallAssessment=asObject(result.overallAssessment); result.overallAssessment.requiresHumanReview=true; result.overallAssessment.riskCategory="CLASS_4_BLAST_SUSPICION"; result.overallAssessment.mainImpression=criticalText;
+  result.morphologyAnalysis=asObject(result.morphologyAnalysis); result.morphologyAnalysis.summary=criticalText; result.morphologyAnalysis.overview=observed ? "Alerta crítico por elemento blástico/blastoide observado no campo analisado." : "Alerta de alta prioridade por elemento blastoide suspeito no campo analisado.";
+  result.morphologyAnalysis.leukocyteReview="A evidência blástica focal tem prioridade sobre classificações reacionais e não pode ser suprimida por baixa representatividade do campo.";
+  result.structuredReport=asObject(result.structuredReport); result.structuredReport.conclusion=criticalText;
+  result.whatAISees=asObject(result.whatAISees); result.whatAISees.dominantFinding=observed ? "Blasto/blastoide observado — alerta crítico." : "Elemento blastoide suspeito — revisão prioritária.";
+  result.clinicalMeaning=observed ? "Achado morfológico crítico. Um único blasto/blastoide observado já exige sinalização e revisão profissional imediata." : "Achado morfológico de alta prioridade. Suspeita blastoide requer confirmação por revisão microscópica profissional.";
+  result.blockNormalReason=pushUnique(result.blockNormalReason, observed ? "Presença de pelo menos um blasto/blastoide observado" : "Presença de pelo menos um elemento blastoide suspeito");
   return result;
 }
-
 export default applySingleBlastSentinel;

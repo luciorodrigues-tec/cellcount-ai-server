@@ -1,6 +1,6 @@
 // ============================================================================
 // CELLCOUNT ENTERPRISE
-// LEUKOCYTE ENGINE V5 ENTERPRISE CALIBRATED
+// LEUKOCYTE ENGINE V5.17 ENTERPRISE CALIBRATED
 // NEGATION-AWARE WBC MORPHOLOGY INTERPRETER
 // ============================================================================
 
@@ -660,7 +660,7 @@ export function analyzeLeukocytes(
 
       leukocyteSummary:
         strongReactivePattern
-          ? 'Linfócitos com características reacionais/ativadas, compatíveis com resposta imunológica. Ausência de critérios morfológicos inequívocos para blastos.'
+          ? 'Características reacionais/ativadas podem estar presentes; a classificação populacional e a exclusão de blastos dependem dos gates estruturados de evidência e avaliabilidade.'
           : leukocyteSummary,
 
       primaryPattern:
@@ -683,8 +683,10 @@ export function analyzeLeukocytes(
       atypicalLymphocytes:
         strongReactivePattern,
 
-      mononucleosisSuspicion:
-        strongReactivePattern,
+      // BE-FIX-005.17: this lexical engine is not authorized to promote
+      // mononucleosis/EBV/CMV. That decision belongs to the structured
+      // reactive sentinel after blast assessability governance.
+      mononucleosisSuspicion: false,
 
       immatureFeaturesDetected,
       leukocyteScores: scores,

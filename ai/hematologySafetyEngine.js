@@ -1,6 +1,6 @@
 // ============================================================================
 // CELLCOUNT ENTERPRISE
-// HEMATOLOGY SAFETY ENGINE V8.3 HOSPITAL CALIBRATED
+// HEMATOLOGY SAFETY ENGINE V8.4 / BE-FIX-005.17 HOSPITAL CALIBRATED
 // SAFE BUT NOT BLIND — SEM LOOP SEMÂNTICO + REAL SCORING
 // ============================================================================
 
@@ -208,7 +208,8 @@ export function validateHematologyAnalysis({
       analysis: correctedAnalysis,
       modifiedFields,
       coherenceAdjustments,
-      preserveBlastSuspicion: moderateBlastMorphology,
+      preserveBlastSuspicion:
+        moderateBlastMorphology || blastMorphologySignal?.present === true,
       blastMorphologySignal,
     });
 
@@ -550,6 +551,10 @@ function calculateBlastMorphologySignal({
 }) {
   const visualExtraction = analysis?.visualExtraction || {};
   const morphologyAnalysis = analysis?.morphologyAnalysis || {};
+  const criticalMorphology = analysis?.localMorphologyEvidence?.criticalMorphology || {};
+  const canonicalBlastState = String(criticalMorphology?.blastLikeMorphology || "").trim();
+  const canonicalBlastObserved = canonicalBlastState === "OBSERVED" || Number(criticalMorphology?.observedBlastLikeCount || 0) >= 1;
+  const canonicalBlastSuspicious = canonicalBlastObserved || canonicalBlastState === "SUSPICIOUS_INDETERMINATE";
   const leukocyteFindings = analysis?.leukocyteFindings || {};
   const blastSuspicion = analysis?.blastSuspicion || {};
 
@@ -632,7 +637,8 @@ function calculateBlastMorphologySignal({
   );
 
   const criteria = {
-    suspectedBlast: blastPositive,
+    suspectedBlast: blastPositive || canonicalBlastSuspicious,
+    observedBlastLikeCell: canonicalBlastObserved,
     immatureCells: immaturePositive,
     nucleoli: nucleoliPositive,
     fineChromatin: fineChromatinPositive,
@@ -645,6 +651,7 @@ function calculateBlastMorphologySignal({
   let confidence = 0;
 
   if (criteria.suspectedBlast) confidence += 14;
+  if (criteria.observedBlastLikeCell) confidence += 45;
   if (criteria.immatureCells) confidence += 16;
   if (criteria.nucleoli) confidence += 18;
   if (criteria.fineChromatin) confidence += 18;
@@ -674,7 +681,13 @@ function calculateBlastMorphologySignal({
   confidence = normalize(confidence);
 
   return {
-    present: confidence >= 35 && criteriaCount >= 2,
+    present: canonicalBlastObserved || canonicalBlastSuspicious || (confidence >= 35 && criteriaCount >= 2),
+    observed: canonicalBlastObserved,
+    evidenceState: canonicalBlastObserved
+      ? "OBSERVED"
+      : canonicalBlastSuspicious
+        ? "SUSPICIOUS_INDETERMINATE"
+        : null,
     confidence,
     criteria,
     criteriaCount,
@@ -1024,7 +1037,7 @@ function applySafetyOverride({
       modifiedFields.push("blastSuspicion.present");
       modifiedFields.push("blastSuspicion.confidence");
       modifiedFields.push("blastSuspicion.safeInterpretation");
-    } else {
+    } else if (blastMorphologySignal?.present !== true) {
       analysis.blastSuspicion.present = false;
       analysis.blastSuspicion.confidence = 0;
 

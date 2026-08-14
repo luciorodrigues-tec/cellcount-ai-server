@@ -12,6 +12,7 @@
 
 export const FIELD_ADEQUACY_CONTRACT_VERSION = "FA-4.0";
 export const BLAST_ASSESSABILITY_GATE_VERSION = "BE-FIX-005.16";
+export const POSITIVE_BLAST_OVERRIDE_VERSION = "BE-FIX-005.17";
 
 function normalizeText(value = "") {
   return String(value || "")
@@ -177,6 +178,11 @@ function buildAdequacyContract({
 
     adequateForBlastScreening:
       blastAssessability?.adequateForBlastScreening === true,
+
+    positiveBlastEvidenceOverride: {
+      version: POSITIVE_BLAST_OVERRIDE_VERSION,
+      principle: "POSITIVE_FOCAL_BLAST_EVIDENCE_IS_VALID_EVEN_WHEN_NEGATIVE_SCREENING_IS_NOT_ASSESSABLE",
+    },
 
     blastAssessability:
       blastAssessability || {

@@ -9,6 +9,7 @@
 
 export const LOCAL_MORPHOLOGY_EVIDENCE_VERSION = "LME-1.0";
 export const BLAST_ASSESSABILITY_LME_VERSION = "BE-FIX-005.16";
+export const SINGLE_BLAST_CONFIRMATION_LME_VERSION = "BE-FIX-005.17";
 
 const GENERIC_LIMITATION_PATTERNS = [
   /campo microsc[oó]pico limitado/i,
@@ -64,16 +65,50 @@ function blastAssessabilityOf(raw = {}, explicit = {}) {
   const gate = asObject(field.blastAssessability);
   const explicitGate = asObject(explicit.blastAssessability);
 
-  const adequate =
+  const declaredAdequacy =
     explicitGate.adequateForBlastScreening ??
     gate.adequateForBlastScreening ??
     field.adequateForBlastScreening;
+
+  // BE-FIX-005.17.2 — restore the 005.16 assessability contract.
+  // An explicit FALSE is authoritative and can never be overridden by cell count.
+  // When no gate was projected yet, detailed evaluable nuclear morphology may
+  // authorize a field-scoped negative. Visible leukocytes alone never do.
+  const local = asObject(raw.localMorphologyEvidence);
+  const wbc = asObject(local.leukocytes);
+  const nuclearText = [
+    asText(wbc.nuclearMorphology),
+    asText(wbc.chromatin),
+    asText(wbc.nucleoli),
+    asText(wbc.ncRatio),
+    asText(wbc.blastLikeFeatures),
+  ].filter(Boolean).join(" ");
+
+  const nuclearDetailPresent =
+    wbc.evaluable === true &&
+    nuclearText.length >= 12 &&
+    !/n[aã]o avali[aá]vel|nao avaliavel|n[aã]o suficientemente|nao suficientemente|indeterminad|limitad|n[aã]o permite|nao permite/i.test(nuclearText);
+
+  const adequate =
+    declaredAdequacy === false
+      ? false
+      : declaredAdequacy === true
+        ? true
+        : nuclearDetailPresent;
 
   return {
     version: BLAST_ASSESSABILITY_LME_VERSION,
     adequateForBlastScreening: adequate === true,
     state: adequate === true ? "EVALUABLE" : "NOT_ASSESSABLE",
     negativeBlastConclusionAllowed: adequate === true,
+    source:
+      declaredAdequacy === true
+        ? "DECLARED_GATE"
+        : declaredAdequacy === false
+          ? "DECLARED_NOT_ASSESSABLE"
+          : nuclearDetailPresent
+            ? "DETAILED_NUCLEAR_MORPHOLOGY"
+            : "INSUFFICIENT_BLAST_MORPHOLOGY",
   };
 }
 function normalizeCriticalMorphology(explicit = {}, raw = {}) {
@@ -81,11 +116,51 @@ function normalizeCriticalMorphology(explicit = {}, raw = {}) {
   const visual = asObject(raw.visualEvidence);
   const assessability = blastAssessabilityOf(raw, explicit);
 
-  let blastLikeMorphology = normalizeTriState(
-    explicit.blastLikeMorphology ??
+  // BE-FIX-005.17: suspicion and observation are different evidence states.
+  // A generic blastSuspicion=true must NEVER be promoted to OBSERVED.
+  const explicitState = asText(
+    explicit.blastEvidenceState ??
+      explicit.blastLikeMorphology ??
       explicit.blastLikeMorphologyObserved ??
-      findings.blastSuspicion,
-  );
+      findings.blastEvidenceState,
+  ).toUpperCase();
+
+  const observedBlastLikeCount =
+    finiteNumber(explicit.observedBlastLikeCount) ??
+    finiteNumber(explicit.blastLikeCellCount) ??
+    finiteNumber(findings.observedBlastLikeCount) ??
+    finiteNumber(findings.blastLikeCellCount);
+
+  let blastLikeMorphology;
+
+  if (
+    explicitState === "OBSERVED" ||
+    (observedBlastLikeCount !== null && observedBlastLikeCount >= 1)
+  ) {
+    blastLikeMorphology = "OBSERVED";
+  } else if (
+    explicitState === "SUSPICIOUS_INDETERMINATE" ||
+    findings.blastSuspicion === true
+  ) {
+    blastLikeMorphology = "SUSPICIOUS_INDETERMINATE";
+  } else if (
+    explicitState === "NOT_OBSERVED_IN_EVALUABLE_FIELD"
+  ) {
+    blastLikeMorphology = "NOT_OBSERVED_IN_EVALUABLE_FIELD";
+  } else if (explicitState === "NOT_ASSESSABLE") {
+    blastLikeMorphology = "NOT_ASSESSABLE";
+  } else if (
+    findings.blastSuspicion === false &&
+    assessability.negativeBlastConclusionAllowed === true
+  ) {
+    // BE-FIX-005.17.5 — explicit negative blast screening is legally
+    // projectable only when the blast-assessability gate is open.
+    blastLikeMorphology = "NOT_OBSERVED_IN_EVALUABLE_FIELD";
+  } else {
+    blastLikeMorphology = normalizeTriState(
+      explicit.blastLikeMorphology ?? explicit.blastLikeMorphologyObserved,
+    );
+  }
 
   // Positive evidence is immutable. A negative, however, is only legal when
   // the field is actually assessable for blast morphology.
@@ -98,6 +173,9 @@ function normalizeCriticalMorphology(explicit = {}, raw = {}) {
 
   return {
     blastLikeMorphology,
+    blastEvidenceGovernanceVersion: SINGLE_BLAST_CONFIRMATION_LME_VERSION,
+    observedBlastLikeCount:
+      observedBlastLikeCount !== null ? Math.max(0, Math.trunc(observedBlastLikeCount)) : null,
     blastAssessability: assessability,
     auerRod: normalizeTriState(
       explicit.auerRod ?? explicit.auerRodObserved ?? findings.auerRods,

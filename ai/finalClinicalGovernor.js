@@ -1,6 +1,6 @@
 // ============================================================================
 // CELLCOUNT ENTERPRISE
-// BE-FIX-005.3 — EVIDENCE PRESERVATION GOVERNOR
+// BE-FIX-005.17 — EVIDENCE PRESERVATION + SINGLE BLAST PRIORITY GOVERNOR
 // FINAL CLINICAL GOVERNOR V2
 //
 // PRINCIPLE
@@ -235,12 +235,30 @@ export function applyFinalClinicalGovernor(result = {}) {
     lymphoid.lymphoidPattern === "REACTIVE_LYMPHOID_PATTERN" ||
     lymphoid.forceDowngrade === true;
 
-  const strongBlastEvidence =
-    safeBool(f.blastSuspicion) &&
-    safeBool(f.immatureCells) &&
-    !reactivePattern &&
-    !safeBool(f.downeyLikeCells) &&
-    !safeBool(f.reactiveLymphocytes);
+  const criticalMorphology = asObject(final.localMorphologyEvidence?.criticalMorphology);
+  const blastSentinel = asObject(final.singleBlastSentinel);
+  const blastEvidenceState =
+    String(
+      blastSentinel.evidenceState ||
+      criticalMorphology.blastLikeMorphology ||
+      f.blastEvidenceState ||
+      "",
+    ).trim();
+
+  const observedBlastEvidence =
+    blastEvidenceState === "OBSERVED" ||
+    blastSentinel.confirmedMorphologicObservation === true ||
+    Number(criticalMorphology.observedBlastLikeCount || 0) >= 1;
+
+  const suspiciousBlastEvidence =
+    observedBlastEvidence ||
+    blastEvidenceState === "SUSPICIOUS_INDETERMINATE" ||
+    blastSentinel.active === true ||
+    safeBool(f.blastSuspicion);
+
+  // BE-FIX-005.17: reactive morphology can coexist with blast evidence, but it
+  // can never suppress or downgrade it.
+  const strongBlastEvidence = suspiciousBlastEvidence;
 
   const highNeoplasticEvidence =
     safeBool(f.plasmablasts) &&
@@ -273,9 +291,12 @@ export function applyFinalClinicalGovernor(result = {}) {
 
   if (strongBlastEvidence) {
     finalClass = "CLASS_4_BLAST_SUSPICION";
-    riskLevel = "Suspeita de células imaturas";
-    mainFinding =
-      "Suspeita morfológica de células imaturas no material analisado. Requer revisão microscópica profissional e correlação com hemograma.";
+    riskLevel = observedBlastEvidence
+      ? "ALERTA CRÍTICO — blasto/blastoide observado"
+      : "ALTO RISCO — suspeita de blasto/blastoide";
+    mainFinding = observedBlastEvidence
+      ? "Pelo menos um elemento com morfologia blástica/blastoide foi observado. Achado crítico que requer revisão microscópica imediata e correlação com hemograma."
+      : "Pelo menos um elemento apresenta morfologia suspeita de blasto/blastoide. Requer revisão microscópica prioritária e correlação com hemograma.";
     requiresHumanReview = true;
   } else if (highNeoplasticEvidence) {
     finalClass = "CLASS_5_HIGH_NEOPLASTIC_SUSPICION";

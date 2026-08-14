@@ -18,6 +18,7 @@
 export const VISUAL_MORPHOLOGY_EVIDENCE_ACQUISITION_VERSION = "VME-1.0";
 export const PRODUCTION_VME_ENFORCEMENT_VERSION = "BE-FIX-005.8";
 export const LOCAL_MORPHOLOGY_ACQUISITION_RECOVERY_VERSION = "BE-FIX-005.9";
+export const SINGLE_BLAST_CONFIRMATION_ACQUISITION_VERSION = "BE-FIX-005.17";
 
 const STATUS = Object.freeze({
   COMPLETE: "COMPLETE",
@@ -284,6 +285,8 @@ REGRAS OBRIGATÓRIAS:
   local diretamente observada.
 - Separe representatividade de morfologia.
 - Para núcleo/cromatina/nucléolos/citoplasma/maturação, descreva o observável;
+- Para blastos/blastoides, diferencie obrigatoriamente: OBSERVED (célula realmente observada), SUSPICIOUS_INDETERMINATE (suspeita sem confirmação), NOT_OBSERVED_IN_EVALUABLE_FIELD (somente se o campo for avaliável) e NOT_ASSESSABLE.
+- Se pelo menos uma célula blastoide for diretamente observada, informe observedBlastLikeCount >= 1. Nunca use blastSuspicion=true como sinônimo de confirmação.
   quando não avaliável, escreva explicitamente "não avaliável".
 - Achado não observado deve ser restrito ao campo; não faça exclusão global.
 - Não invente contagens diferenciais, índices hematimétricos ou diagnóstico.
@@ -409,8 +412,18 @@ export function buildVisualMorphologyAcquisitionResponseFormat() {
               monomorphicPopulation: { type: "boolean" },
               immatureCells: { type: "boolean" },
               blastSuspicion: { type: "boolean" },
+              blastEvidenceState: {
+                type: "string",
+                enum: [
+                  "OBSERVED",
+                  "SUSPICIOUS_INDETERMINATE",
+                  "NOT_OBSERVED_IN_EVALUABLE_FIELD",
+                  "NOT_ASSESSABLE"
+                ],
+              },
+              observedBlastLikeCount: nullableIntegerSchema(),
             },
-            required: ["reactiveLymphocytes", "largeMononuclearCells", "plasmacytoidCells", "plasmocytes", "plasmablasts", "atypicalLymphocytes", "monomorphicPopulation", "immatureCells", "blastSuspicion"],
+            required: ["reactiveLymphocytes", "largeMononuclearCells", "plasmacytoidCells", "plasmocytes", "plasmablasts", "atypicalLymphocytes", "monomorphicPopulation", "immatureCells", "blastSuspicion", "blastEvidenceState", "observedBlastLikeCount"],
           },
           visualEvidence: {
             type: "object",

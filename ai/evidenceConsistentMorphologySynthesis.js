@@ -8,6 +8,7 @@
 // ============================================================================
 
 export const EVIDENCE_CONSISTENT_MORPHOLOGY_SYNTHESIS_VERSION = "BE-FIX-005.11";
+export const SINGLE_BLAST_PRESENTATION_GOVERNANCE_VERSION = "BE-FIX-005.17";
 
 function asObject(value) {
   return value && typeof value === "object" && !Array.isArray(value) ? value : {};
@@ -194,8 +195,31 @@ export function applyEvidenceConsistentFinalMorphologySynthesis(result = {}) {
     }
   }
 
+
+  const criticalMorphology = asObject(lme.criticalMorphology);
+  const blastEvidenceState = text(criticalMorphology.blastLikeMorphology);
+  const blastPositive =
+    blastEvidenceState === "OBSERVED" ||
+    blastEvidenceState === "SUSPICIOUS_INDETERMINATE";
+
+  if (blastPositive) {
+    result.findings = asObject(result.findings);
+    result.findings.blastSuspicion = true;
+    result.findings.blastEvidenceState = blastEvidenceState;
+    if (blastEvidenceState === "OBSERVED") {
+      result.findings.observedBlastLikeCount =
+        Math.max(1, Number(criticalMorphology.observedBlastLikeCount || 1));
+    }
+    result.requiresHumanReview = true;
+    result.normalityBlocked = true;
+  }
+
   result.evidenceConsistentMorphologySynthesis = {
     version: EVIDENCE_CONSISTENT_MORPHOLOGY_SYNTHESIS_VERSION,
+    singleBlastPresentationGovernanceVersion:
+      SINGLE_BLAST_PRESENTATION_GOVERNANCE_VERSION,
+    blastEvidenceState: blastEvidenceState || null,
+    blastPositiveEvidencePreserved: blastPositive,
     source: "LME-1.0",
     parasitePositiveEvidence: parasiteObserved(lme),
     localMorphologyProjected: true,
