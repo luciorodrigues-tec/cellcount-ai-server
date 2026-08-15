@@ -1,3 +1,8 @@
+import {
+  evaluateMarrowPrecursorDiscrimination,
+  MARROW_PRECURSOR_DISCRIMINATION_VERSION,
+} from "./boneMarrow/marrowPrecursorDiscriminationEngine.js";
+
 // ============================================================================
 // CELLCOUNT ENTERPRISE
 // BE-FIX-005.16 — LME-1.0 BLAST ASSESSABILITY HARDENING
@@ -12,6 +17,7 @@ export const BLAST_ASSESSABILITY_LME_VERSION = "BE-FIX-005.16";
 export const SINGLE_BLAST_CONFIRMATION_LME_VERSION = "BE-FIX-005.17";
 export const HEMOPARASITE_HIGH_SALIENCE_LME_VERSION = "BE-FIX-005.23";
 export const MARROW_POSITIVE_EVIDENCE_PROJECTION_VERSION = "BE-FIX-005.26";
+export const MARROW_PRECURSOR_FALSE_POSITIVE_CONTAINMENT_LME_VERSION = MARROW_PRECURSOR_DISCRIMINATION_VERSION;
 
 const GENERIC_LIMITATION_PATTERNS = [
   /campo microsc[oó]pico limitado/i,
@@ -181,6 +187,15 @@ function normalizeCriticalMorphology(explicit = {}, raw = {}) {
         : "SUSPICIOUS_INDETERMINATE";
   }
 
+  // BE-FIX-005.27 — physiologic marrow precursors must not leak into the
+  // generic single-blast sentinel as suspicious blast morphology.
+  if (
+    marrowBlast.precursorDiscrimination?.strongPhysiologicPattern === true ||
+    marrowBlast.precursorDiscrimination?.ambiguousPrecursorVsBlast === true
+  ) {
+    blastLikeMorphology = "NOT_ASSESSABLE";
+  }
+
   return {
     blastLikeMorphology,
     blastEvidenceGovernanceVersion: SINGLE_BLAST_CONFIRMATION_LME_VERSION,
@@ -247,7 +262,18 @@ function normalizeMarrowBlastEvidence(raw = {}) {
     );
 
   const state = asText(blast.evidenceState).toUpperCase();
-  const positiveState = ["OBSERVED_POPULATION", "SUSPICIOUS_POPULATION", "FOCAL_SUSPICION"].includes(state);
+  const precursorDiscrimination =
+    evaluateMarrowPrecursorDiscrimination({
+      specimenType: specimenType || asText(asObject(raw.specimenAssessment).specimenType).toUpperCase(),
+      blastAssessment: blast,
+      rawResponse: raw,
+      myeloidSeries: asObject(raw.myeloidSeries),
+      erythroidSeries: asObject(raw.erythroidSeries),
+    });
+  const positiveState =
+    ["OBSERVED_POPULATION", "SUSPICIOUS_POPULATION", "FOCAL_SUSPICION"].includes(state) &&
+    precursorDiscrimination.suppressBlastPromotion !== true &&
+    precursorDiscrimination.capBlastPromotionAtIndeterminate !== true;
   const repeated =
     blast.populationPattern === "repeated" ||
     blast.populationPattern === "dominant" ||
@@ -281,6 +307,7 @@ function normalizeMarrowBlastEvidence(raw = {}) {
       monomorphism: support.monomorphism === true,
       repeatedAcrossField: support.repeatedAcrossField === true,
     },
+    precursorDiscrimination,
   };
 }
 
@@ -426,6 +453,7 @@ export function createLocalMorphologyEvidence({
     marrow: {
       projectionVersion: MARROW_POSITIVE_EVIDENCE_PROJECTION_VERSION,
       blastPopulationEvidence: marrowBlastEvidence,
+      precursorDiscrimination: marrowBlastEvidence.precursorDiscrimination,
       myeloidSummary: asText(marrowMyeloid.summary),
       erythroidSummary: asText(marrowErythroid.summary),
       megakaryocyticSummary: asText(marrowMegakaryocytic.summary),

@@ -18,6 +18,11 @@ import {
 } from "./ai/boneMarrow/marrowBlastPopulationSentinel.js";
 
 import {
+  MARROW_PRECURSOR_DISCRIMINATION_VERSION,
+  applyMarrowPrecursorDiscrimination,
+} from "./ai/boneMarrow/marrowPrecursorDiscriminationEngine.js";
+
+import {
   applyClinicalSafetyGovernor,
 } from "./ai/clinicalSafety/index.js";
 
@@ -3965,6 +3970,14 @@ CONTRATO JSON MEDULAR OBRIGATÓRIO:
       "monomorphism": null,
       "repeatedAcrossField": null
     },
+    "precursorContext": {
+      "maturationHeterogeneity": null,
+      "maturationContinuum": null,
+      "matureFormsPresent": null,
+      "lineageDiversity": null,
+      "orderlyGranulocyticMaturation": null,
+      "nonMonomorphicBackground": null
+    },
     "lineageAssignable": false,
     "lineage": "indeterminate",
     "summary": ""
@@ -3993,6 +4006,16 @@ BE-FIX-005.24 — VARREDURA BLASTOIDE MEDULAR OBRIGATÓRIA:
 - Representatividade limitada restringe percentual/globalização; não apaga uma população blastoide positivamente observada.
 - OBSERVED_POPULATION requer evidência visual estruturada repetida; SUSPICIOUS_POPULATION quando a população é sugestiva mas não inequívoca.
 - Nunca converter população blastoide em LLA, LMA ou outra linhagem pela imagem isolada. lineageAssignable deve permanecer false sem evidência complementar.
+
+BE-FIX-005.27 — DISCRIMINAÇÃO OBRIGATÓRIA DE PRECURSORES FISIOLÓGICOS:
+- Em medula óssea, IMATURIDADE NÃO É SINÔNIMO DE BLASTO.
+- Antes de usar SUSPICIOUS_POPULATION, avaliar explicitamente precursorContext.
+- Favorecem maturação fisiológica: heterogeneidade de tamanhos/estágios, continuidade maturativa, coexistência de precursores e formas maduras, diversidade de linhagens e ausência de monomorfismo blastoide.
+- Relação N:C alta, cromatina aberta e nucléolos podem ocorrer em precursores normais; nunca usar um ou dois desses critérios isoladamente para promover blastoidia.
+- SUSPICIOUS_POPULATION exige arquitetura populacional blastoide sustentada, especialmente repetição/monomorfismo + conjunto citomorfológico coerente.
+- Se houver forte continuidade maturativa e população heterogênea, usar populationPattern="heterogeneous", morphologySupport.monomorphism=false e preencher precursorContext com os sinais observados.
+- Se não for possível distinguir precursor fisiológico de blasto, NÃO usar alerta alto automático; manter estado focal/indeterminado e recomendar revisão.
+- OBSERVED_POPULATION somente quando houver população blastoide estruturada inequívoca; a 005.27 não deve apagar evidência positiva verdadeiramente observada.
 
 `;
 
@@ -6332,6 +6355,8 @@ app.get("/runtime-version", (_req, res) => {
       MARROW_BLAST_POPULATION_GOVERNANCE_VERSION,
     marrowPositiveEvidencePriorityLockVersion:
       MARROW_POSITIVE_EVIDENCE_PRIORITY_LOCK_VERSION,
+    marrowPrecursorDiscriminationVersion:
+      MARROW_PRECURSOR_DISCRIMINATION_VERSION,
     reactiveLymphoidEvidenceSentinelVersion:
       REACTIVE_LYMPHOID_EVIDENCE_SENTINEL_VERSION,
     canonicalClinicalResultArchitectureVersion:
@@ -6764,6 +6789,11 @@ app.post(
           );
 
         validation.result =
+          applyMarrowPrecursorDiscrimination(
+            validation.result,
+          );
+
+        validation.result =
           applyMarrowBlastPopulationGovernance(
             validation.result,
           );
@@ -6774,6 +6804,11 @@ app.post(
             {
               specimenGate,
             },
+          );
+
+        validation.result =
+          applyMarrowPrecursorDiscrimination(
+            validation.result,
           );
 
         validation.result =
@@ -6807,6 +6842,10 @@ app.post(
         );
 
       if (specimenGate.analysisType === "bone_marrow") {
+        validation.result =
+          applyMarrowPrecursorDiscrimination(
+            validation.result,
+          );
         validation.result =
           applyMarrowBlastPopulationGovernance(
             validation.result,
@@ -7234,6 +7273,7 @@ let finalResult =
 // BE-FIX-005.26 — the generic final governor may qualify representativity,
 // but it cannot be the last writer over structured positive marrow evidence.
 if (specimenGate.analysisType === "bone_marrow") {
+  finalResult = applyMarrowPrecursorDiscrimination(finalResult);
   finalResult = applyMarrowBlastPopulationGovernance(finalResult);
 }
 
@@ -7879,6 +7919,10 @@ finalResult =
 // review pathway. Run after the final morphology synthesis so reactive/limited
 // field layers cannot suppress it, then rebuild field-scoped negatives.
 // ============================================================================
+if (specimenGate.analysisType === "bone_marrow") {
+  finalResult = applyMarrowPrecursorDiscrimination(finalResult);
+}
+
 finalResult =
   applySingleBlastSentinel(
     finalResult,
@@ -7910,6 +7954,7 @@ finalResult =
 // medullary evidence class while allowing field adequacy to remain a separate
 // representativity qualifier.
 if (specimenGate.analysisType === "bone_marrow") {
+  finalResult = applyMarrowPrecursorDiscrimination(finalResult);
   finalResult = applyMarrowBlastPopulationGovernance(finalResult);
 }
 
@@ -7919,6 +7964,7 @@ finalResult =
   );
 
 if (specimenGate.analysisType === "bone_marrow") {
+  finalResult = applyMarrowPrecursorDiscrimination(finalResult);
   finalResult = applyMarrowBlastPopulationGovernance(finalResult);
 }
 

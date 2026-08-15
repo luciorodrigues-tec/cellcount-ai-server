@@ -1,3 +1,9 @@
+import {
+  applyMarrowPrecursorDiscrimination,
+  evaluateMarrowPrecursorDiscrimination,
+  MARROW_PRECURSOR_DISCRIMINATION_VERSION,
+} from "./marrowPrecursorDiscriminationEngine.js";
+
 // ============================================================================
 // CELLCOUNT ENTERPRISE
 // BE-FIX-005.24 — MARROW BLAST-POPULATION RECOGNITION & FINDING-FIRST GOVERNANCE
@@ -13,6 +19,7 @@
 
 export const MARROW_BLAST_POPULATION_GOVERNANCE_VERSION = "BE-FIX-005.24";
 export const MARROW_POSITIVE_EVIDENCE_PRIORITY_LOCK_VERSION = "BE-FIX-005.26";
+export const MARROW_PRECURSOR_FALSE_POSITIVE_CONTAINMENT_VERSION = MARROW_PRECURSOR_DISCRIMINATION_VERSION;
 
 const MARROW_TYPES = new Set([
   "BONE_MARROW_ASPIRATE",
@@ -93,6 +100,15 @@ export function evaluateMarrowBlastPopulationEvidence(result = {}) {
     pattern === "dominant" ||
     (count !== null && count >= 3);
 
+  const precursorDiscrimination =
+    evaluateMarrowPrecursorDiscrimination(result);
+
+  const suppressBlastPromotion =
+    precursorDiscrimination.suppressBlastPromotion === true;
+
+  const capAtIndeterminate =
+    precursorDiscrimination.capBlastPromotionAtIndeterminate === true;
+
   const explicitObserved =
     assessment.observed === true ||
     rawAssessment.observed === true ||
@@ -102,11 +118,14 @@ export function evaluateMarrowBlastPopulationEvidence(result = {}) {
     marrow &&
     explicitObserved &&
     repeatedPopulation &&
-    featureCount >= 2;
+    featureCount >= 2 &&
+    !suppressBlastPromotion;
 
   const suspiciousPopulation =
     marrow &&
     !observedPopulation &&
+    !suppressBlastPromotion &&
+    !capAtIndeterminate &&
     (
       evidenceState === "SUSPICIOUS_POPULATION" ||
       (repeatedPopulation && featureCount >= 2)
@@ -133,6 +152,11 @@ export function evaluateMarrowBlastPopulationEvidence(result = {}) {
     focalSuspicion,
     positivePopulationFinding:
       observedPopulation || suspiciousPopulation,
+    precursorDiscrimination,
+    physiologicPrecursorPattern:
+      precursorDiscrimination.strongPhysiologicPattern === true,
+    indeterminatePrecursorVsBlast:
+      precursorDiscrimination.ambiguousPrecursorVsBlast === true,
   };
 }
 
@@ -153,13 +177,54 @@ export function applyMarrowBlastPopulationGovernance(result = {}) {
   const evidence = evaluateMarrowBlastPopulationEvidence(result);
   if (!evidence.marrow) return result;
 
-  const output = ensureContainers({ ...result });
+  const precursorGoverned =
+    applyMarrowPrecursorDiscrimination(result);
+
+  const output = ensureContainers({ ...precursorGoverned });
   output.marrowBlastPopulationEvidence = evidence;
   output.marrowBlastPopulationGovernance = {
     version: MARROW_BLAST_POPULATION_GOVERNANCE_VERSION,
     positiveEvidencePriorityLockVersion: MARROW_POSITIVE_EVIDENCE_PRIORITY_LOCK_VERSION,
+    precursorFalsePositiveContainmentVersion: MARROW_PRECURSOR_DISCRIMINATION_VERSION,
     applied: true,
   };
+
+  if (evidence.physiologicPrecursorPattern) {
+    output.marrowBlastPopulationEvidence = {
+      ...evidence,
+      positivePopulationFinding: false,
+      observedPopulation: false,
+      suspiciousPopulation: false,
+      focalSuspicion: false,
+    };
+    output.localMorphologyEvidence = {
+      ...obj(output.localMorphologyEvidence),
+      marrow: {
+        ...obj(obj(output.localMorphologyEvidence).marrow),
+        precursorDiscrimination:
+          evidence.precursorDiscrimination,
+        blastPopulationEvidence: {
+          ...evidence,
+          positivePopulationFinding: false,
+          observedPopulation: false,
+          suspiciousPopulation: false,
+          focalSuspicion: false,
+        },
+      },
+    };
+    return output;
+  }
+
+  if (evidence.indeterminatePrecursorVsBlast) {
+    output.marrowBlastPopulationEvidence = {
+      ...evidence,
+      positivePopulationFinding: false,
+      observedPopulation: false,
+      suspiciousPopulation: false,
+      focalSuspicion: false,
+    };
+    return output;
+  }
 
   if (!evidence.positivePopulationFinding && !evidence.focalSuspicion) {
     return output;

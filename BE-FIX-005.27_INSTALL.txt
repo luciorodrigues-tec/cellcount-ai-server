@@ -1,0 +1,184 @@
+BE-FIX-005.27 — BONE MARROW PHYSIOLOGIC PRECURSOR DISCRIMINATION
+& BLAST FALSE-POSITIVE CONTAINMENT
+
+BASE UTILIZADA
+--------------
+- server.js enviado em 15/08/2026, pós-BE-FIX-005.26
+- ai (3).zip enviado em 15/08/2026
+
+PROBLEMA CLÍNICO ISOLADO
+------------------------
+Uma medula de referência normal, com heterogeneidade maturativa e coexistência
+de precursores e formas mais maduras, foi promovida para suspeita blástica/
+blastoide de alto risco.
+
+A BE-FIX-005.24/005.26 resolveu corretamente o falso-negativo de uma população
+blastoide verdadeira. A BE-FIX-005.27 corrige o problema simétrico: falso
+positivo causado pela equivalência indevida entre "imaturidade medular" e
+"blastoidia".
+
+PRINCÍPIO CENTRAL
+-----------------
+IMATURIDADE MEDULAR != BLASTO.
+
+Em medula óssea é fisiológica a presença de células precursoras em diferentes
+estágios. Relação N:C alta, cromatina aberta e nucléolos podem ocorrer em
+precursores normais e NÃO podem, isoladamente, promover uma população para
+blastoide.
+
+ARQUIVOS A SUBSTITUIR
+---------------------
+C:\CELLCOUNT_V1.0.0-beta.4_10_08\backend\server.js
+
+C:\CELLCOUNT_V1.0.0-beta.4_10_08\backend\ai\localMorphologyEvidenceContract.js
+
+C:\CELLCOUNT_V1.0.0-beta.4_10_08\backend\ai\boneMarrow\marrowBlastPopulationSentinel.js
+C:\CELLCOUNT_V1.0.0-beta.4_10_08\backend\ai\boneMarrow\boneMarrowOutputContract.js
+C:\CELLCOUNT_V1.0.0-beta.4_10_08\backend\ai\boneMarrow\boneMarrowClinicalReasoningEngine.js
+
+NOVO ARQUIVO
+------------
+C:\CELLCOUNT_V1.0.0-beta.4_10_08\backend\ai\boneMarrow\marrowPrecursorDiscriminationEngine.js
+
+NOVO TESTE
+----------
+C:\CELLCOUNT_V1.0.0-beta.4_10_08\backend\tests\be_fix_005_27_marrow_physiologic_precursor_discrimination_blast_false_positive_containment_test.mjs
+
+ALTERAÇÕES PRINCIPAIS
+---------------------
+1. Nova identidade:
+   MARROW_PRECURSOR_DISCRIMINATION_VERSION = BE-FIX-005.27
+
+2. As identidades históricas permanecem intactas:
+   BE-FIX-005.24 = reconhecimento/governança de população blastoide
+   BE-FIX-005.26 = projeção da evidência positiva e final priority lock
+
+3. blastAssessment passa a transportar precursorContext:
+   - maturationHeterogeneity
+   - maturationContinuum
+   - matureFormsPresent
+   - lineageDiversity
+   - orderlyGranulocyticMaturation
+   - nonMonomorphicBackground
+
+4. O prompt medular obriga discriminação antes de SUSPICIOUS_POPULATION.
+
+5. Favorecem PRECURSOR FISIOLÓGICO:
+   - heterogeneidade de tamanhos/estágios
+   - continuidade maturativa
+   - coexistência de formas precursoras e maduras
+   - diversidade de linhagens
+   - maturação granulocítica ordenada
+   - ausência de monomorfismo blastoide
+
+6. Favorecem POPULAÇÃO BLASTOIDE:
+   - arquitetura repetida/dominante
+   - monomorfismo
+   - repetição no campo
+   - conjunto coerente de critérios citomorfológicos
+   - não apenas tamanho, N:C ou cromatina isoladamente
+
+7. Estado fisiológico novo:
+   MARROW_PHYSIOLOGIC_MATURATION_PATTERN
+
+8. Estado intermediário novo:
+   MARROW_IMMATURE_POPULATION_INDETERMINATE
+
+9. Medula fisiológica:
+   - blastSuspicion=false
+   - não entra no single-blast sentinel como SUSPICIOUS_INDETERMINATE
+   - não recebe alto risco apenas por precursores
+   - não é chamada de "normal global"; a interpretação continua restrita ao campo
+
+10. Caso ambíguo:
+    - não é tranquilizado
+    - não recebe high-risk blast automático
+    - fica indeterminado e requer revisão de múltiplos campos
+
+11. População blastoide realmente suspeita:
+    - permanece MARROW_BLASTOID_POPULATION_SUSPICIOUS
+
+12. População blastoide observada:
+    - permanece MARROW_BLASTOID_POPULATION_OBSERVED
+    - nunca é apagada pela 005.27
+
+13. LME-1.0 passa a impedir que precursores fisiológicos sejam projetados para
+    criticalMorphology.blastLikeMorphology e ativem indevidamente o sentinel
+    genérico de blastos.
+
+14. Bone Marrow Output Contract preserva precursorContext para todas as camadas
+    posteriores.
+
+15. /runtime-version passa a expor:
+    marrowPrecursorDiscriminationVersion = BE-FIX-005.27
+
+16. Invariantes da 005.25 preservadas:
+    reasoning_effort=none
+    boneMarrowMaxCompletionTokens=4000
+    repair/fail-closed de aquisição
+
+VALIDAÇÃO EXECUTADA NA PREPARAÇÃO
+---------------------------------
+node --check server.js: PASS
+node --check ai\boneMarrow\marrowPrecursorDiscriminationEngine.js: PASS
+node --check ai\boneMarrow\marrowBlastPopulationSentinel.js: PASS
+node --check ai\boneMarrow\boneMarrowClinicalReasoningEngine.js: PASS
+node --check ai\boneMarrow\boneMarrowOutputContract.js: PASS
+node --check ai\localMorphologyEvidenceContract.js: PASS
+
+BE-FIX-005.27:
+tests 10
+pass 10
+fail 0
+
+REGRESSÃO BE-FIX-005.24 + 005.26:
+tests 20
+pass 20
+fail 0
+
+REGRESSÃO BE-FIX-005.25:
+tests 9
+pass 9
+fail 0
+
+VALIDAÇÃO LOCAL APÓS SUBSTITUIÇÃO
+---------------------------------
+cd /d C:\CELLCOUNT_V1.0.0-beta.4_10_08\backend
+
+node --check server.js
+node --check ai\localMorphologyEvidenceContract.js
+node --check ai\boneMarrow\marrowPrecursorDiscriminationEngine.js
+node --check ai\boneMarrow\marrowBlastPopulationSentinel.js
+node --check ai\boneMarrow\boneMarrowOutputContract.js
+node --check ai\boneMarrow\boneMarrowClinicalReasoningEngine.js
+
+node --test tests\be_fix_005_27_marrow_physiologic_precursor_discrimination_blast_false_positive_containment_test.mjs
+node --test tests\be_fix_005_26_bone_marrow_positive_evidence_projection_final_governor_priority_lock_test.mjs
+node --test tests\be_fix_005_24_marrow_blast_population_recognition_test.mjs
+node --test tests\be_fix_005_25_vme_gpt55_effective_reasoning_zero_evidence_containment_test.mjs
+
+git status
+
+NÃO FAZER COMMIT/PUSH ANTES DE ENVIAR OS RESULTADOS.
+
+TESTE CLÍNICO APÓS DEPLOY
+-------------------------
+CASO A — MEDULA NORMAL DE REFERÊNCIA:
+Esperado:
+- não classificar como MARROW_BLASTOID_POPULATION_SUSPICIOUS
+- não exibir alerta blastoide de alto risco apenas por células precursoras
+- quando sustentado pela imagem, reconhecer heterogeneidade/continuidade maturativa
+- saída possível: MARROW_PHYSIOLOGIC_MATURATION_PATTERN
+- não afirmar normalidade global por uma única imagem
+
+CASO B — MEDULA BLASTOIDE ANTERIOR:
+Esperado:
+- preservar a classificação positiva/suspeita das 005.24/005.26
+- não permitir que a 005.27 apague população blastoide estruturada
+- manter segurança de linhagem: não afirmar LLA/LMA pela imagem isolada
+
+CASO C — IMAGEM AMBÍGUA:
+Esperado:
+- MARROW_IMMATURE_POPULATION_INDETERMINATE
+- revisão de múltiplos campos
+- sem falso alto risco e sem falsa tranquilização

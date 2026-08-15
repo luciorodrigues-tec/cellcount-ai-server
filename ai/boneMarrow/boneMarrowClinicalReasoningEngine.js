@@ -3,8 +3,14 @@ import {
   MarrowObservationStatus,
 } from "./boneMarrowOutputContract.js";
 
+import {
+  evaluateMarrowPrecursorDiscrimination,
+  MARROW_PRECURSOR_DISCRIMINATION_VERSION,
+} from "./marrowPrecursorDiscriminationEngine.js";
+
 export const BONE_MARROW_REASONING_VERSION = "CI-001B.4-v1";
 export const MARROW_BLAST_POPULATION_REASONING_VERSION = "BE-FIX-005.24";
+export const MARROW_PRECURSOR_DISCRIMINATION_REASONING_VERSION = MARROW_PRECURSOR_DISCRIMINATION_VERSION;
 
 const MARROW_TYPES = new Set([
   "BONE_MARROW_ASPIRATE",
@@ -354,6 +360,9 @@ function buildBlastReasoning(result) {
   const morphologySupportCount =
     Object.values(morphologySupport).filter((value) => value === true).length;
 
+  const precursorDiscrimination =
+    evaluateMarrowPrecursorDiscrimination(result);
+
   const repeatedPopulation =
     populationPattern === "repeated" ||
     populationPattern === "dominant" ||
@@ -363,19 +372,27 @@ function buildBlastReasoning(result) {
   const observedPopulation =
     evidenceState === "OBSERVED_POPULATION" &&
     repeatedPopulation &&
-    morphologySupportCount >= 2;
+    morphologySupportCount >= 2 &&
+    precursorDiscrimination.suppressBlastPromotion !== true;
 
   const suspiciousPopulation =
-    evidenceState === "SUSPICIOUS_POPULATION" ||
-    (!observedPopulation && repeatedPopulation && morphologySupportCount >= 2);
+    precursorDiscrimination.suppressBlastPromotion !== true &&
+    precursorDiscrimination.capBlastPromotionAtIndeterminate !== true &&
+    (
+      evidenceState === "SUSPICIOUS_POPULATION" ||
+      (!observedPopulation && repeatedPopulation && morphologySupportCount >= 2)
+    );
 
   const concern =
-    observedPopulation ||
-    suspiciousPopulation ||
-    observed ||
-    result.findings?.monomorphicPopulation === true ||
-    morphologicSignal &&
-      result.findings?.blastSuspicion === true;
+    precursorDiscrimination.suppressBlastPromotion !== true &&
+    (
+      observedPopulation ||
+      suspiciousPopulation ||
+      observed ||
+      result.findings?.monomorphicPopulation === true ||
+      morphologicSignal &&
+        result.findings?.blastSuspicion === true
+    );
 
   return {
     status,
@@ -392,8 +409,12 @@ function buildBlastReasoning(result) {
     repeatedPopulation,
     observedPopulation,
     suspiciousPopulation,
+    precursorDiscrimination,
+    precursorDiscriminationVersion:
+      MARROW_PRECURSOR_DISCRIMINATION_VERSION,
     findingFirstPriority:
-      observedPopulation ? "CRITICAL" : suspiciousPopulation ? "HIGH" : "REVIEW",
+      observedPopulation ? "CRITICAL" : suspiciousPopulation ? "HIGH" :
+      precursorDiscrimination.strongPhysiologicPattern ? "ROUTINE" : "REVIEW",
     lineageAssignable: false,
     diagnosticLabelProhibited: true,
     governanceVersion: MARROW_BLAST_POPULATION_REASONING_VERSION,
@@ -412,13 +433,17 @@ function buildBlastReasoning(result) {
       "A ausência de blastos no campo não permite exclusão global.",
       "Estimativa percentual exige contagem representativa em múltiplos campos.",
     ],
-    interpretation: observedPopulation
-      ? "População blastoide/imatura morfologicamente observada no campo medular. A limitação de representatividade não invalida o achado positivo; requer revisão hematológica urgente e caracterização complementar, sem atribuição de linhagem pela imagem isolada."
-      : suspiciousPopulation
-        ? "Há suspeita sustentada de população blastoide/imatura no campo medular. A representatividade limita quantificação global, mas não apaga a suspeita; requer revisão hematológica prioritária."
-        : concern
-          ? "Há suspeita morfológica de células imaturas/blásticas; requer revisão hematológica especializada e correlação com métodos complementares."
-          : "Blastos inequívocos não foram confirmados no campo, mas a ausência global não pode ser afirmada.",
+    interpretation: precursorDiscrimination.strongPhysiologicPattern
+      ? "A heterogeneidade maturativa, a continuidade entre precursores e formas mais maduras e a ausência de monomorfismo blastoide sustentado favorecem precursores hematopoéticos fisiológicos no campo analisado. Imaturidade medular isolada não equivale a blastoidia."
+      : precursorDiscrimination.ambiguousPrecursorVsBlast
+        ? "Há elementos imaturos, porém a imagem não separa com segurança precursor fisiológico de blastoidia verdadeira. Manter interpretação indeterminada e revisar múltiplos campos."
+        : observedPopulation
+          ? "População blastoide/imatura morfologicamente observada no campo medular. A limitação de representatividade não invalida o achado positivo; requer revisão hematológica urgente e caracterização complementar, sem atribuição de linhagem pela imagem isolada."
+          : suspiciousPopulation
+            ? "Há suspeita sustentada de população blastoide/imatura no campo medular. A representatividade limita quantificação global, mas não apaga a suspeita; requer revisão hematológica prioritária."
+            : concern
+              ? "Há suspeita morfológica de células imaturas/blásticas; requer revisão hematológica especializada e correlação com métodos complementares."
+              : "Blastos inequívocos não foram confirmados no campo, mas a ausência global não pode ser afirmada.",
     globalAbsenceAllowed: false,
   };
 }
