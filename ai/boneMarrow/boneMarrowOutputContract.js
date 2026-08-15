@@ -1,4 +1,5 @@
 export const BONE_MARROW_CONTRACT_VERSION = "CI-001B.3-v1";
+export const MARROW_BLAST_POPULATION_CONTRACT_VERSION = "BE-FIX-005.24";
 
 export const MarrowObservationStatus = Object.freeze({
   present: "present",
@@ -388,6 +389,29 @@ export function enforceBoneMarrowOutputContract(
           sourceValue(safe, raw, "blastAssessment")?.percentage ??
           null,
         globalAbsenceAllowed: false,
+        evidenceState:
+          asText(
+            sourceValue(safe, raw, "blastAssessment")?.evidenceState,
+            "NOT_ASSESSABLE",
+          ).toUpperCase(),
+        approximateBlastLikeCells:
+          sourceValue(safe, raw, "blastAssessment")?.approximateBlastLikeCells ??
+          sourceValue(safe, raw, "blastAssessment")?.observedBlastLikeCount ??
+          null,
+        populationPattern:
+          asText(
+            sourceValue(safe, raw, "blastAssessment")?.populationPattern,
+            "indeterminate",
+          ),
+        morphologySupport: {
+          ...(isObject(sourceValue(safe, raw, "blastAssessment")?.morphologySupport)
+            ? sourceValue(safe, raw, "blastAssessment").morphologySupport
+            : {}),
+        },
+        lineageAssignable: false,
+        lineage: "indeterminate",
+        diagnosticLabelProhibited: true,
+        governanceVersion: MARROW_BLAST_POPULATION_CONTRACT_VERSION,
       },
     },
   );

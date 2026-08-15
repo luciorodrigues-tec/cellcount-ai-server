@@ -12,6 +12,11 @@ import {
 } from "./ai/boneMarrow/boneMarrowClinicalReasoningEngine.js";
 
 import {
+  MARROW_BLAST_POPULATION_GOVERNANCE_VERSION,
+  applyMarrowBlastPopulationGovernance,
+} from "./ai/boneMarrow/marrowBlastPopulationSentinel.js";
+
+import {
   applyClinicalSafetyGovernor,
 } from "./ai/clinicalSafety/index.js";
 
@@ -3931,6 +3936,19 @@ CONTRATO JSON MEDULAR OBRIGATÓRIO:
     "observed": null,
     "estimatedPercentage": null,
     "globalAbsenceAllowed": false,
+    "evidenceState": "OBSERVED_POPULATION|SUSPICIOUS_POPULATION|FOCAL_SUSPICION|NOT_OBSERVED_IN_EVALUABLE_FIELD|NOT_ASSESSABLE",
+    "approximateBlastLikeCells": null,
+    "populationPattern": "dominant|repeated|focal|heterogeneous|indeterminate",
+    "morphologySupport": {
+      "highNCRatio": null,
+      "openFineChromatin": null,
+      "nucleoli": null,
+      "scantBasophilicCytoplasm": null,
+      "monomorphism": null,
+      "repeatedAcrossField": null
+    },
+    "lineageAssignable": false,
+    "lineage": "indeterminate",
     "summary": ""
   },
   "dysplasiaAssessment": {
@@ -3949,6 +3967,14 @@ CONTRATO JSON MEDULAR OBRIGATÓRIO:
 Nunca omitir qualquer um desses 13 campos.
 Quando não for possível avaliar, usar status="notAssessable".
 Não usar false para representar "não avaliável".
+
+BE-FIX-005.24 — VARREDURA BLASTOIDE MEDULAR OBRIGATÓRIA:
+- Em aspirado medular, pesquisar ativamente se há UMA POPULAÇÃO repetida/dominante de células imaturas/blastoides, e não apenas uma célula isolada.
+- Avaliar em conjunto: relação N:C, cromatina aberta/fina, nucléolos, volume/basofilia citoplasmática, monomorfismo e repetição ao longo do campo.
+- Se múltiplos elementos repetirem pelo menos dois critérios de imaturidade/blastoidia, NÃO usar campo limitado como conclusão principal.
+- Representatividade limitada restringe percentual/globalização; não apaga uma população blastoide positivamente observada.
+- OBSERVED_POPULATION requer evidência visual estruturada repetida; SUSPICIOUS_POPULATION quando a população é sugestiva mas não inequívoca.
+- Nunca converter população blastoide em LLA, LMA ou outra linhagem pela imagem isolada. lineageAssignable deve permanecer false sem evidência complementar.
 
 `;
 
@@ -6256,6 +6282,8 @@ app.get("/runtime-version", (_req, res) => {
       PARASITE_EVIDENCE_SENTINEL_VERSION,
     hemoparasiteHighSalienceVersion:
       HEMOPARASITE_HIGH_SALIENCE_SENTINEL_VERSION,
+    marrowBlastPopulationGovernanceVersion:
+      MARROW_BLAST_POPULATION_GOVERNANCE_VERSION,
     reactiveLymphoidEvidenceSentinelVersion:
       REACTIVE_LYMPHOID_EVIDENCE_SENTINEL_VERSION,
     canonicalClinicalResultArchitectureVersion:
@@ -6684,11 +6712,21 @@ app.post(
           );
 
         validation.result =
+          applyMarrowBlastPopulationGovernance(
+            validation.result,
+          );
+
+        validation.result =
           applyClinicalSafetyGovernor(
             validation.result,
             {
               specimenGate,
             },
+          );
+
+        validation.result =
+          applyMarrowBlastPopulationGovernance(
+            validation.result,
           );
 
         if (
@@ -6715,6 +6753,13 @@ app.post(
             analysisSource,
           },
         );
+
+      if (specimenGate.analysisType === "bone_marrow") {
+        validation.result =
+          applyMarrowBlastPopulationGovernance(
+            validation.result,
+          );
+      }
 
       if (
         validation.result

@@ -4,6 +4,7 @@ import {
 } from "./boneMarrowOutputContract.js";
 
 export const BONE_MARROW_REASONING_VERSION = "CI-001B.4-v1";
+export const MARROW_BLAST_POPULATION_REASONING_VERSION = "BE-FIX-005.24";
 
 const MARROW_TYPES = new Set([
   "BONE_MARROW_ASPIRATE",
@@ -334,7 +335,43 @@ function buildBlastReasoning(result) {
       evidenceTerms,
     );
 
+  const evidenceState =
+    text(assessment.evidenceState, "NOT_ASSESSABLE").toUpperCase();
+
+  const approximateBlastLikeCells =
+    Number.isFinite(Number(assessment.approximateBlastLikeCells))
+      ? Math.max(0, Math.trunc(Number(assessment.approximateBlastLikeCells)))
+      : null;
+
+  const populationPattern =
+    text(assessment.populationPattern, "indeterminate").toLowerCase();
+
+  const morphologySupport =
+    isObject(assessment.morphologySupport)
+      ? { ...assessment.morphologySupport }
+      : {};
+
+  const morphologySupportCount =
+    Object.values(morphologySupport).filter((value) => value === true).length;
+
+  const repeatedPopulation =
+    populationPattern === "repeated" ||
+    populationPattern === "dominant" ||
+    morphologySupport.repeatedAcrossField === true ||
+    (approximateBlastLikeCells !== null && approximateBlastLikeCells >= 3);
+
+  const observedPopulation =
+    evidenceState === "OBSERVED_POPULATION" &&
+    repeatedPopulation &&
+    morphologySupportCount >= 2;
+
+  const suspiciousPopulation =
+    evidenceState === "SUSPICIOUS_POPULATION" ||
+    (!observedPopulation && repeatedPopulation && morphologySupportCount >= 2);
+
   const concern =
+    observedPopulation ||
+    suspiciousPopulation ||
     observed ||
     result.findings?.monomorphicPopulation === true ||
     morphologicSignal &&
@@ -347,6 +384,19 @@ function buildBlastReasoning(result) {
         ? true
         : null,
     estimatedPercentage,
+    evidenceState,
+    approximateBlastLikeCells,
+    populationPattern,
+    morphologySupport,
+    morphologySupportCount,
+    repeatedPopulation,
+    observedPopulation,
+    suspiciousPopulation,
+    findingFirstPriority:
+      observedPopulation ? "CRITICAL" : suspiciousPopulation ? "HIGH" : "REVIEW",
+    lineageAssignable: false,
+    diagnosticLabelProhibited: true,
+    governanceVersion: MARROW_BLAST_POPULATION_REASONING_VERSION,
     concern,
     confidence:
       concern
@@ -362,9 +412,13 @@ function buildBlastReasoning(result) {
       "A ausência de blastos no campo não permite exclusão global.",
       "Estimativa percentual exige contagem representativa em múltiplos campos.",
     ],
-    interpretation: concern
-      ? "Há suspeita morfológica de células imaturas/blásticas; requer revisão hematológica especializada e correlação com métodos complementares."
-      : "Blastos inequívocos não foram confirmados no campo, mas a ausência global não pode ser afirmada.",
+    interpretation: observedPopulation
+      ? "População blastoide/imatura morfologicamente observada no campo medular. A limitação de representatividade não invalida o achado positivo; requer revisão hematológica urgente e caracterização complementar, sem atribuição de linhagem pela imagem isolada."
+      : suspiciousPopulation
+        ? "Há suspeita sustentada de população blastoide/imatura no campo medular. A representatividade limita quantificação global, mas não apaga a suspeita; requer revisão hematológica prioritária."
+        : concern
+          ? "Há suspeita morfológica de células imaturas/blásticas; requer revisão hematológica especializada e correlação com métodos complementares."
+          : "Blastos inequívocos não foram confirmados no campo, mas a ausência global não pode ser afirmada.",
     globalAbsenceAllowed: false,
   };
 }
