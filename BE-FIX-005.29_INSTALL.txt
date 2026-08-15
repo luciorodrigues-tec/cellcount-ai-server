@@ -1,0 +1,189 @@
+BE-FIX-005.29 — MARROW POSITIVE BLAST EVIDENCE END-TO-END PRESERVATION
+& NEGATIVE-ONLY ASSESSABILITY GATE
+
+BASE
+----
+BE-FIX-005.28 em produção.
+
+CAUSA RAIZ CORRIGIDA
+--------------------
+Uma aquisição medular podia produzir evidência positiva estruturada:
+
+blastAssessment.evidenceState = SUSPICIOUS_POPULATION
+approximateBlastLikeCells > 0
+morphologySupport positiva
+subpopulação distinta/repetida/coerente
+
+mas camadas posteriores de normalização/Field Adequacy/Global Pattern podiam
+transformar o estado clínico em:
+
+blastSuspicion=false
+immatureCells=false
+blastEvidenceState=NOT_ASSESSABLE
+CLASS_1_LIMITED_FIELD
+"blastos não identificados"
+
+Isso misturava duas perguntas diferentes:
+
+1. O campo é suficiente para EXCLUIR blastos?
+2. Existe evidência POSITIVA de blastos/blastoidia no campo?
+
+A BE-FIX-005.29 separa definitivamente essas duas dimensões.
+
+PRINCÍPIO CENTRAL
+-----------------
+NOT_ASSESSABLE É UM ESTADO DE EXCLUSÃO NEGATIVA.
+
+Ele NÃO pode apagar:
+
+OBSERVED_POPULATION
+SUSPICIOUS_POPULATION
+FOCAL_SUSPICION
+
+Campo limitado pode restringir:
+- percentual global
+- exclusão global
+- estimativa populacional
+
+Campo limitado NÃO pode apagar:
+- população blastoide observada
+- população blastoide suspeita estruturada
+- suspeita focal positiva
+
+ARQUIVOS A SUBSTITUIR
+---------------------
+C:\CELLCOUNT_V1.0.0-beta.4_10_08\backend\server.js
+C:\CELLCOUNT_V1.0.0-beta.4_10_08\backend\ai\fieldAdequacyEngine.js
+C:\CELLCOUNT_V1.0.0-beta.4_10_08\backend\ai\globalPatternEngine.js
+C:\CELLCOUNT_V1.0.0-beta.4_10_08\backend\ai\localMorphologyEvidenceContract.js
+
+NOVO ARQUIVO
+------------
+C:\CELLCOUNT_V1.0.0-beta.4_10_08\backend\ai\boneMarrow\marrowPositiveBlastEvidencePreservationEngine.js
+
+NOVO TESTE
+----------
+C:\CELLCOUNT_V1.0.0-beta.4_10_08\backend\tests\be_fix_005_29_marrow_positive_blast_e2e_preservation_negative_only_assessability_gate_test.mjs
+
+IDENTIDADE
+----------
+MARROW_POSITIVE_BLAST_E2E_PRESERVATION_VERSION = BE-FIX-005.29
+
+/runtime-version:
+marrowPositiveBlastE2EPreservationVersion = BE-FIX-005.29
+
+ALTERAÇÕES PRINCIPAIS
+---------------------
+1. Field Adequacy passa a declarar:
+   assessabilityScope = NEGATIVE_EXCLUSION_ONLY
+
+2. adequateForBlastScreening=false continua válido para bloquear uma conclusão
+   negativa global, porém não interfere em evidência positiva estruturada.
+
+3. O LME-1.0 não permite mais que precursorDiscrimination/ambiguidade posterior
+   sobrescreva uma população medular positiva com NOT_ASSESSABLE.
+
+4. Global Pattern reconhece evidência blastoide medular positiva diretamente,
+   mesmo quando blastAssessable=false.
+
+5. Novo motor 005.29 restaura end-to-end:
+   findings.blastSuspicion=true
+   findings.immatureCells=true
+   blastEvidenceState positivo
+   localMorphologyEvidence.criticalMorphology
+   classificação medular
+   prioridade clínica
+   executive/final narrative
+
+6. O motor remove negativos contraditórios como:
+   "blastos não identificados"
+   "população blástica significativa não estabelecida"
+   "células imaturas críticas não identificadas"
+
+   quando já existe evidência positiva estruturada.
+
+7. Bastonetes de Auer não identificados podem permanecer como achado negativo
+   específico; o que é proibido é negar blastos/células imaturas depois de um
+   SUSPICIOUS_POPULATION ou OBSERVED_POPULATION.
+
+8. 005.29 é reaplicada:
+   - após LME
+   - após Field Adequacy
+   - após Global Pattern
+   - durante governança medular
+   - após Clinical Safety
+   - após Dual Pipeline Stabilizer
+   - depois do Final Clinical Governor
+
+9. A 005.28 permanece responsável pela reconciliação aquisição narrativa/JSON.
+   A 005.29 começa onde a 005.28 termina: preservação positiva até a entrega.
+
+SEGURANÇA PRESERVADA
+--------------------
+- Não diagnosticar LLA/LMA.
+- Não atribuir linhagem.
+- Não inferir percentual global de um campo isolado.
+- NOT_ASSESSABLE continua permitido quando não existe evidência positiva.
+- Medula fisiológica sem população positiva não é promovida.
+- OBSERVED_POPULATION não é rebaixado.
+- SUSPICIOUS_POPULATION não é promovido automaticamente a OBSERVED_POPULATION.
+
+VALIDAÇÃO EXECUTADA
+-------------------
+BE-FIX-005.29    10/10 PASS
+BE-FIX-005.28    10/10 PASS
+BE-FIX-005.27.2  10/10 PASS
+BE-FIX-005.27.1  10/10 PASS
+BE-FIX-005.27    10/10 PASS
+BE-FIX-005.26    10/10 PASS
+BE-FIX-005.24    10/10 PASS
+BE-FIX-005.25     9/9 PASS
+
+TOTAL: 79 PASS / 0 FAIL
+
+NODE CHECK
+----------
+server.js: PASS
+fieldAdequacyEngine.js: PASS
+globalPatternEngine.js: PASS
+localMorphologyEvidenceContract.js: PASS
+marrowPositiveBlastEvidencePreservationEngine.js: PASS
+
+VALIDAÇÃO LOCAL APÓS SUBSTITUIÇÃO
+---------------------------------
+cd /d C:\CELLCOUNT_V1.0.0-beta.4_10_08\backend
+
+node --check server.js
+node --check ai\fieldAdequacyEngine.js
+node --check ai\globalPatternEngine.js
+node --check ai\localMorphologyEvidenceContract.js
+node --check ai\boneMarrow\marrowPositiveBlastEvidencePreservationEngine.js
+
+node --test tests\be_fix_005_29_marrow_positive_blast_e2e_preservation_negative_only_assessability_gate_test.mjs
+node --test tests\be_fix_005_28_marrow_blast_evidence_acquisition_reconciliation_test.mjs
+node --test tests\be_fix_005_27_2_dual_axis_marrow_blast_scoring_calibrated_subpopulation_escalation_test.mjs
+node --test tests\be_fix_005_27_1_precursor_blast_rebalancing_positive_signal_preservation_test.mjs
+node --test tests\be_fix_005_27_marrow_physiologic_precursor_discrimination_blast_false_positive_containment_test.mjs
+node --test tests\be_fix_005_26_bone_marrow_positive_evidence_projection_final_governor_priority_lock_test.mjs
+node --test tests\be_fix_005_24_marrow_blast_population_recognition_test.mjs
+node --test tests\be_fix_005_25_vme_gpt55_effective_reasoning_zero_evidence_containment_test.mjs
+
+git status
+
+NÃO FAZER COMMIT/PUSH ANTES DE ENVIAR OS RESULTADOS.
+
+TESTE CLÍNICO PÓS-DEPLOY
+------------------------
+CASO POSITIVO:
+- RAW GPT: SUSPICIOUS_POPULATION/OBSERVED_POPULATION
+- Field Adequacy pode continuar NOT_ASSESSABLE para EXCLUSÃO negativa
+- resultado clínico NÃO pode virar CLASS_1_LIMITED_FIELD
+- findings.blastSuspicion deve permanecer true
+- findings.immatureCells deve permanecer true
+- não pode haver "blastos não identificados" no negativo final
+- resultado deve manter prioridade medular positiva
+
+CASO NORMAL:
+- sem evidenceState positivo, 005.29 permanece inativa
+- não criar blastSuspicion
+- 005.27/005.27.2 continuam protegendo precursores fisiológicos

@@ -12,7 +12,7 @@
 
 export const FIELD_ADEQUACY_CONTRACT_VERSION = "FA-4.0";
 export const BLAST_ASSESSABILITY_GATE_VERSION = "BE-FIX-005.16";
-export const POSITIVE_BLAST_OVERRIDE_VERSION = "BE-FIX-005.17";
+export const POSITIVE_BLAST_OVERRIDE_VERSION = "BE-FIX-005.29";
 
 function normalizeText(value = "") {
   return String(value || "")
@@ -30,6 +30,31 @@ function asObject(value) {
   return value && typeof value === "object" && !Array.isArray(value)
     ? value
     : {};
+}
+
+function hasStructuredPositiveMarrowBlastEvidence(analysis = {}) {
+  const rawBlast = asObject(analysis?.rawResponse?.blastAssessment);
+  const directBlast = asObject(analysis?.blastAssessment);
+  const lmeBlast = asObject(analysis?.localMorphologyEvidence?.marrow?.blastPopulationEvidence);
+  const projected = asObject(analysis?.marrowBlastPopulationEvidence);
+  const states = [
+    rawBlast.evidenceState,
+    directBlast.evidenceState,
+    lmeBlast.evidenceState,
+    projected.evidenceState,
+  ].map((value) => String(value || "").trim().toUpperCase());
+
+  return (
+    states.some((state) => [
+      "OBSERVED_POPULATION",
+      "SUSPICIOUS_POPULATION",
+      "FOCAL_SUSPICION",
+    ].includes(state)) ||
+    lmeBlast.positive === true ||
+    projected.observedPopulation === true ||
+    projected.suspiciousPopulation === true ||
+    projected.focalSuspicion === true
+  );
 }
 
 function hasLocalMorphologyEvidence(analysis = {}) {
@@ -60,6 +85,8 @@ function meaningfulMorphologyText(value) {
 }
 
 function evaluateBlastAssessability(analysis = {}, visibleLeukocytes = 0) {
+  const positiveMarrowBlastEvidence =
+    hasStructuredPositiveMarrowBlastEvidence(analysis);
   const explicitField = asObject(analysis?.fieldAdequacy);
   const rawField = asObject(analysis?.rawResponse?.fieldAdequacy);
   const lmeWbc = asObject(analysis?.localMorphologyEvidence?.leukocytes);
@@ -149,7 +176,14 @@ function evaluateBlastAssessability(analysis = {}, visibleLeukocytes = 0) {
     detailedNuclearFeatureCount,
     detailSignals,
     nuclearDetailLimited,
+    // BE-FIX-005.29 — this gate governs NEGATIVE exclusion only.
+    // Positive structured marrow blast evidence remains valid even when the
+    // field is not adequate to exclude blast morphology globally.
     negativeBlastConclusionAllowed: adequateForBlastScreening,
+    assessabilityScope: "NEGATIVE_EXCLUSION_ONLY",
+    positiveEvidencePresent: positiveMarrowBlastEvidence,
+    positiveEvidencePreserved: positiveMarrowBlastEvidence,
+    negativeOnlyGateVersion: "BE-FIX-005.29",
     reason,
   };
 }
@@ -181,7 +215,9 @@ function buildAdequacyContract({
 
     positiveBlastEvidenceOverride: {
       version: POSITIVE_BLAST_OVERRIDE_VERSION,
-      principle: "POSITIVE_FOCAL_BLAST_EVIDENCE_IS_VALID_EVEN_WHEN_NEGATIVE_SCREENING_IS_NOT_ASSESSABLE",
+      active: blastAssessability?.positiveEvidencePresent === true,
+      assessabilityScope: "NEGATIVE_EXCLUSION_ONLY",
+      principle: "POSITIVE_MARROW_BLAST_EVIDENCE_IS_VALID_EVEN_WHEN_NEGATIVE_SCREENING_IS_NOT_ASSESSABLE",
     },
 
     blastAssessability:

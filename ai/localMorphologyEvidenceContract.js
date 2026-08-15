@@ -189,9 +189,15 @@ function normalizeCriticalMorphology(explicit = {}, raw = {}) {
 
   // BE-FIX-005.27 — physiologic marrow precursors must not leak into the
   // generic single-blast sentinel as suspicious blast morphology.
+  // BE-FIX-005.29 — precursor/assessability logic is negative-only once
+  // structured positive marrow blast evidence exists. A positive population
+  // state must never be rewritten to NOT_ASSESSABLE by a later ambiguity gate.
   if (
-    marrowBlast.precursorDiscrimination?.strongPhysiologicPattern === true ||
-    marrowBlast.precursorDiscrimination?.ambiguousPrecursorVsBlast === true
+    marrowBlast.positive !== true &&
+    (
+      marrowBlast.precursorDiscrimination?.strongPhysiologicPattern === true ||
+      marrowBlast.precursorDiscrimination?.ambiguousPrecursorVsBlast === true
+    )
   ) {
     blastLikeMorphology = "NOT_ASSESSABLE";
   }

@@ -30,6 +30,11 @@ import {
 } from "./ai/boneMarrow/marrowBlastEvidenceReconciliationEngine.js";
 
 import {
+  MARROW_POSITIVE_BLAST_E2E_PRESERVATION_VERSION,
+  applyMarrowPositiveBlastEvidencePreservation,
+} from "./ai/boneMarrow/marrowPositiveBlastEvidencePreservationEngine.js";
+
+import {
   applyClinicalSafetyGovernor,
 } from "./ai/clinicalSafety/index.js";
 
@@ -4510,6 +4515,12 @@ BE-FIX-005.28 — REFORÇO DA AQUISIÇÃO DE EVIDÊNCIA BLASTOIDE MEDULAR:
     // localMorphologyEvidence; observedMorphology remains a legacy projection.
     mergedAnalysis = applyMorphologyEvidencePreservation(mergedAnalysis);
 
+    // BE-FIX-005.29 — project structured positive marrow evidence before
+    // field-adequacy evaluates NEGATIVE screening assessability.
+    if (analysisType === "bone_marrow") {
+      mergedAnalysis = applyMarrowPositiveBlastEvidencePreservation(mergedAnalysis);
+    }
+
     mergedAnalysis =
       applyFieldAdequacyRules(
         mergedAnalysis,
@@ -4517,6 +4528,13 @@ BE-FIX-005.28 — REFORÇO DA AQUISIÇÃO DE EVIDÊNCIA BLASTOIDE MEDULAR:
 
     // Field adequacy qualifies representativity; restore observed morphology.
     mergedAnalysis = applyMorphologyEvidencePreservation(mergedAnalysis);
+
+    // BE-FIX-005.29 — field adequacy is a negative-only gate. Reapply the
+    // positive lock immediately afterwards so NOT_ASSESSABLE can never erase
+    // a previously acquired SUSPICIOUS/OBSERVED marrow population.
+    if (analysisType === "bone_marrow") {
+      mergedAnalysis = applyMarrowPositiveBlastEvidencePreservation(mergedAnalysis);
+    }
 
 // =====================================================
 // RESTORE RAW ATYPICAL MONONUCLEAR FINDINGS
@@ -4591,6 +4609,10 @@ if (
 
     mergedAnalysis.globalPattern =
       globalPattern;
+
+    if (analysisType === "bone_marrow") {
+      mergedAnalysis = applyMarrowPositiveBlastEvidencePreservation(mergedAnalysis);
+    }
 
     mergedAnalysis.morphologyAnalysis =
       mergedAnalysis.morphologyAnalysis || {};
@@ -6426,6 +6448,8 @@ app.get("/runtime-version", (_req, res) => {
       MARROW_DUAL_AXIS_SCORING_VERSION,
     marrowBlastEvidenceReconciliationVersion:
       MARROW_BLAST_EVIDENCE_RECONCILIATION_VERSION,
+    marrowPositiveBlastE2EPreservationVersion:
+      MARROW_POSITIVE_BLAST_E2E_PRESERVATION_VERSION,
     reactiveLymphoidEvidenceSentinelVersion:
       REACTIVE_LYMPHOID_EVIDENCE_SENTINEL_VERSION,
     canonicalClinicalResultArchitectureVersion:
@@ -6858,6 +6882,11 @@ app.post(
           );
 
         validation.result =
+          applyMarrowPositiveBlastEvidencePreservation(
+            validation.result,
+          );
+
+        validation.result =
           applyMarrowPrecursorDiscrimination(
             validation.result,
           );
@@ -6873,6 +6902,11 @@ app.post(
             {
               specimenGate,
             },
+          );
+
+        validation.result =
+          applyMarrowPositiveBlastEvidencePreservation(
+            validation.result,
           );
 
         validation.result =
@@ -6912,11 +6946,19 @@ app.post(
 
       if (specimenGate.analysisType === "bone_marrow") {
         validation.result =
+          applyMarrowPositiveBlastEvidencePreservation(
+            validation.result,
+          );
+        validation.result =
           applyMarrowPrecursorDiscrimination(
             validation.result,
           );
         validation.result =
           applyMarrowBlastPopulationGovernance(
+            validation.result,
+          );
+        validation.result =
+          applyMarrowPositiveBlastEvidencePreservation(
             validation.result,
           );
       }
@@ -7342,8 +7384,10 @@ let finalResult =
 // BE-FIX-005.26 — the generic final governor may qualify representativity,
 // but it cannot be the last writer over structured positive marrow evidence.
 if (specimenGate.analysisType === "bone_marrow") {
+  finalResult = applyMarrowPositiveBlastEvidencePreservation(finalResult);
   finalResult = applyMarrowPrecursorDiscrimination(finalResult);
   finalResult = applyMarrowBlastPopulationGovernance(finalResult);
+  finalResult = applyMarrowPositiveBlastEvidencePreservation(finalResult);
 }
 
 // BE-FIX-005.7 — preserve acquisition provenance through final governor and
