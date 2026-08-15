@@ -2,6 +2,7 @@ import {
   applyMarrowPrecursorDiscrimination,
   evaluateMarrowPrecursorDiscrimination,
   MARROW_PRECURSOR_DISCRIMINATION_VERSION,
+  MARROW_PRECURSOR_REBALANCING_VERSION,
 } from "./marrowPrecursorDiscriminationEngine.js";
 
 // ============================================================================
@@ -186,6 +187,7 @@ export function applyMarrowBlastPopulationGovernance(result = {}) {
     version: MARROW_BLAST_POPULATION_GOVERNANCE_VERSION,
     positiveEvidencePriorityLockVersion: MARROW_POSITIVE_EVIDENCE_PRIORITY_LOCK_VERSION,
     precursorFalsePositiveContainmentVersion: MARROW_PRECURSOR_DISCRIMINATION_VERSION,
+    precursorBlastRebalancingVersion: MARROW_PRECURSOR_REBALANCING_VERSION,
     applied: true,
   };
 

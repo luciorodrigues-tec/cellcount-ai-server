@@ -414,6 +414,11 @@ export function enforceBoneMarrowOutputContract(
             ? sourceValue(safe, raw, "blastAssessment").precursorContext
             : {}),
         },
+        blastoidSubpopulationContext: {
+          ...(isObject(sourceValue(safe, raw, "blastAssessment")?.blastoidSubpopulationContext)
+            ? sourceValue(safe, raw, "blastAssessment").blastoidSubpopulationContext
+            : {}),
+        },
         precursorDiscriminationVersion:
           MARROW_PRECURSOR_DISCRIMINATION_CONTRACT_VERSION,
         lineageAssignable: false,

@@ -1,0 +1,134 @@
+BE-FIX-005.27.1 — PRECURSOR/BLAST DISCRIMINATION REBALANCING
+& POSITIVE-SIGNAL PRESERVATION
+
+BASE
+----
+BE-FIX-005.27 em produção:
+- controle negativo (medula normal): melhorou a especificidade;
+- controle positivo blastoide: ficou excessivamente rebaixado por heterogeneidade
+  maturativa.
+
+PROBLEMA
+--------
+A 005.27 tratava "forte maturação fisiológica/heterogênea" como evidência
+contra blastoidia de forma excessivamente global. Isso é incorreto quando
+uma medula heterogênea contém, simultaneamente, uma SUBPOPULAÇÃO distinta,
+coerente e repetida de células blastoides.
+
+PRINCÍPIO 005.27.1
+------------------
+HETEROGENEIDADE GLOBAL != AUSÊNCIA DE SUBPOPULAÇÃO BLASTOIDE.
+
+A análise passa a separar dois eixos:
+1. arquitetura maturativa global do campo;
+2. presença ou ausência de uma subpopulação blastoide distinta do continuum.
+
+ARQUIVOS A SUBSTITUIR
+---------------------
+C:\CELLCOUNT_V1.0.0-beta.4_10_08\backend\server.js
+C:\CELLCOUNT_V1.0.0-beta.4_10_08\backend\ai\boneMarrow\marrowPrecursorDiscriminationEngine.js
+C:\CELLCOUNT_V1.0.0-beta.4_10_08\backend\ai\boneMarrow\marrowBlastPopulationSentinel.js
+C:\CELLCOUNT_V1.0.0-beta.4_10_08\backend\ai\boneMarrow\boneMarrowOutputContract.js
+
+NOVO TESTE
+----------
+C:\CELLCOUNT_V1.0.0-beta.4_10_08\backend\tests\be_fix_005_27_1_precursor_blast_rebalancing_positive_signal_preservation_test.mjs
+
+ALTERAÇÕES
+----------
+1. BE-FIX-005.27 permanece como identidade histórica de discriminação.
+2. Nova identidade:
+   MARROW_PRECURSOR_REBALANCING_VERSION = BE-FIX-005.27.1
+
+3. Novo container obrigatório em blastAssessment:
+   blastoidSubpopulationContext:
+   - distinctFromMaturationContinuum
+   - morphologicallyCoherent
+   - repeatedSubsetAcrossField
+   - disproportionateImmatureSubset
+   - matureFormsCoexist
+
+4. Heterogeneidade/continuidade maturativa não podem apagar uma subpopulação
+   suspeita se ela for:
+   - distinta do continuum maturativo;
+   - morfologicamente coerente;
+   - repetida no campo;
+   - sustentada por pelo menos dois critérios citomorfológicos de blastoidia.
+
+5. Formas maduras podem coexistir com uma subpopulação blastoide anormal.
+
+6. N:C alta, cromatina aberta ou tamanho isolados continuam insuficientes
+   para promoção.
+
+7. Quando blastoidSubpopulationContext está presente e informa que o subconjunto
+   NÃO é distinto da continuidade maturativa, o fallback legado não pode
+   promover o caso indevidamente.
+
+8. Compatibilidade com payload antigo:
+   sem blastoidSubpopulationContext, uma suspeita só é preservada por fallback
+   quando houver estado estruturado SUSPICIOUS_POPULATION + repetição + conjunto
+   citomorfológico forte.
+
+9. Bone Marrow Output Contract preserva blastoidSubpopulationContext.
+
+10. /runtime-version passa a expor:
+    marrowPrecursorDiscriminationVersion = BE-FIX-005.27
+    marrowPrecursorRebalancingVersion = BE-FIX-005.27.1
+
+11. BE-FIX-005.24 / 005.25 / 005.26 continuam preservadas.
+
+VALIDAÇÃO EXECUTADA
+-------------------
+node --check server.js: PASS
+node --check marrowPrecursorDiscriminationEngine.js: PASS
+node --check marrowBlastPopulationSentinel.js: PASS
+node --check boneMarrowOutputContract.js: PASS
+
+BE-FIX-005.27.1: 10/10 PASS
+BE-FIX-005.27:   10/10 PASS
+BE-FIX-005.26:   10/10 PASS
+BE-FIX-005.24:   10/10 PASS
+BE-FIX-005.25:    9/9 PASS
+
+TOTAL: 49 PASS / 0 FAIL
+
+VALIDAÇÃO LOCAL
+---------------
+cd /d C:\CELLCOUNT_V1.0.0-beta.4_10_08\backend
+
+node --check server.js
+node --check ai\boneMarrow\marrowPrecursorDiscriminationEngine.js
+node --check ai\boneMarrow\marrowBlastPopulationSentinel.js
+node --check ai\boneMarrow\boneMarrowOutputContract.js
+
+node --test tests\be_fix_005_27_1_precursor_blast_rebalancing_positive_signal_preservation_test.mjs
+node --test tests\be_fix_005_27_marrow_physiologic_precursor_discrimination_blast_false_positive_containment_test.mjs
+node --test tests\be_fix_005_26_bone_marrow_positive_evidence_projection_final_governor_priority_lock_test.mjs
+node --test tests\be_fix_005_24_marrow_blast_population_recognition_test.mjs
+node --test tests\be_fix_005_25_vme_gpt55_effective_reasoning_zero_evidence_containment_test.mjs
+
+git status
+
+NÃO FAZER COMMIT/PUSH ANTES DA VALIDAÇÃO.
+
+TESTES CLÍNICOS APÓS DEPLOY
+---------------------------
+A — MEDULA NORMAL:
+- deve continuar sem alerta blastoide alto;
+- heterogeneidade fisiológica permanece protegida.
+
+B — MEDULA BLASTOIDE QUE FALHOU NA 005.27:
+- se houver subpopulação distinta/coerente/repetida, deve preservar
+  MARROW_BLASTOID_POPULATION_SUSPICIOUS;
+- coexistência de formas maduras não deve neutralizar o achado.
+
+C — CASO AMBÍGUO:
+- não promover apenas por imaturidade;
+- permanecer indeterminado/revisão recomendada.
+
+SEGURANÇA
+---------
+- não diagnosticar LLA/LMA pela imagem isolada;
+- não atribuir linhagem;
+- não inferir percentual global a partir de campo isolado;
+- não usar heterogeneidade como "prova de benignidade".

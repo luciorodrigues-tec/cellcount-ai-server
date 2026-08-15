@@ -19,6 +19,7 @@ import {
 
 import {
   MARROW_PRECURSOR_DISCRIMINATION_VERSION,
+  MARROW_PRECURSOR_REBALANCING_VERSION,
   applyMarrowPrecursorDiscrimination,
 } from "./ai/boneMarrow/marrowPrecursorDiscriminationEngine.js";
 
@@ -3978,6 +3979,13 @@ CONTRATO JSON MEDULAR OBRIGATÓRIO:
       "orderlyGranulocyticMaturation": null,
       "nonMonomorphicBackground": null
     },
+    "blastoidSubpopulationContext": {
+      "distinctFromMaturationContinuum": null,
+      "morphologicallyCoherent": null,
+      "repeatedSubsetAcrossField": null,
+      "disproportionateImmatureSubset": null,
+      "matureFormsCoexist": null
+    },
     "lineageAssignable": false,
     "lineage": "indeterminate",
     "summary": ""
@@ -4016,6 +4024,17 @@ BE-FIX-005.27 — DISCRIMINAÇÃO OBRIGATÓRIA DE PRECURSORES FISIOLÓGICOS:
 - Se houver forte continuidade maturativa e população heterogênea, usar populationPattern="heterogeneous", morphologySupport.monomorphism=false e preencher precursorContext com os sinais observados.
 - Se não for possível distinguir precursor fisiológico de blasto, NÃO usar alerta alto automático; manter estado focal/indeterminado e recomendar revisão.
 - OBSERVED_POPULATION somente quando houver população blastoide estruturada inequívoca; a 005.27 não deve apagar evidência positiva verdadeiramente observada.
+
+BE-FIX-005.27.1 — REBALANCEAMENTO PRECURSOR/BLASTO E PRESERVAÇÃO DE SUBPOPULAÇÃO:
+- Heterogeneidade global NÃO exclui uma subpopulação blastoide patológica coexistente. Avaliar o campo inteiro e também possíveis SUBPOPULAÇÕES distintas.
+- Preencher blastoidSubpopulationContext obrigatoriamente quando evidenceState for SUSPICIOUS_POPULATION ou OBSERVED_POPULATION.
+- distinctFromMaturationContinuum=true somente se o subconjunto imaturo tiver morfologia que não se encaixa de modo convincente na continuidade maturativa observada.
+- morphologicallyCoherent=true somente se múltiplas células do subconjunto repetirem um conjunto citomorfológico semelhante; tamanho ou relação N:C isolados não bastam.
+- repeatedSubsetAcrossField=true somente quando esse subconjunto se repete em regiões/células distintas do campo.
+- matureFormsCoexist pode ser true sem neutralizar a subpopulação suspeita: formas maduras e blastos podem coexistir na mesma medula.
+- Uma medula heterogênea só deve ser rebaixada para padrão fisiológico quando NÃO houver subpopulação blastoide distinta, coerente e repetida.
+- Uma subpopulação suspeita distinta + coerente + repetida, com pelo menos dois critérios citomorfológicos de blastoidia, deve preservar SUSPICIOUS_POPULATION mesmo em fundo maturativo heterogêneo.
+- Se o subconjunto não for claramente distinto da continuidade maturativa, manter indeterminado/fisiológico conforme o restante das evidências; nunca promover apenas por imaturidade.
 
 `;
 
@@ -6357,6 +6376,8 @@ app.get("/runtime-version", (_req, res) => {
       MARROW_POSITIVE_EVIDENCE_PRIORITY_LOCK_VERSION,
     marrowPrecursorDiscriminationVersion:
       MARROW_PRECURSOR_DISCRIMINATION_VERSION,
+    marrowPrecursorRebalancingVersion:
+      MARROW_PRECURSOR_REBALANCING_VERSION,
     reactiveLymphoidEvidenceSentinelVersion:
       REACTIVE_LYMPHOID_EVIDENCE_SENTINEL_VERSION,
     canonicalClinicalResultArchitectureVersion:

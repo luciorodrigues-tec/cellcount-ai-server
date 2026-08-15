@@ -1,7 +1,7 @@
 // ============================================================================
 // CELLCOUNT ENTERPRISE
-// BE-FIX-005.27 — BONE MARROW PHYSIOLOGIC PRECURSOR DISCRIMINATION
-// & BLAST FALSE-POSITIVE CONTAINMENT
+// BE-FIX-005.27.1 — PRECURSOR/BLAST DISCRIMINATION REBALANCING
+// & POSITIVE-SIGNAL PRESERVATION
 //
 // Scientific invariants:
 //   1. Immaturity is physiologic in marrow and is not synonymous with blast.
@@ -13,6 +13,7 @@
 // ============================================================================
 
 export const MARROW_PRECURSOR_DISCRIMINATION_VERSION = "BE-FIX-005.27";
+export const MARROW_PRECURSOR_REBALANCING_VERSION = "BE-FIX-005.27.1";
 
 const MARROW_TYPES = new Set([
   "BONE_MARROW_ASPIRATE",
@@ -79,6 +80,11 @@ export function evaluateMarrowPrecursorDiscrimination(result = {}) {
   const rawAssessment = obj(obj(result.rawResponse).blastAssessment);
   const support = { ...obj(rawAssessment.morphologySupport), ...obj(assessment.morphologySupport) };
   const context = structuredPrecursorContext(result);
+  const raw = obj(result.rawResponse);
+  const subpopulation = {
+    ...obj(obj(raw.blastAssessment).blastoidSubpopulationContext),
+    ...obj(obj(result.blastAssessment).blastoidSubpopulationContext),
+  };
   const fallback = fallbackMaturationSignals(result);
 
   const evidenceState = text(assessment.evidenceState || rawAssessment.evidenceState || "NOT_ASSESSABLE").toUpperCase();
@@ -113,6 +119,33 @@ export function evaluateMarrowPrecursorDiscrimination(result = {}) {
     scantBasophilicCytoplasm: support.scantBasophilicCytoplasm === true,
   };
 
+  // BE-FIX-005.27.1 — whole-field heterogeneity and a pathologic blastoid
+  // subpopulation are independent axes. A heterogeneous marrow can contain a
+  // repeated coherent blastoid subset and must not be downgraded merely because
+  // mature cells/other lineages coexist in the same field.
+  const blastoidSubpopulationSignals = {
+    distinctFromMaturationContinuum:
+      subpopulation.distinctFromMaturationContinuum === true,
+    morphologicallyCoherent:
+      subpopulation.morphologicallyCoherent === true,
+    repeatedSubsetAcrossField:
+      subpopulation.repeatedSubsetAcrossField === true,
+    disproportionateImmatureSubset:
+      subpopulation.disproportionateImmatureSubset === true,
+    matureFormsCoexist:
+      subpopulation.matureFormsCoexist === true,
+  };
+
+  const blastoidSubpopulationScore = countTrue([
+    blastoidSubpopulationSignals.distinctFromMaturationContinuum,
+    blastoidSubpopulationSignals.morphologicallyCoherent,
+    blastoidSubpopulationSignals.repeatedSubsetAcrossField,
+    blastoidSubpopulationSignals.disproportionateImmatureSubset,
+  ]);
+
+  const hasStructuredBlastoidSubpopulationContext =
+    Object.keys(subpopulation).length > 0;
+
   const physiologicScore = countTrue(Object.values(physiologicSignals));
   const blastArchitectureScore = countTrue([
     blastSpecificSignals.monomorphism,
@@ -129,6 +162,31 @@ export function evaluateMarrowPrecursorDiscrimination(result = {}) {
   const explicitObserved =
     assessment.observed === true || rawAssessment.observed === true || evidenceState === "OBSERVED_POPULATION";
 
+  const explicitSuspicious = evidenceState === "SUSPICIOUS_POPULATION";
+  const coherentBlastoidSubpopulation =
+    marrow &&
+    explicitSuspicious &&
+    blastoidSubpopulationSignals.distinctFromMaturationContinuum &&
+    blastoidSubpopulationSignals.morphologicallyCoherent &&
+    blastoidSubpopulationSignals.repeatedSubsetAcrossField &&
+    blastoidSubpopulationScore >= 3 &&
+    blastFeatureScore >= 2;
+
+  // Compatibility fallback for older payloads: preserve suspicion only when
+  // the vision model already supplied a repeated structured suspicious state
+  // with a sufficiently coherent cytologic bundle. This is intentionally
+  // stricter than "immature cells present" and does not depend on N:C alone.
+  const legacyStructuredSuspiciousSubset =
+    marrow &&
+    !hasStructuredBlastoidSubpopulationContext &&
+    explicitSuspicious &&
+    blastSpecificSignals.repeatedAcrossField &&
+    blastFeatureScore >= 3 &&
+    (blastSpecificSignals.monomorphism || (count !== null && count >= 6));
+
+  const protectedSuspiciousBlastoid =
+    coherentBlastoidSubpopulation || legacyStructuredSuspiciousSubset;
+
   // An explicitly observed structured population with architecture + cytology
   // remains protected from any physiologic-precursor downgrade.
   const protectedObservedBlastoid =
@@ -137,6 +195,7 @@ export function evaluateMarrowPrecursorDiscrimination(result = {}) {
   const strongPhysiologicPattern =
     marrow &&
     !protectedObservedBlastoid &&
+    !protectedSuspiciousBlastoid &&
     physiologicScore >= 3 &&
     physiologicSignals.maturationHeterogeneity &&
     physiologicSignals.maturationContinuum &&
@@ -145,14 +204,21 @@ export function evaluateMarrowPrecursorDiscrimination(result = {}) {
 
   const strongBlastoidPattern =
     marrow &&
-    !strongPhysiologicPattern &&
-    blastArchitectureScore >= 2 &&
-    blastFeatureScore >= 2 &&
-    (evidenceState === "OBSERVED_POPULATION" || evidenceState === "SUSPICIOUS_POPULATION");
+    (
+      protectedObservedBlastoid ||
+      protectedSuspiciousBlastoid ||
+      (
+        !strongPhysiologicPattern &&
+        blastArchitectureScore >= 2 &&
+        blastFeatureScore >= 2 &&
+        (evidenceState === "OBSERVED_POPULATION" || evidenceState === "SUSPICIOUS_POPULATION")
+      )
+    );
 
   const ambiguousPrecursorVsBlast =
     marrow &&
     !protectedObservedBlastoid &&
+    !protectedSuspiciousBlastoid &&
     !strongPhysiologicPattern &&
     !strongBlastoidPattern &&
     ["SUSPICIOUS_POPULATION", "FOCAL_SUSPICION"].includes(evidenceState);
@@ -164,6 +230,7 @@ export function evaluateMarrowPrecursorDiscrimination(result = {}) {
 
   return {
     version: MARROW_PRECURSOR_DISCRIMINATION_VERSION,
+    rebalancingVersion: MARROW_PRECURSOR_REBALANCING_VERSION,
     marrow,
     classification,
     evidenceState,
@@ -171,6 +238,12 @@ export function evaluateMarrowPrecursorDiscrimination(result = {}) {
     approximateBlastLikeCells: count,
     physiologicSignals,
     blastSpecificSignals,
+    blastoidSubpopulationSignals,
+    blastoidSubpopulationScore,
+    hasStructuredBlastoidSubpopulationContext,
+    coherentBlastoidSubpopulation,
+    legacyStructuredSuspiciousSubset,
+    protectedSuspiciousBlastoid,
     physiologicScore,
     blastArchitectureScore,
     blastFeatureScore,
