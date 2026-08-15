@@ -20,6 +20,7 @@ import {
 import {
   MARROW_PRECURSOR_DISCRIMINATION_VERSION,
   MARROW_PRECURSOR_REBALANCING_VERSION,
+  MARROW_DUAL_AXIS_SCORING_VERSION,
   applyMarrowPrecursorDiscrimination,
 } from "./ai/boneMarrow/marrowPrecursorDiscriminationEngine.js";
 
@@ -4025,6 +4026,16 @@ BE-FIX-005.27 — DISCRIMINAÇÃO OBRIGATÓRIA DE PRECURSORES FISIOLÓGICOS:
 - Se não for possível distinguir precursor fisiológico de blasto, NÃO usar alerta alto automático; manter estado focal/indeterminado e recomendar revisão.
 - OBSERVED_POPULATION somente quando houver população blastoide estruturada inequívoca; a 005.27 não deve apagar evidência positiva verdadeiramente observada.
 
+BE-FIX-005.27.2 — DUAL-AXIS MARROW BLAST SCORING:
+- Julgar separadamente dois eixos: MATURAÇÃO FISIOLÓGICA GLOBAL e SUBPOPULAÇÃO BLASTOIDE.
+- Não usar heterogeneidade global como veto binário contra blastoidia. Uma medula pode mostrar continuidade maturativa e, simultaneamente, conter um subconjunto blastoide anormal.
+- Para cada suspeita blastoide, documentar repetição, coerência, separação do continuum e critérios citomorfológicos independentes.
+- N:C alta, cromatina aberta, nucléolo ou citoplasma basofílico isoladamente não bastam.
+- Um subconjunto repetido/coerente com pelo menos dois critérios citomorfológicos e arquitetura populacional deve preservar SUSPICIOUS_POPULATION mesmo com formas maduras coexistentes.
+- Padrão fisiológico requer continuidade maturativa real e ausência de subpopulação blastoide estruturada; não basta apenas haver heterogeneidade.
+- Casos na zona intermediária devem permanecer INDETERMINADOS, sem falso alto risco e sem falsa tranquilização.
+- Nunca calcular os escores numericamente no modelo: apenas fornecer os sinais estruturados; o backend calcula os dois eixos de forma determinística.
+
 BE-FIX-005.27.1 — REBALANCEAMENTO PRECURSOR/BLASTO E PRESERVAÇÃO DE SUBPOPULAÇÃO:
 - Heterogeneidade global NÃO exclui uma subpopulação blastoide patológica coexistente. Avaliar o campo inteiro e também possíveis SUBPOPULAÇÕES distintas.
 - Preencher blastoidSubpopulationContext obrigatoriamente quando evidenceState for SUSPICIOUS_POPULATION ou OBSERVED_POPULATION.
@@ -6378,6 +6389,8 @@ app.get("/runtime-version", (_req, res) => {
       MARROW_PRECURSOR_DISCRIMINATION_VERSION,
     marrowPrecursorRebalancingVersion:
       MARROW_PRECURSOR_REBALANCING_VERSION,
+    marrowDualAxisBlastScoringVersion:
+      MARROW_DUAL_AXIS_SCORING_VERSION,
     reactiveLymphoidEvidenceSentinelVersion:
       REACTIVE_LYMPHOID_EVIDENCE_SENTINEL_VERSION,
     canonicalClinicalResultArchitectureVersion:

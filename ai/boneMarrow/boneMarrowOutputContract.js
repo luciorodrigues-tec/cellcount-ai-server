@@ -1,6 +1,7 @@
 export const BONE_MARROW_CONTRACT_VERSION = "CI-001B.3-v1";
 export const MARROW_BLAST_POPULATION_CONTRACT_VERSION = "BE-FIX-005.24";
 export const MARROW_PRECURSOR_DISCRIMINATION_CONTRACT_VERSION = "BE-FIX-005.27";
+export const MARROW_DUAL_AXIS_BLAST_SCORING_CONTRACT_VERSION = "BE-FIX-005.27.2";
 
 export const MarrowObservationStatus = Object.freeze({
   present: "present",
@@ -421,6 +422,13 @@ export function enforceBoneMarrowOutputContract(
         },
         precursorDiscriminationVersion:
           MARROW_PRECURSOR_DISCRIMINATION_CONTRACT_VERSION,
+        dualAxisBlastScoringVersion:
+          MARROW_DUAL_AXIS_BLAST_SCORING_CONTRACT_VERSION,
+        dualAxisBlastScoring: {
+          ...(isObject(sourceValue(safe, raw, "blastAssessment")?.dualAxisBlastScoring)
+            ? sourceValue(safe, raw, "blastAssessment").dualAxisBlastScoring
+            : {}),
+        },
         lineageAssignable: false,
         lineage: "indeterminate",
         diagnosticLabelProhibited: true,

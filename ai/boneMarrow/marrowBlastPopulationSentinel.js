@@ -3,6 +3,7 @@ import {
   evaluateMarrowPrecursorDiscrimination,
   MARROW_PRECURSOR_DISCRIMINATION_VERSION,
   MARROW_PRECURSOR_REBALANCING_VERSION,
+  MARROW_DUAL_AXIS_SCORING_VERSION,
 } from "./marrowPrecursorDiscriminationEngine.js";
 
 // ============================================================================
@@ -21,6 +22,7 @@ import {
 export const MARROW_BLAST_POPULATION_GOVERNANCE_VERSION = "BE-FIX-005.24";
 export const MARROW_POSITIVE_EVIDENCE_PRIORITY_LOCK_VERSION = "BE-FIX-005.26";
 export const MARROW_PRECURSOR_FALSE_POSITIVE_CONTAINMENT_VERSION = MARROW_PRECURSOR_DISCRIMINATION_VERSION;
+export const MARROW_CALIBRATED_SUBPOPULATION_ESCALATION_VERSION = MARROW_DUAL_AXIS_SCORING_VERSION;
 
 const MARROW_TYPES = new Set([
   "BONE_MARROW_ASPIRATE",
@@ -115,11 +117,14 @@ export function evaluateMarrowBlastPopulationEvidence(result = {}) {
     rawAssessment.observed === true ||
     evidenceState === "OBSERVED_POPULATION";
 
+  const dualAxis = precursorDiscrimination.dualAxis || {};
+
   const observedPopulation =
     marrow &&
     explicitObserved &&
     repeatedPopulation &&
     featureCount >= 2 &&
+    dualAxis.observedEscalation === true &&
     !suppressBlastPromotion;
 
   const suspiciousPopulation =
@@ -127,10 +132,7 @@ export function evaluateMarrowBlastPopulationEvidence(result = {}) {
     !observedPopulation &&
     !suppressBlastPromotion &&
     !capAtIndeterminate &&
-    (
-      evidenceState === "SUSPICIOUS_POPULATION" ||
-      (repeatedPopulation && featureCount >= 2)
-    );
+    dualAxis.suspiciousEscalation === true;
 
   const focalSuspicion =
     marrow &&
@@ -154,6 +156,7 @@ export function evaluateMarrowBlastPopulationEvidence(result = {}) {
     positivePopulationFinding:
       observedPopulation || suspiciousPopulation,
     precursorDiscrimination,
+    dualAxisScoring: precursorDiscrimination.dualAxis || null,
     physiologicPrecursorPattern:
       precursorDiscrimination.strongPhysiologicPattern === true,
     indeterminatePrecursorVsBlast:
@@ -188,6 +191,7 @@ export function applyMarrowBlastPopulationGovernance(result = {}) {
     positiveEvidencePriorityLockVersion: MARROW_POSITIVE_EVIDENCE_PRIORITY_LOCK_VERSION,
     precursorFalsePositiveContainmentVersion: MARROW_PRECURSOR_DISCRIMINATION_VERSION,
     precursorBlastRebalancingVersion: MARROW_PRECURSOR_REBALANCING_VERSION,
+    dualAxisBlastScoringVersion: MARROW_DUAL_AXIS_SCORING_VERSION,
     applied: true,
   };
 

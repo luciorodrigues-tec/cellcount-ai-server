@@ -1,7 +1,12 @@
+import {
+  MARROW_DUAL_AXIS_BLAST_SCORING_VERSION,
+  scoreMarrowBlastAxes,
+} from "./marrowBlastScoringEngine.js";
+
 // ============================================================================
 // CELLCOUNT ENTERPRISE
-// BE-FIX-005.27.1 — PRECURSOR/BLAST DISCRIMINATION REBALANCING
-// & POSITIVE-SIGNAL PRESERVATION
+// BE-FIX-005.27.2 — DUAL-AXIS MARROW BLAST SCORING
+// & CALIBRATED SUBPOPULATION ESCALATION
 //
 // Scientific invariants:
 //   1. Immaturity is physiologic in marrow and is not synonymous with blast.
@@ -14,6 +19,7 @@
 
 export const MARROW_PRECURSOR_DISCRIMINATION_VERSION = "BE-FIX-005.27";
 export const MARROW_PRECURSOR_REBALANCING_VERSION = "BE-FIX-005.27.1";
+export const MARROW_DUAL_AXIS_SCORING_VERSION = MARROW_DUAL_AXIS_BLAST_SCORING_VERSION;
 
 const MARROW_TYPES = new Set([
   "BONE_MARROW_ASPIRATE",
@@ -162,66 +168,48 @@ export function evaluateMarrowPrecursorDiscrimination(result = {}) {
   const explicitObserved =
     assessment.observed === true || rawAssessment.observed === true || evidenceState === "OBSERVED_POPULATION";
 
-  const explicitSuspicious = evidenceState === "SUSPICIOUS_POPULATION";
-  const coherentBlastoidSubpopulation =
-    marrow &&
-    explicitSuspicious &&
-    blastoidSubpopulationSignals.distinctFromMaturationContinuum &&
-    blastoidSubpopulationSignals.morphologicallyCoherent &&
-    blastoidSubpopulationSignals.repeatedSubsetAcrossField &&
-    blastoidSubpopulationScore >= 3 &&
-    blastFeatureScore >= 2;
+  const dualAxis = scoreMarrowBlastAxes({
+    physiologicSignals,
+    blastSpecificSignals,
+    blastoidSubpopulationSignals,
+    approximateBlastLikeCells: count,
+    evidenceState,
+    populationPattern,
+  });
 
-  // Compatibility fallback for older payloads: preserve suspicion only when
-  // the vision model already supplied a repeated structured suspicious state
-  // with a sufficiently coherent cytologic bundle. This is intentionally
-  // stricter than "immature cells present" and does not depend on N:C alone.
-  const legacyStructuredSuspiciousSubset =
-    marrow &&
-    !hasStructuredBlastoidSubpopulationContext &&
-    explicitSuspicious &&
-    blastSpecificSignals.repeatedAcrossField &&
-    blastFeatureScore >= 3 &&
-    (blastSpecificSignals.monomorphism || (count !== null && count >= 6));
+  // 005.27.2 replaces boolean-veto behavior with calibrated independent axes.
+  // A strong physiologic axis cannot erase a simultaneously strong, repeated
+  // blastoid subpopulation. Conversely, isolated immature cytology cannot beat
+  // a strong maturation continuum without architecture.
+  const explicitlyNotDistinctFromContinuum =
+    hasStructuredBlastoidSubpopulationContext &&
+    subpopulation.distinctFromMaturationContinuum === false;
 
+  const protectedObservedBlastoid = marrow && dualAxis.observedEscalation;
   const protectedSuspiciousBlastoid =
-    coherentBlastoidSubpopulation || legacyStructuredSuspiciousSubset;
-
-  // An explicitly observed structured population with architecture + cytology
-  // remains protected from any physiologic-precursor downgrade.
-  const protectedObservedBlastoid =
-    marrow && explicitObserved && blastArchitectureScore >= 2 && blastFeatureScore >= 2;
+    marrow &&
+    dualAxis.suspiciousEscalation &&
+    !explicitlyNotDistinctFromContinuum;
 
   const strongPhysiologicPattern =
     marrow &&
     !protectedObservedBlastoid &&
     !protectedSuspiciousBlastoid &&
-    physiologicScore >= 3 &&
-    physiologicSignals.maturationHeterogeneity &&
-    physiologicSignals.maturationContinuum &&
-    (physiologicSignals.matureFormsPresent || physiologicSignals.lineageDiversity) &&
-    !blastSpecificSignals.monomorphism;
+    dualAxis.physiologicDominance;
 
   const strongBlastoidPattern =
-    marrow &&
-    (
-      protectedObservedBlastoid ||
-      protectedSuspiciousBlastoid ||
-      (
-        !strongPhysiologicPattern &&
-        blastArchitectureScore >= 2 &&
-        blastFeatureScore >= 2 &&
-        (evidenceState === "OBSERVED_POPULATION" || evidenceState === "SUSPICIOUS_POPULATION")
-      )
-    );
+    marrow && (protectedObservedBlastoid || protectedSuspiciousBlastoid);
 
   const ambiguousPrecursorVsBlast =
     marrow &&
-    !protectedObservedBlastoid &&
-    !protectedSuspiciousBlastoid &&
     !strongPhysiologicPattern &&
     !strongBlastoidPattern &&
-    ["SUSPICIOUS_POPULATION", "FOCAL_SUSPICION"].includes(evidenceState);
+    dualAxis.indeterminateZone;
+
+  const coherentBlastoidSubpopulation = dualAxis.subpopulationCore;
+  const legacyStructuredSuspiciousSubset =
+    !hasStructuredBlastoidSubpopulationContext &&
+    protectedSuspiciousBlastoid;
 
   let classification = "NOT_APPLICABLE";
   if (protectedObservedBlastoid || strongBlastoidPattern) classification = "BLASTOID_PATTERN_SUPPORTED";
@@ -231,6 +219,7 @@ export function evaluateMarrowPrecursorDiscrimination(result = {}) {
   return {
     version: MARROW_PRECURSOR_DISCRIMINATION_VERSION,
     rebalancingVersion: MARROW_PRECURSOR_REBALANCING_VERSION,
+    dualAxisScoringVersion: MARROW_DUAL_AXIS_SCORING_VERSION,
     marrow,
     classification,
     evidenceState,
@@ -244,9 +233,12 @@ export function evaluateMarrowPrecursorDiscrimination(result = {}) {
     coherentBlastoidSubpopulation,
     legacyStructuredSuspiciousSubset,
     protectedSuspiciousBlastoid,
-    physiologicScore,
+    physiologicScore: dualAxis.physiologicScore,
     blastArchitectureScore,
     blastFeatureScore,
+    blastoidScore: dualAxis.blastoidScore,
+    dualAxis,
+    explicitlyNotDistinctFromContinuum,
     protectedObservedBlastoid,
     strongPhysiologicPattern,
     strongBlastoidPattern,
@@ -264,6 +256,11 @@ export function applyMarrowPrecursorDiscrimination(result = {}) {
   const output = {
     ...result,
     marrowPrecursorDiscrimination: discrimination,
+    blastAssessment: {
+      ...obj(result.blastAssessment),
+      dualAxisBlastScoring: discrimination.dualAxis || {},
+      dualAxisBlastScoringVersion: MARROW_DUAL_AXIS_SCORING_VERSION,
+    },
     findings: { ...obj(result.findings) },
     overallAssessment: { ...obj(result.overallAssessment) },
     structuredReport: { ...obj(result.structuredReport) },

@@ -1,0 +1,144 @@
+BE-FIX-005.27.2 — DUAL-AXIS MARROW BLAST SCORING
+& CALIBRATED SUBPOPULATION ESCALATION
+
+BASE
+----
+- server.js atual pós-BE-FIX-005.27.1
+- ai.zip atual pós-BE-FIX-005.27.1
+
+PROBLEMA CORRIGIDO
+------------------
+A 005.27/005.27.1 melhorou a contenção de falso positivo, mas a decisão ainda
+dependia excessivamente de flags booleanas. Em medula heterogênea, isso podia
+deixar uma subpopulação blastoide repetida em estado indeterminado.
+
+PRINCÍPIO CENTRAL
+-----------------
+A arquitetura medular passa a avaliar DOIS EIXOS INDEPENDENTES:
+
+1. PHYSIOLOGIC MATURATION AXIS
+   - heterogeneidade maturativa
+   - continuidade maturativa
+   - formas maduras presentes
+   - diversidade de linhagens
+   - maturação granulocítica ordenada
+   - fundo não monomórfico
+
+2. BLASTOID SUBPOPULATION AXIS
+   - repetição
+   - coerência morfológica
+   - separação do continuum
+   - desproporção de células imaturas
+   - monomorfismo
+   - padrão dominante/repetido
+   - N:C
+   - cromatina
+   - nucléolos
+   - citoplasma
+
+HETEROGENEIDADE GLOBAL NÃO É VETO CONTRA BLASTOIDIA.
+
+Ao mesmo tempo:
+IMATURIDADE ISOLADA NÃO É BLASTO.
+
+ARQUIVOS A SUBSTITUIR
+---------------------
+C:\CELLCOUNT_V1.0.0-beta.4_10_08\backend\server.js
+C:\CELLCOUNT_V1.0.0-beta.4_10_08\backend\ai\boneMarrow\marrowPrecursorDiscriminationEngine.js
+C:\CELLCOUNT_V1.0.0-beta.4_10_08\backend\ai\boneMarrow\marrowBlastPopulationSentinel.js
+C:\CELLCOUNT_V1.0.0-beta.4_10_08\backend\ai\boneMarrow\boneMarrowOutputContract.js
+
+NOVO ARQUIVO
+------------
+C:\CELLCOUNT_V1.0.0-beta.4_10_08\backend\ai\boneMarrow\marrowBlastScoringEngine.js
+
+NOVO TESTE
+----------
+C:\CELLCOUNT_V1.0.0-beta.4_10_08\backend\tests\be_fix_005_27_2_dual_axis_marrow_blast_scoring_calibrated_subpopulation_escalation_test.mjs
+
+IDENTIDADE
+----------
+MARROW_DUAL_AXIS_BLAST_SCORING_VERSION = BE-FIX-005.27.2
+
+/runtime-version:
+marrowDualAxisBlastScoringVersion = BE-FIX-005.27.2
+
+REGRAS DE ESCALONAMENTO
+-----------------------
+- Padrão fisiológico forte:
+  eixo fisiológico alto + eixo blastoide baixo + ausência de subpopulação
+  blastoide distinta.
+
+- SUSPICIOUS_POPULATION:
+  eixo blastoide calibrado + >=2 critérios citomorfológicos + arquitetura
+  populacional/repetição.
+
+- OBSERVED_POPULATION:
+  exige evidência explícita observada + escore blastoide mais alto +
+  arquitetura/citologia estruturadas.
+
+- Zona intermediária:
+  permanece MARROW_IMMATURE_POPULATION_INDETERMINATE.
+
+- Se blastoidSubpopulationContext explicitamente disser
+  distinctFromMaturationContinuum=false, a suspeita não é promovida apenas por
+  repetição/N:C/cromatina.
+
+- Formas maduras coexistentes não neutralizam subpopulação blastoide verdadeira.
+
+SEGURANÇA PRESERVADA
+--------------------
+- Não atribuir LLA/LMA/linhagem pela imagem isolada.
+- Campo limitado restringe percentual/globalização, não apaga achado positivo.
+- N:C, cromatina ou tamanho isoladamente não promovem blastoidia.
+- Aquisição incompleta continua fail-closed pela 005.25.
+- 005.24, 005.26, 005.27 e 005.27.1 permanecem registradas.
+
+VALIDAÇÃO REALIZADA NA PREPARAÇÃO
+---------------------------------
+BE-FIX-005.27.2  10/10 PASS
+BE-FIX-005.27.1  10/10 PASS
+BE-FIX-005.27    10/10 PASS
+BE-FIX-005.26    10/10 PASS
+BE-FIX-005.24    10/10 PASS
+BE-FIX-005.25     9/9 PASS
+
+TOTAL: 59 PASS / 0 FAIL
+
+VALIDAÇÃO LOCAL APÓS SUBSTITUIÇÃO
+---------------------------------
+cd /d C:\CELLCOUNT_V1.0.0-beta.4_10_08\backend
+
+node --check server.js
+node --check ai\boneMarrow\marrowBlastScoringEngine.js
+node --check ai\boneMarrow\marrowPrecursorDiscriminationEngine.js
+node --check ai\boneMarrow\marrowBlastPopulationSentinel.js
+node --check ai\boneMarrow\boneMarrowOutputContract.js
+
+node --test tests\be_fix_005_27_2_dual_axis_marrow_blast_scoring_calibrated_subpopulation_escalation_test.mjs
+node --test tests\be_fix_005_27_1_precursor_blast_rebalancing_positive_signal_preservation_test.mjs
+node --test tests\be_fix_005_27_marrow_physiologic_precursor_discrimination_blast_false_positive_containment_test.mjs
+node --test tests\be_fix_005_26_bone_marrow_positive_evidence_projection_final_governor_priority_lock_test.mjs
+node --test tests\be_fix_005_24_marrow_blast_population_recognition_test.mjs
+node --test tests\be_fix_005_25_vme_gpt55_effective_reasoning_zero_evidence_containment_test.mjs
+
+git status
+
+NÃO FAZER COMMIT/PUSH ANTES DE ENVIAR OS RESULTADOS.
+
+TESTES CLÍNICOS APÓS DEPLOY
+---------------------------
+A — MEDULA NORMAL:
+- não gerar alerta blastoide;
+- maturação heterogênea/ordenada deve permanecer fisiológica quando sustentada;
+- não afirmar normalidade global por campo isolado.
+
+B — MEDULA BLASTOIDE QUE FALHOU NA 005.27/005.27.1:
+- subpopulação distinta + coerente + repetida deve atingir no mínimo
+  MARROW_BLASTOID_POPULATION_SUSPICIOUS;
+- formas maduras coexistentes não podem apagar o achado.
+
+C — CASO AMBÍGUO:
+- deve permanecer indeterminado;
+- não gerar falso alto risco;
+- não gerar falsa tranquilização.
