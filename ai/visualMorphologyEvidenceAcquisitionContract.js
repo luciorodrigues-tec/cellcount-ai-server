@@ -296,6 +296,22 @@ export function assessBoneMarrowVisualEvidenceAcquisition({
   const zeroEvidence = marrowContainersPresent === 0;
   const complete = missingRequirements.length === 0 && !zeroEvidence;
 
+  const blastAssessment = asObject(raw.blastAssessment);
+  const blastSummary = asText(blastAssessment.summary).toLowerCase();
+  const marrowNarrative = [
+    blastSummary,
+    asText(asObject(raw.myeloidSeries).summary).toLowerCase(),
+    asText(asObject(raw.whatAISees).leukocytes).toLowerCase(),
+    asText(asObject(raw.morphologyAnalysis).leukocyteReview).toLowerCase(),
+  ].join(" ");
+  const narrativeMentionsRepeatedImmature =
+    /(múltipl|multipl|divers|repetid).*(imatur|blasto)|(?:imatur|blasto).*(repetid|ao longo do campo)/i.test(marrowNarrative);
+  const structuredRepeat =
+    asObject(blastAssessment.morphologySupport).repeatedAcrossField === true ||
+    ["repeated", "dominant"].includes(asText(blastAssessment.populationPattern).toLowerCase());
+  const narrativeStructuredDiscordance =
+    narrativeMentionsRepeatedImmature && structuredRepeat !== true;
+
   return {
     contractVersion: VISUAL_MORPHOLOGY_EVIDENCE_ACQUISITION_VERSION,
     productionEnforcementVersion: PRODUCTION_VME_ENFORCEMENT_VERSION,
@@ -311,6 +327,9 @@ export function assessBoneMarrowVisualEvidenceAcquisition({
       marrowContainersPresent,
       blastPopulationEvidenceState:
         asText(asObject(raw.blastAssessment).evidenceState) || null,
+      narrativeMentionsRepeatedImmature,
+      structuredRepeat,
+      narrativeStructuredDiscordance,
     },
     invariants: {
       incompleteEvidenceIsNotNegativeMorphology: true,
@@ -338,13 +357,18 @@ Prioridade absoluta:
 1. specimenAssessment e marrowAdequacy;
 2. myeloidSeries, erythroidSeries e megakaryocyticSeries;
 3. blastAssessment com evidenceState, approximateBlastLikeCells,
-   populationPattern e morphologySupport;
+   approximateImmatureCellCount, immatureCellBurden, spatialDistribution,
+   morphologicFeatureCount, populationPattern, morphologySupport,
+   precursorContext e blastoidSubpopulationContext;
 4. plasmaCellAssessment, dysplasiaAssessment e infiltrationAssessment.
 
 Use status=notAssessable quando realmente não avaliável.
 NÃO use ausência de evidência como achado negativo.
 NÃO escreva relatório longo. NÃO diagnostique LLA/LMA.
-Campo limitado não pode apagar população blastoide positivamente observada.`;
+Campo limitado não pode apagar população blastoide positivamente observada.
+Se a narrativa disser múltiplas/repetidas células imaturas/blastoides e descrever
+N:C/cromatina/nucléolos/citoplasma, os campos estruturados correspondentes devem
+ser coerentes; use null quando não avaliável, nunca false por simples incerteza.`;
 }
 
 export function mergeVisualMorphologyRepair(

@@ -25,6 +25,11 @@ import {
 } from "./ai/boneMarrow/marrowPrecursorDiscriminationEngine.js";
 
 import {
+  MARROW_BLAST_EVIDENCE_RECONCILIATION_VERSION,
+  reconcileMarrowBlastEvidence,
+} from "./ai/boneMarrow/marrowBlastEvidenceReconciliationEngine.js";
+
+import {
   applyClinicalSafetyGovernor,
 } from "./ai/clinicalSafety/index.js";
 
@@ -3963,6 +3968,10 @@ CONTRATO JSON MEDULAR OBRIGATÓRIO:
     "globalAbsenceAllowed": false,
     "evidenceState": "OBSERVED_POPULATION|SUSPICIOUS_POPULATION|FOCAL_SUSPICION|NOT_OBSERVED_IN_EVALUABLE_FIELD|NOT_ASSESSABLE",
     "approximateBlastLikeCells": null,
+    "approximateImmatureCellCount": null,
+    "immatureCellBurden": "none|few|multiple|numerous|dominant|indeterminate",
+    "spatialDistribution": "isolated|focal|repeated_across_field|diffuse|indeterminate",
+    "morphologicFeatureCount": null,
     "populationPattern": "dominant|repeated|focal|heterogeneous|indeterminate",
     "morphologySupport": {
       "highNCRatio": null,
@@ -4046,6 +4055,19 @@ BE-FIX-005.27.1 — REBALANCEAMENTO PRECURSOR/BLASTO E PRESERVAÇÃO DE SUBPOPUL
 - Uma medula heterogênea só deve ser rebaixada para padrão fisiológico quando NÃO houver subpopulação blastoide distinta, coerente e repetida.
 - Uma subpopulação suspeita distinta + coerente + repetida, com pelo menos dois critérios citomorfológicos de blastoidia, deve preservar SUSPICIOUS_POPULATION mesmo em fundo maturativo heterogêneo.
 - Se o subconjunto não for claramente distinto da continuidade maturativa, manter indeterminado/fisiológico conforme o restante das evidências; nunca promover apenas por imaturidade.
+
+BE-FIX-005.28 — REFORÇO DA AQUISIÇÃO DE EVIDÊNCIA BLASTOIDE MEDULAR:
+- A narrativa observacional e os campos estruturados DEVEM ser internamente coerentes.
+- Se você escrever que há múltiplas/repetidas células imaturas ou blastoides com critérios como N:C elevada, cromatina fina/aberta, nucléolos ou citoplasma basofílico/escasso, os respectivos campos de morphologySupport NÃO podem permanecer null/false sem justificativa explícita.
+- false significa: característica suficientemente avaliável e realmente NÃO observada. Se não for possível decidir, use null.
+- approximateImmatureCellCount: número aproximado de células imaturas visualizadas quando estimável; null quando não estimável.
+- approximateBlastLikeCells: número aproximado de células com conjunto blastoide, não mero precursor fisiológico.
+- immatureCellBurden: classificar carga visual como none/few/multiple/numerous/dominant/indeterminate.
+- spatialDistribution: isolated/focal/repeated_across_field/diffuse/indeterminate.
+- morphologicFeatureCount: contar quantos dos quatro critérios citomorfológicos principais (N:C, cromatina, nucléolos, citoplasma) estão positivamente sustentados.
+- repeatedAcrossField=true somente se a morfologia imatura/blastoide se repetir em múltiplas células/regiões do campo; se a narrativa disser repetição, este campo deve refletir isso.
+- Não transformar diversidade maturativa em veto contra subpopulação blastoide.
+- Não transformar linguagem narrativa em diagnóstico. O backend fará reconciliação e scoring determinísticos.
 
 `;
 
@@ -4413,6 +4435,17 @@ BE-FIX-005.27.1 — REBALANCEAMENTO PRECURSOR/BLASTO E PRESERVAÇÃO DE SUBPOPUL
               !Array.isArray(region),
           )
         : [];
+
+    // BE-FIX-005.28 — reconcile contradictions between the model's own
+    // marrow observation narrative and its structured blast container before
+    // LME, dual-axis scoring, safety governors or final arbitration run.
+    if (analysisType === "bone_marrow") {
+      parsed = reconcileMarrowBlastEvidence(parsed);
+      console.log(
+        "BE-FIX-005.28 — MARROW BLAST EVIDENCE RECONCILIATION",
+        JSON.stringify(parsed.marrowBlastEvidenceReconciliation || {}, null, 2),
+      );
+    }
 
     console.log("================================");
     console.log("RAW GPT RESPONSE");
@@ -6391,6 +6424,8 @@ app.get("/runtime-version", (_req, res) => {
       MARROW_PRECURSOR_REBALANCING_VERSION,
     marrowDualAxisBlastScoringVersion:
       MARROW_DUAL_AXIS_SCORING_VERSION,
+    marrowBlastEvidenceReconciliationVersion:
+      MARROW_BLAST_EVIDENCE_RECONCILIATION_VERSION,
     reactiveLymphoidEvidenceSentinelVersion:
       REACTIVE_LYMPHOID_EVIDENCE_SENTINEL_VERSION,
     canonicalClinicalResultArchitectureVersion:

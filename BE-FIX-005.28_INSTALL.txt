@@ -1,0 +1,171 @@
+BE-FIX-005.28 — MARROW BLAST EVIDENCE ACQUISITION REINFORCEMENT
+& NARRATIVE-TO-STRUCTURED EVIDENCE RECONCILIATION
+
+BASE
+----
+BE-FIX-005.27.2 em produção, com:
+- BE-FIX-005.24 reconhecimento de população blastoide;
+- BE-FIX-005.25 aquisição VME e fail-closed;
+- BE-FIX-005.26 positive-evidence priority lock;
+- BE-FIX-005.27 discriminação de precursores fisiológicos;
+- BE-FIX-005.27.1 preservação de subpopulação positiva;
+- BE-FIX-005.27.2 dual-axis scoring.
+
+CAUSA RAIZ CORRIGIDA
+--------------------
+O RAW GPT RESPONSE podia narrar:
+"múltiplas células imaturas/blastoides", "relação N:C elevada",
+"cromatina fina/aberta", "citoplasma basofílico" etc.
+
+Ao mesmo tempo, blastAssessment estruturado podia retornar:
+- evidenceState=NOT_ASSESSABLE
+- approximateBlastLikeCells=null
+- highNCRatio=null
+- openFineChromatin=null
+- repeatedAcrossField=false
+- blastoidSubpopulationContext=false/null
+
+Assim, o Dual-Axis Scoring recebia evidência estrutural negativa/incompleta
+apesar de a observação do próprio modelo conter sinal positivo.
+
+PRINCÍPIO 005.28
+----------------
+NARRATIVA OBSERVACIONAL E ESTRUTURA JSON DEVEM SER COERENTES.
+
+A reconciliação:
+- NÃO usa texto livre para diagnosticar;
+- NÃO converte precursores fisiológicos em blastos;
+- NÃO atribui LLA/LMA/linhagem;
+- restaura somente critérios morfológicos explicitamente descritos;
+- exige linguagem populacional/repetitiva + pelo menos dois critérios
+  citomorfológicos antes de permitir reconciliação positiva;
+- mantém casos fisiológicos e ambíguos protegidos.
+
+ARQUIVOS A SUBSTITUIR
+---------------------
+C:\CELLCOUNT_V1.0.0-beta.4_10_08\backend\server.js
+C:\CELLCOUNT_V1.0.0-beta.4_10_08\backend\ai\visualMorphologyEvidenceAcquisitionContract.js
+C:\CELLCOUNT_V1.0.0-beta.4_10_08\backend\ai\boneMarrow\boneMarrowOutputContract.js
+
+NOVO ARQUIVO
+------------
+C:\CELLCOUNT_V1.0.0-beta.4_10_08\backend\ai\boneMarrow\marrowBlastEvidenceReconciliationEngine.js
+
+NOVO TESTE
+----------
+C:\CELLCOUNT_V1.0.0-beta.4_10_08\backend\tests\be_fix_005_28_marrow_blast_evidence_acquisition_reconciliation_test.mjs
+
+IDENTIDADE
+----------
+MARROW_BLAST_EVIDENCE_RECONCILIATION_VERSION = BE-FIX-005.28
+
+/runtime-version:
+marrowBlastEvidenceReconciliationVersion = BE-FIX-005.28
+
+NOVOS CAMPOS DE AQUISIÇÃO
+-------------------------
+blastAssessment:
+- approximateImmatureCellCount
+- immatureCellBurden
+- spatialDistribution
+- morphologicFeatureCount
+
+NOVOS CAMPOS DE AUDITORIA/RECONCILIAÇÃO
+---------------------------------------
+blastAssessment.evidenceReconciliation:
+- acquisitionEvidenceConflict
+- structuredNarrativeDiscordance
+- requiresBlastEvidenceReconciliation
+- narrativeFeatures
+- narrativeFeatureCount
+- contradictions
+
+Além de:
+- acquisitionEvidenceConflict
+- structuredNarrativeDiscordance
+- reconciledFromObservationNarrative
+- reconciliationVersion
+
+REGRAS IMPORTANTES
+------------------
+1. false passa a significar "avaliável e realmente não observado".
+2. Quando não avaliável, usar null — não false.
+3. Narrativa de múltiplas/repetidas células imaturas/blastoides +
+   >=2 critérios citomorfológicos pode reconciliar:
+   - morphologySupport
+   - repeatedAcrossField
+   - populationPattern
+   - evidenceState
+4. Evidência reconciliada é aplicada ANTES de:
+   - LME
+   - Dual-Axis Scoring
+   - Clinical Safety Governor
+   - Final Governor
+5. Se houver "precursores em diferentes estágios / continuidade maturativa"
+   sem população blastoide repetida, não há promoção.
+6. N:C/cromatina isoladas continuam insuficientes.
+7. OBSERVED_POPULATION estruturado nunca é rebaixado.
+
+VALIDAÇÃO EXECUTADA NA PREPARAÇÃO
+---------------------------------
+BE-FIX-005.28    10/10 PASS
+BE-FIX-005.27.2  10/10 PASS
+BE-FIX-005.27.1  10/10 PASS
+BE-FIX-005.27    10/10 PASS
+BE-FIX-005.26    10/10 PASS
+BE-FIX-005.24    10/10 PASS
+BE-FIX-005.25     9/9 PASS
+
+TOTAL: 69 PASS / 0 FAIL
+
+NODE CHECK
+----------
+server.js: PASS
+marrowBlastEvidenceReconciliationEngine.js: PASS
+boneMarrowOutputContract.js: PASS
+visualMorphologyEvidenceAcquisitionContract.js: PASS
+
+VALIDAÇÃO LOCAL
+---------------
+cd /d C:\CELLCOUNT_V1.0.0-beta.4_10_08\backend
+
+node --check server.js
+node --check ai\visualMorphologyEvidenceAcquisitionContract.js
+node --check ai\boneMarrow\boneMarrowOutputContract.js
+node --check ai\boneMarrow\marrowBlastEvidenceReconciliationEngine.js
+
+node --test tests\be_fix_005_28_marrow_blast_evidence_acquisition_reconciliation_test.mjs
+node --test tests\be_fix_005_27_2_dual_axis_marrow_blast_scoring_calibrated_subpopulation_escalation_test.mjs
+node --test tests\be_fix_005_27_1_precursor_blast_rebalancing_positive_signal_preservation_test.mjs
+node --test tests\be_fix_005_27_marrow_physiologic_precursor_discrimination_blast_false_positive_containment_test.mjs
+node --test tests\be_fix_005_26_bone_marrow_positive_evidence_projection_final_governor_priority_lock_test.mjs
+node --test tests\be_fix_005_24_marrow_blast_population_recognition_test.mjs
+node --test tests\be_fix_005_25_vme_gpt55_effective_reasoning_zero_evidence_containment_test.mjs
+
+git status
+
+NÃO FAZER COMMIT/PUSH ANTES DE ENVIAR OS RESULTADOS.
+
+TESTES CLÍNICOS APÓS DEPLOY
+---------------------------
+A — CONTROLE NEGATIVO / MEDULA NORMAL
+Esperado:
+- não promover precursores fisiológicos;
+- não criar blastoidia por N:C/cromatina isoladas;
+- não gerar conflito 005.28 sem narrativa populacional positiva.
+
+B — CONTROLE POSITIVO / MEDULA BLASTOIDE PROBLEMÁTICA
+Esperado:
+- se a própria aquisição narrar múltiplas/repetidas células imaturas/blastoides
+  e >=2 critérios morfológicos, os campos estruturados não podem permanecer
+  silenciosamente null/false;
+- evidenceReconciliation deve registrar o conflito e corrigi-lo antes do scoring;
+- 005.27.2 deve receber evidência reconciliada;
+- quando o conjunto for suficiente, atingir no mínimo
+  MARROW_BLASTOID_POPULATION_SUSPICIOUS.
+
+C — AMBÍGUO
+Esperado:
+- continuar indeterminado;
+- sem falso alerta alto;
+- sem falsa normalidade.

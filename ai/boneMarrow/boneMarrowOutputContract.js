@@ -2,6 +2,7 @@ export const BONE_MARROW_CONTRACT_VERSION = "CI-001B.3-v1";
 export const MARROW_BLAST_POPULATION_CONTRACT_VERSION = "BE-FIX-005.24";
 export const MARROW_PRECURSOR_DISCRIMINATION_CONTRACT_VERSION = "BE-FIX-005.27";
 export const MARROW_DUAL_AXIS_BLAST_SCORING_CONTRACT_VERSION = "BE-FIX-005.27.2";
+export const MARROW_BLAST_EVIDENCE_RECONCILIATION_CONTRACT_VERSION = "BE-FIX-005.28";
 
 export const MarrowObservationStatus = Object.freeze({
   present: "present",
@@ -400,6 +401,15 @@ export function enforceBoneMarrowOutputContract(
           sourceValue(safe, raw, "blastAssessment")?.approximateBlastLikeCells ??
           sourceValue(safe, raw, "blastAssessment")?.observedBlastLikeCount ??
           null,
+        approximateImmatureCellCount:
+          sourceValue(safe, raw, "blastAssessment")?.approximateImmatureCellCount ??
+          null,
+        immatureCellBurden:
+          asText(sourceValue(safe, raw, "blastAssessment")?.immatureCellBurden, "indeterminate"),
+        spatialDistribution:
+          asText(sourceValue(safe, raw, "blastAssessment")?.spatialDistribution, "indeterminate"),
+        morphologicFeatureCount:
+          sourceValue(safe, raw, "blastAssessment")?.morphologicFeatureCount ?? null,
         populationPattern:
           asText(
             sourceValue(safe, raw, "blastAssessment")?.populationPattern,
@@ -429,6 +439,19 @@ export function enforceBoneMarrowOutputContract(
             ? sourceValue(safe, raw, "blastAssessment").dualAxisBlastScoring
             : {}),
         },
+        evidenceReconciliation: {
+          ...(isObject(sourceValue(safe, raw, "blastAssessment")?.evidenceReconciliation)
+            ? sourceValue(safe, raw, "blastAssessment").evidenceReconciliation
+            : {}),
+        },
+        acquisitionEvidenceConflict:
+          sourceValue(safe, raw, "blastAssessment")?.acquisitionEvidenceConflict === true,
+        structuredNarrativeDiscordance:
+          sourceValue(safe, raw, "blastAssessment")?.structuredNarrativeDiscordance === true,
+        reconciledFromObservationNarrative:
+          sourceValue(safe, raw, "blastAssessment")?.reconciledFromObservationNarrative === true,
+        reconciliationVersion:
+          asText(sourceValue(safe, raw, "blastAssessment")?.reconciliationVersion, MARROW_BLAST_EVIDENCE_RECONCILIATION_CONTRACT_VERSION),
         lineageAssignable: false,
         lineage: "indeterminate",
         diagnosticLabelProhibited: true,
