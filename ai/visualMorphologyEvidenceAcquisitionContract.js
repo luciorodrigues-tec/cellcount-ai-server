@@ -20,6 +20,7 @@ export const PRODUCTION_VME_ENFORCEMENT_VERSION = "BE-FIX-005.8";
 export const LOCAL_MORPHOLOGY_ACQUISITION_RECOVERY_VERSION = "BE-FIX-005.9";
 export const SINGLE_BLAST_CONFIRMATION_ACQUISITION_VERSION = "BE-FIX-005.17";
 export const HEMOPARASITE_HIGH_SALIENCE_ACQUISITION_VERSION = "BE-FIX-005.23";
+export const VME_EFFECTIVE_REASONING_ZERO_EVIDENCE_VERSION = "BE-FIX-005.25";
 
 const STATUS = Object.freeze({
   COMPLETE: "COMPLETE",
@@ -213,6 +214,137 @@ export function assessVisualMorphologyEvidenceAcquisition({
       morphologyRequiredBeforeInterpretation: true,
     },
   };
+}
+
+
+
+// ============================================================================
+// BE-FIX-005.25 — BONE-MARROW VME / ZERO-EVIDENCE ASSESSMENT
+// Bone marrow has a different acquisition contract from peripheral blood.
+// It must not be rejected for lacking RBC/WBC/PLT peripheral-blood fields, but
+// it must fail closed when the model returns no marrow morphology at all.
+// ============================================================================
+
+function hasObject(value) {
+  return value && typeof value === "object" && !Array.isArray(value) && Object.keys(value).length > 0;
+}
+
+function hasSubstantiveMarrowField(raw = {}, key = "") {
+  const value = asObject(raw[key]);
+  if (!hasObject(value)) return false;
+
+  const status = asText(value.status).toLowerCase();
+  const texts = [
+    value.summary, value.technicalQuality, value.representativity,
+    value.maturation, value.dysplasia, value.estimate,
+  ].map(asText).filter(Boolean);
+
+  // A structurally present explicit NOT_ASSESSABLE is still valid acquisition
+  // provenance. What is forbidden is an entirely absent marrow container.
+  return Boolean(status) || texts.length > 0 ||
+    value.observed !== undefined || value.suspected !== undefined ||
+    value.estimatedPercentage !== undefined || value.evidenceState !== undefined;
+}
+
+export function assessBoneMarrowVisualEvidenceAcquisition({
+  visionResponse = {},
+  analysisSource = "ai_visual",
+} = {}) {
+  if (analysisSource !== "ai_visual" && analysisSource !== "hybrid") {
+    return {
+      contractVersion: VISUAL_MORPHOLOGY_EVIDENCE_ACQUISITION_VERSION,
+      productionEnforcementVersion: PRODUCTION_VME_ENFORCEMENT_VERSION,
+      effectiveReasoningGovernanceVersion: VME_EFFECTIVE_REASONING_ZERO_EVIDENCE_VERSION,
+      specimenScope: "BONE_MARROW",
+      status: STATUS.NOT_APPLICABLE,
+      complete: true,
+      retryRecommended: false,
+      zeroEvidence: false,
+      missingRequirements: [],
+      acquiredDomains: {},
+    };
+  }
+
+  const raw = asObject(visionResponse);
+  const required = [
+    "specimenAssessment",
+    "marrowAdequacy",
+    "myeloidSeries",
+    "erythroidSeries",
+    "megakaryocyticSeries",
+    "blastAssessment",
+  ];
+
+  const acquired = Object.fromEntries(
+    required.map((key) => [key, hasSubstantiveMarrowField(raw, key)]),
+  );
+
+  const missingRequirements = required
+    .filter((key) => acquired[key] !== true)
+    .map((key) => `marrow_${key}`);
+
+  const marrowContainersPresent = [
+    ...required,
+    "plasmaCellAssessment",
+    "dysplasiaAssessment",
+    "infiltrationAssessment",
+    "hemodilutionAssessment",
+    "spiculeAssessment",
+    "cellularityAssessment",
+  ].filter((key) => hasObject(raw[key])).length;
+
+  const zeroEvidence = marrowContainersPresent === 0;
+  const complete = missingRequirements.length === 0 && !zeroEvidence;
+
+  return {
+    contractVersion: VISUAL_MORPHOLOGY_EVIDENCE_ACQUISITION_VERSION,
+    productionEnforcementVersion: PRODUCTION_VME_ENFORCEMENT_VERSION,
+    effectiveReasoningGovernanceVersion: VME_EFFECTIVE_REASONING_ZERO_EVIDENCE_VERSION,
+    specimenScope: "BONE_MARROW",
+    status: complete ? STATUS.COMPLETE : STATUS.INCOMPLETE,
+    complete,
+    retryRecommended: !complete,
+    zeroEvidence,
+    missingRequirements,
+    acquiredDomains: {
+      ...acquired,
+      marrowContainersPresent,
+      blastPopulationEvidenceState:
+        asText(asObject(raw.blastAssessment).evidenceState) || null,
+    },
+    invariants: {
+      incompleteEvidenceIsNotNegativeMorphology: true,
+      zeroEvidenceCannotGenerateNegativeFindings: true,
+      limitedFieldDoesNotErasePositiveMarrowMorphology: true,
+      morphologyRequiredBeforeInterpretation: true,
+    },
+  };
+}
+
+export function buildBoneMarrowVisualRepairPrompt({
+  missingRequirements = [],
+} = {}) {
+  const missing = Array.isArray(missingRequirements)
+    ? missingRequirements.join(", ")
+    : "marrow morphology";
+
+  return `CELLCOUNT BE-FIX-005.25 — REPARO DE AQUISIÇÃO MEDULAR
+
+Reanalise as imagens de aspirado/medula e devolva SOMENTE JSON válido.
+A resposta anterior ficou sem evidência medular suficiente.
+Itens ausentes: ${missing}.
+
+Prioridade absoluta:
+1. specimenAssessment e marrowAdequacy;
+2. myeloidSeries, erythroidSeries e megakaryocyticSeries;
+3. blastAssessment com evidenceState, approximateBlastLikeCells,
+   populationPattern e morphologySupport;
+4. plasmaCellAssessment, dysplasiaAssessment e infiltrationAssessment.
+
+Use status=notAssessable quando realmente não avaliável.
+NÃO use ausência de evidência como achado negativo.
+NÃO escreva relatório longo. NÃO diagnostique LLA/LMA.
+Campo limitado não pode apagar população blastoide positivamente observada.`;
 }
 
 export function mergeVisualMorphologyRepair(

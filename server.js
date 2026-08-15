@@ -199,6 +199,9 @@ import {
   mergeVisualMorphologyRepair,
   shouldAttemptVisualMorphologyRepair,
   visualMorphologyEvidenceAcquisitionContractStatus,
+  assessBoneMarrowVisualEvidenceAcquisition,
+  buildBoneMarrowVisualRepairPrompt,
+  VME_EFFECTIVE_REASONING_ZERO_EVIDENCE_VERSION,
 } from "./ai/visualMorphologyEvidenceAcquisitionContract.js";
 
 import {
@@ -1563,6 +1566,13 @@ function normalizeMedicalResponse(
       ? [...data.negativeFindingsStructured]
       : [];
 
+  // BE-FIX-005.25 — no negative morphology may be synthesized from an
+  // acquisition that explicitly failed to produce visual evidence.
+  const zeroEvidenceAcquisition =
+    data?.visualMorphologyEvidenceAcquisition?.complete === false ||
+    data?.visualMorphologyEvidenceAcquisition?.zeroEvidence === true ||
+    data?.visualEvidenceAcquisitionIncomplete === true;
+
   if (
     findings?.reactiveLymphocytes === true
   ) {
@@ -1622,8 +1632,9 @@ function normalizeMedicalResponse(
   const blastEvidenceState = String(findings?.blastEvidenceState || data?.blastEvidenceState || '').toUpperCase();
 
   if (
+    zeroEvidenceAcquisition !== true &&
     findings?.blastSuspicion !== true &&
-    !['OBSERVED', 'SUSPICIOUS_INDETERMINATE', 'SUSPICIOUS', 'SUSPECTED'].includes(blastEvidenceState)
+    blastEvidenceState === 'NOT_OBSERVED_IN_EVALUABLE_FIELD'
   ) {
     negativeFindingsStructured.push(
       "Blastos inequívocos não identificados entre as células suficientemente avaliáveis neste campo. Esta observação não permite exclusão global na lâmina."
@@ -1631,20 +1642,24 @@ function normalizeMedicalResponse(
   }
 
   if (
-    findings?.immatureCells !== true
+    zeroEvidenceAcquisition !== true &&
+    findings?.immatureCells !== true &&
+    blastEvidenceState === 'NOT_OBSERVED_IN_EVALUABLE_FIELD'
   ) {
     negativeFindingsStructured.push(
       "Células imaturas críticas não identificadas entre as células suficientemente avaliáveis neste campo. Esta observação não permite exclusão global na lâmina."
     );
   }
 
-  negativeFindingsStructured.push(
-    "Bastonetes de Auer não identificados entre as células suficientemente avaliáveis neste campo. Esta observação não permite exclusão global na lâmina."
-  );
+  if (zeroEvidenceAcquisition !== true) {
+    negativeFindingsStructured.push(
+      "Bastonetes de Auer não identificados entre as células suficientemente avaliáveis neste campo. Esta observação não permite exclusão global na lâmina."
+    );
 
-  negativeFindingsStructured.push(
-    "Agregados plaquetários não identificados entre os elementos suficientemente avaliáveis neste campo. Esta observação não permite exclusão global na lâmina."
-  );
+    negativeFindingsStructured.push(
+      "Agregados plaquetários não identificados entre os elementos suficientemente avaliáveis neste campo. Esta observação não permite exclusão global na lâmina."
+    );
+  }
 
   const uniquePositiveFindings =
     [...new Set(positiveFindings)]
@@ -3357,6 +3372,8 @@ function applyBoneMarrowLanguageGuard(result = {}) {
 // ============================================================================
 const VME_LENGTH_EXHAUSTION_RECOVERY_VERSION = "BE-FIX-005.21";
 const VME_REASONING_COMPATIBILITY_VERSION = "BE-FIX-005.21.1";
+const VME_EFFECTIVE_REASONING_ENFORCEMENT_VERSION =
+  VME_EFFECTIVE_REASONING_ZERO_EVIDENCE_VERSION;
 
 // ============================================================================
 // OPENAI ANALYSIS
@@ -4009,14 +4026,26 @@ BE-FIX-005.24 — VARREDURA BLASTOIDE MEDULAR OBRIGATÓRIA:
       ? `ANALYSIS SOURCE: ${analysisSource}\nSPECIMEN: ${specimenType || "peripheral_blood"}\nAvalie diretamente as imagens anexadas. Não use ausência de descrição como ausência celular.`
       : contextualPrompt;
 
+    // BE-FIX-005.25 — reasoning_effort is a property of the effective OpenAI
+    // request, not of the specimen type. Bone-marrow visual calls previously
+    // fell back to model-default and could spend the entire output budget on
+    // hidden reasoning. Enforce the GPT-5.5-compatible low-output mode on every
+    // visual acquisition request.
+    const effectiveVisionReasoningEffort =
+      process.env.OPENAI_VISION_REASONING_EFFORT || "none";
+    const effectivePrimaryMaxCompletionTokens =
+      isPeripheralVisualAcquisition
+        ? Number(process.env.OPENAI_VISION_MAX_COMPLETION_TOKENS || 3200)
+        : Number(process.env.OPENAI_MARROW_MAX_COMPLETION_TOKENS || 4000);
+
     console.log(
       "BE-FIX-005.8 — VME PRODUCTION ENFORCEMENT",
       JSON.stringify({
         version: PRODUCTION_VME_ENFORCEMENT_VERSION,
+        effectiveReasoningGovernanceVersion:
+          VME_EFFECTIVE_REASONING_ENFORCEMENT_VERSION,
         structuredOutput: isPeripheralVisualAcquisition,
-        reasoningEffort: isPeripheralVisualAcquisition
-          ? (process.env.OPENAI_VISION_REASONING_EFFORT || "none")
-          : "model-default",
+        reasoningEffort: effectiveVisionReasoningEffort,
         systemPromptLength: selectedPrompt.length,
         acquisitionContextLength: acquisitionContext.length,
       }),
@@ -4027,8 +4056,7 @@ BE-FIX-005.24 — VARREDURA BLASTOIDE MEDULAR OBRIGATÓRIA:
       JSON.stringify({
         version: LOCAL_MORPHOLOGY_ACQUISITION_RECOVERY_VERSION,
         primaryImages: imagesPayload.length,
-        maxCompletionTokens:
-          Number(process.env.OPENAI_VISION_MAX_COMPLETION_TOKENS || 3200),
+        maxCompletionTokens: effectivePrimaryMaxCompletionTokens,
         lengthExhaustionRecoveryVersion:
           VME_LENGTH_EXHAUSTION_RECOVERY_VERSION,
         imageDetail:
@@ -4041,9 +4069,7 @@ BE-FIX-005.24 — VARREDURA BLASTOIDE MEDULAR OBRIGATÓRIA:
 
     const completionRequest = {
       model: OPENAI_MODEL,
-      max_completion_tokens: isPeripheralVisualAcquisition
-        ? Number(process.env.OPENAI_VISION_MAX_COMPLETION_TOKENS || 3200)
-        : 4000,
+      max_completion_tokens: effectivePrimaryMaxCompletionTokens,
       response_format: isPeripheralVisualAcquisition
         ? buildVisualMorphologyAcquisitionResponseFormat()
         : { type: "json_object" },
@@ -4062,14 +4088,13 @@ BE-FIX-005.24 — VARREDURA BLASTOIDE MEDULAR OBRIGATÓRIA:
       ],
     };
 
-    if (isPeripheralVisualAcquisition) {
-      completionRequest.reasoning_effort =
-        process.env.OPENAI_VISION_REASONING_EFFORT || "none";
+    // BE-FIX-005.25 — enforce the configured reasoning mode on BOTH
+    // peripheral-blood and bone-marrow visual requests.
+    completionRequest.reasoning_effort = effectiveVisionReasoningEffort;
 
-      if (process.env.OPENAI_VISION_SERVICE_TIER) {
-        completionRequest.service_tier =
-          process.env.OPENAI_VISION_SERVICE_TIER;
-      }
+    if (process.env.OPENAI_VISION_SERVICE_TIER) {
+      completionRequest.service_tier =
+        process.env.OPENAI_VISION_SERVICE_TIER;
     }
 
     const completion = await openai.chat.completions.create(completionRequest);
@@ -4090,10 +4115,15 @@ BE-FIX-005.24 — VARREDURA BLASTOIDE MEDULAR OBRIGATÓRIA:
     // before LME/field-adequacy/governors can interpret an incomplete payload.
     // ======================================================================
     let visualMorphologyEvidenceAcquisition =
-      assessVisualMorphologyEvidenceAcquisition({
-        visionResponse: parsed,
-        analysisSource,
-      });
+      analysisType === "bone_marrow"
+        ? assessBoneMarrowVisualEvidenceAcquisition({
+            visionResponse: parsed,
+            analysisSource,
+          })
+        : assessVisualMorphologyEvidenceAcquisition({
+            visionResponse: parsed,
+            analysisSource,
+          });
 
     console.log("VME-1.0 — INITIAL ACQUISITION");
     console.log(
@@ -4147,7 +4177,6 @@ BE-FIX-005.24 — VARREDURA BLASTOIDE MEDULAR OBRIGATÓRIA:
     );
 
     if (
-      analysisType !== "bone_marrow" &&
       shouldAttemptVisualMorphologyRepair({
         acquisition: visualMorphologyEvidenceAcquisition,
         primaryElapsedMs: visualTiming,
@@ -4158,10 +4187,15 @@ BE-FIX-005.24 — VARREDURA BLASTOIDE MEDULAR OBRIGATÓRIA:
       visualMorphologyRepairAttempted = true;
 
       const repairStart = performance.now();
-      const repairPrompt = buildVisualMorphologyRepairPrompt({
-        missingRequirements:
-          visualMorphologyEvidenceAcquisition.missingRequirements,
-      });
+      const repairPrompt = analysisType === "bone_marrow"
+        ? buildBoneMarrowVisualRepairPrompt({
+            missingRequirements:
+              visualMorphologyEvidenceAcquisition.missingRequirements,
+          })
+        : buildVisualMorphologyRepairPrompt({
+            missingRequirements:
+              visualMorphologyEvidenceAcquisition.missingRequirements,
+          });
 
       try {
         const repairCompletion = await openai.chat.completions.create({
@@ -4171,7 +4205,9 @@ BE-FIX-005.24 — VARREDURA BLASTOIDE MEDULAR OBRIGATÓRIA:
           max_completion_tokens: Number(
             process.env.OPENAI_VISION_REPAIR_MAX_COMPLETION_TOKENS || 3600,
           ),
-          response_format: buildVisualMorphologyAcquisitionResponseFormat(),
+          response_format: analysisType === "bone_marrow"
+            ? { type: "json_object" }
+            : buildVisualMorphologyAcquisitionResponseFormat(),
           messages: [
             {
               role: "system",
@@ -4182,7 +4218,9 @@ BE-FIX-005.24 — VARREDURA BLASTOIDE MEDULAR OBRIGATÓRIA:
               content: [
                 {
                   type: "text",
-                  text: "Reanalise as mesmas imagens somente para preencher o schema VME obrigatório. Priorize primeiro os campos ausentes, use descrições morfológicas objetivas e concisas, use null/NOT_ASSESSABLE quando não avaliável e não produza relatório clínico final.",
+                  text: analysisType === "bone_marrow"
+                    ? "Reanalise as mesmas imagens somente para preencher a aquisição medular obrigatória. Priorize os campos ausentes, especialmente blastAssessment e séries medulares. Use notAssessable quando necessário e não produza relatório clínico longo."
+                    : "Reanalise as mesmas imagens somente para preencher o schema VME obrigatório. Priorize primeiro os campos ausentes, use descrições morfológicas objetivas e concisas, use null/NOT_ASSESSABLE quando não avaliável e não produza relatório clínico final.",
                 },
                 ...imagesPayload,
               ],
@@ -4199,10 +4237,15 @@ BE-FIX-005.24 — VARREDURA BLASTOIDE MEDULAR OBRIGATÓRIA:
         parsed = mergeVisualMorphologyRepair(parsed, repaired);
 
         visualMorphologyEvidenceAcquisition =
-          assessVisualMorphologyEvidenceAcquisition({
-            visionResponse: parsed,
-            analysisSource,
-          });
+          analysisType === "bone_marrow"
+            ? assessBoneMarrowVisualEvidenceAcquisition({
+                visionResponse: parsed,
+                analysisSource,
+              })
+            : assessVisualMorphologyEvidenceAcquisition({
+                visionResponse: parsed,
+                analysisSource,
+              });
 
         console.log("VME-1.0 — REPAIR ACQUISITION");
         console.log(
@@ -4227,7 +4270,6 @@ BE-FIX-005.24 — VARREDURA BLASTOIDE MEDULAR OBRIGATÓRIA:
     }
 
     if (
-      analysisType !== "bone_marrow" &&
       visualMorphologyEvidenceAcquisition.retryRecommended === true &&
       visualMorphologyRepairAttempted === false
     ) {
@@ -4258,7 +4300,6 @@ BE-FIX-005.24 — VARREDURA BLASTOIDE MEDULAR OBRIGATÓRIA:
     };
 
     if (
-      analysisType !== "bone_marrow" &&
       visualMorphologyEvidenceAcquisition.complete !== true
     ) {
       const incompleteResponse =
@@ -4285,6 +4326,8 @@ BE-FIX-005.24 — VARREDURA BLASTOIDE MEDULAR OBRIGATÓRIA:
             LOCAL_MORPHOLOGY_ACQUISITION_RECOVERY_VERSION,
           vmeLengthExhaustionRecoveryVersion:
             VME_LENGTH_EXHAUSTION_RECOVERY_VERSION,
+          vmeEffectiveReasoningEnforcementVersion:
+            VME_EFFECTIVE_REASONING_ENFORCEMENT_VERSION,
           failedClosed: true,
           visualAcquisitionOnly: true,
         },
@@ -6273,6 +6316,8 @@ app.get("/runtime-version", (_req, res) => {
       VME_LENGTH_EXHAUSTION_RECOVERY_VERSION,
     vmeReasoningCompatibilityVersion:
       VME_REASONING_COMPATIBILITY_VERSION,
+    vmeEffectiveReasoningEnforcementVersion:
+      VME_EFFECTIVE_REASONING_ENFORCEMENT_VERSION,
     finalAnalysisAssemblyRecoveryVersion: "BE-FIX-005.10",
     evidenceConsistentMorphologySynthesisVersion:
       EVIDENCE_CONSISTENT_MORPHOLOGY_SYNTHESIS_VERSION,
@@ -6295,8 +6340,12 @@ app.get("/runtime-version", (_req, res) => {
     defaults: {
       reasoningEffort:
         process.env.OPENAI_VISION_REASONING_EFFORT || "none",
+      boneMarrowReasoningEffort:
+        process.env.OPENAI_VISION_REASONING_EFFORT || "none",
       maxCompletionTokens:
         Number(process.env.OPENAI_VISION_MAX_COMPLETION_TOKENS || 3200),
+      boneMarrowMaxCompletionTokens:
+        Number(process.env.OPENAI_MARROW_MAX_COMPLETION_TOKENS || 4000),
       repairReasoningEffort:
         process.env.OPENAI_VISION_REPAIR_REASONING_EFFORT || "none",
       repairMaxCompletionTokens:
