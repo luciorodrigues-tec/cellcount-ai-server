@@ -53,6 +53,12 @@ import {
 } from "./ai/boneMarrow/marrowFinalResultCoherenceEngine.js";
 
 import {
+  MARROW_IMMATURE_CELL_CYTOLOGY_RECOVERY_VERSION,
+  MARROW_BLASTOID_CANDIDATE_PRESERVATION_VERSION,
+  applyMarrowImmatureCellCytologyRecovery,
+} from "./ai/boneMarrow/marrowImmatureCellCytologyRecoveryEngine.js";
+
+import {
   applyClinicalSafetyGovernor,
 } from "./ai/clinicalSafety/index.js";
 
@@ -4253,10 +4259,16 @@ BE-FIX-005.31 — COERÊNCIA NARRATIVA-ESTRUTURA E RECUPERAÇÃO FISIOLÓGICA:
     const lengthRecoveryBudgetMs = Number(
       process.env.VME_LENGTH_RECOVERY_PRIMARY_BUDGET_MS || 65000,
     );
+    const immatureCellCytologyRecoveryRequired =
+      analysisType === "bone_marrow" &&
+      visualMorphologyEvidenceAcquisition
+        ?.immatureCellCytologyRecoveryRequired === true;
     const effectiveRepairEnabled =
-      visualRepairEnabled || lengthExhausted;
+      visualRepairEnabled || lengthExhausted || immatureCellCytologyRecoveryRequired;
     const effectiveRepairBudgetMs =
-      lengthExhausted ? lengthRecoveryBudgetMs : visualRepairBudgetMs;
+      (lengthExhausted || immatureCellCytologyRecoveryRequired)
+        ? lengthRecoveryBudgetMs
+        : visualRepairBudgetMs;
 
     console.log(
       "BE-FIX-005.21 — VME LENGTH-EXHAUSTION GOVERNANCE",
@@ -4266,6 +4278,7 @@ BE-FIX-005.31 — COERÊNCIA NARRATIVA-ESTRUTURA E RECUPERAÇÃO FISIOLÓGICA:
         lengthExhausted,
         generalRepairEnabled: visualRepairEnabled,
         effectiveRepairEnabled,
+        immatureCellCytologyRecoveryRequired,
         primaryElapsedMs: visualTiming,
         effectiveRepairBudgetMs,
       }),
@@ -4479,6 +4492,12 @@ BE-FIX-005.31 — COERÊNCIA NARRATIVA-ESTRUTURA E RECUPERAÇÃO FISIOLÓGICA:
           null,
           2,
         ),
+      );
+
+      parsed = applyMarrowImmatureCellCytologyRecovery(parsed);
+      console.log(
+        "BE-FIX-005.33 — MARROW IMMATURE-CELL CYTOLOGY RECOVERY",
+        JSON.stringify(parsed.marrowImmatureCellCytologyRecovery || {}, null, 2),
       );
     }
 
@@ -6495,6 +6514,10 @@ app.get("/runtime-version", (_req, res) => {
       MARROW_FINAL_RESULT_COHERENCE_VERSION,
     assessabilityConsistentNegativeFindingsVersion:
       ASSESSABILITY_CONSISTENT_NEGATIVE_FINDINGS_VERSION,
+    marrowImmatureCellCytologyRecoveryVersion:
+      MARROW_IMMATURE_CELL_CYTOLOGY_RECOVERY_VERSION,
+    marrowBlastoidCandidatePreservationVersion:
+      MARROW_BLASTOID_CANDIDATE_PRESERVATION_VERSION,
     reactiveLymphoidEvidenceSentinelVersion:
       REACTIVE_LYMPHOID_EVIDENCE_SENTINEL_VERSION,
     canonicalClinicalResultArchitectureVersion:

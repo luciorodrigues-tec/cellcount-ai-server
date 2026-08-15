@@ -96,6 +96,16 @@ export function evaluateMarrowPrecursorDiscrimination(result = {}) {
   const evidenceState = text(assessment.evidenceState || rawAssessment.evidenceState || "NOT_ASSESSABLE").toUpperCase();
   const populationPattern = text(assessment.populationPattern || rawAssessment.populationPattern || "indeterminate").toLowerCase();
   const count = finite(assessment.approximateBlastLikeCells ?? rawAssessment.approximateBlastLikeCells);
+  const immatureCandidateState = text(
+    assessment.candidateEvidenceState ||
+    rawAssessment.candidateEvidenceState ||
+    assessment.evidenceState ||
+    rawAssessment.evidenceState
+  ).toUpperCase();
+  const unresolvedImmatureCandidate =
+    immatureCandidateState === "IMMATURE_POPULATION_REQUIRES_DISCRIMINATION" ||
+    assessment.cytologyRecoveryRequired === true ||
+    rawAssessment.cytologyRecoveryRequired === true;
 
   const chooseBoolean = (value, fallbackValue = false) =>
     typeof value === "boolean" ? value : fallbackValue;
@@ -193,6 +203,7 @@ export function evaluateMarrowPrecursorDiscrimination(result = {}) {
 
   const strongPhysiologicPattern =
     marrow &&
+    !unresolvedImmatureCandidate &&
     !protectedObservedBlastoid &&
     !protectedSuspiciousBlastoid &&
     dualAxis.physiologicDominance;
@@ -204,7 +215,7 @@ export function evaluateMarrowPrecursorDiscrimination(result = {}) {
     marrow &&
     !strongPhysiologicPattern &&
     !strongBlastoidPattern &&
-    dualAxis.indeterminateZone;
+    (dualAxis.indeterminateZone || unresolvedImmatureCandidate);
 
   const coherentBlastoidSubpopulation = dualAxis.subpopulationCore;
   const legacyStructuredSuspiciousSubset =
@@ -225,6 +236,11 @@ export function evaluateMarrowPrecursorDiscrimination(result = {}) {
     evidenceState,
     populationPattern,
     approximateBlastLikeCells: count,
+    unresolvedImmatureCandidate,
+    immatureCandidateState: unresolvedImmatureCandidate
+      ? "IMMATURE_POPULATION_REQUIRES_DISCRIMINATION"
+      : null,
+    immatureCellCytologyRecoveryVersion: "BE-FIX-005.33",
     physiologicSignals,
     blastSpecificSignals,
     blastoidSubpopulationSignals,

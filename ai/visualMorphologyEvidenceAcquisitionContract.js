@@ -246,6 +246,28 @@ function hasSubstantiveMarrowField(raw = {}, key = "") {
     value.estimatedPercentage !== undefined || value.evidenceState !== undefined;
 }
 
+
+function marrowImmatureCellCytologyRecoveryNeed(raw = {}) {
+  const blast=asObject(raw.blastAssessment);
+  const support=asObject(blast.morphologySupport);
+  const subpopulation=asObject(blast.blastoidSubpopulationContext);
+  const immatureCount=Number(blast.approximateImmatureCellCount);
+  const burden=asText(blast.immatureCellBurden).toLowerCase();
+  const distribution=asText(blast.spatialDistribution).toLowerCase();
+  const multiple=(Number.isFinite(immatureCount)&&immatureCount>=3)||["multiple","numerous","increased"].includes(burden);
+  const repeated=distribution.includes("repeated")||distribution.includes("across_field")||
+    support.repeatedAcrossField===true||subpopulation.repeatedSubsetAcrossField===true;
+  const cytology=[support.highNCRatio,support.openFineChromatin,support.nucleoli,support.scantBasophilicCytoplasm];
+  const characterized=cytology.filter(v=>typeof v==="boolean").length;
+  const positive=cytology.filter(v=>v===true).length;
+  const state=asText(blast.evidenceState).toUpperCase();
+  const positiveState=["OBSERVED_POPULATION","SUSPICIOUS_POPULATION","FOCAL_SUSPICION"].includes(state);
+  const required=multiple&&repeated&&characterized<=1&&positive===0&&!positiveState&&blast.observed!==true;
+  return {version:"BE-FIX-005.33",required,multipleImmatureCells:multiple,repeatedImmatureCells:repeated,
+    characterizedBlastCytologyCount:characterized,positiveBlastCytologyCount:positive,
+    approximateImmatureCellCount:Number.isFinite(immatureCount)?immatureCount:null};
+}
+
 export function assessBoneMarrowVisualEvidenceAcquisition({
   visionResponse = {},
   analysisSource = "ai_visual",
@@ -312,14 +334,28 @@ export function assessBoneMarrowVisualEvidenceAcquisition({
   const narrativeStructuredDiscordance =
     narrativeMentionsRepeatedImmature && structuredRepeat !== true;
 
+  const immatureCellCytologyRecovery =
+    marrowImmatureCellCytologyRecoveryNeed(raw);
+  if (
+    immatureCellCytologyRecovery.required &&
+    !missingRequirements.includes("blastAssessment.immatureCellCytology")
+  ) {
+    missingRequirements.push("blastAssessment.immatureCellCytology");
+  }
+  const effectiveComplete =
+    complete && immatureCellCytologyRecovery.required !== true;
+
   return {
     contractVersion: VISUAL_MORPHOLOGY_EVIDENCE_ACQUISITION_VERSION,
     productionEnforcementVersion: PRODUCTION_VME_ENFORCEMENT_VERSION,
     effectiveReasoningGovernanceVersion: VME_EFFECTIVE_REASONING_ZERO_EVIDENCE_VERSION,
     specimenScope: "BONE_MARROW",
-    status: complete ? STATUS.COMPLETE : STATUS.INCOMPLETE,
-    complete,
-    retryRecommended: !complete,
+    status: effectiveComplete ? STATUS.COMPLETE : STATUS.INCOMPLETE,
+    complete: effectiveComplete,
+    retryRecommended: !effectiveComplete,
+    immatureCellCytologyRecoveryRequired:
+      immatureCellCytologyRecovery.required === true,
+    immatureCellCytologyRecovery,
     zeroEvidence,
     missingRequirements,
     acquiredDomains: {
@@ -368,7 +404,16 @@ NÃO escreva relatório longo. NÃO diagnostique LLA/LMA.
 Campo limitado não pode apagar população blastoide positivamente observada.
 Se a narrativa disser múltiplas/repetidas células imaturas/blastoides e descrever
 N:C/cromatina/nucléolos/citoplasma, os campos estruturados correspondentes devem
-ser coerentes; use null quando não avaliável, nunca false por simples incerteza.`;
+ser coerentes; use null quando não avaliável, nunca false por simples incerteza.
+
+BE-FIX-005.33 — DISCRIMINAÇÃO FOCAL DE CÉLULAS IMATURAS:
+Se houver múltiplas células imaturas repetidas, faça uma segunda leitura focal.
+Preencha explicitamente highNCRatio, openFineChromatin, nucleoli,
+scantBasophilicCytoplasm, monomorphism, distinctFromMaturationContinuum,
+morphologicallyCoherent e repeatedSubsetAcrossField quando avaliáveis.
+Não use coexistência de células maduras como evidência negativa suficiente
+contra uma subpopulação blastoide concomitante.
+Se a citologia continuar insuficiente, preserve null/indeterminado; não converta para zero.`;
 }
 
 export function mergeVisualMorphologyRepair(
