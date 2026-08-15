@@ -47,6 +47,12 @@ import {
 } from "./ai/boneMarrow/marrowPhysiologicPrecursorCoherenceEngine.js";
 
 import {
+  MARROW_FINAL_RESULT_COHERENCE_VERSION,
+  ASSESSABILITY_CONSISTENT_NEGATIVE_FINDINGS_VERSION,
+  applyMarrowFinalResultCoherence,
+} from "./ai/boneMarrow/marrowFinalResultCoherenceEngine.js";
+
+import {
   applyClinicalSafetyGovernor,
 } from "./ai/clinicalSafety/index.js";
 
@@ -1488,19 +1494,8 @@ function normalizeMedicalResponse(
   const findings =
     data.findings || {};
 
-  const defaultAbsentFindings = `
-
-  ✓ Blastos inequívocos não identificados entre as células suficientemente avaliáveis neste campo
-
-  ✓ Bastonetes de Auer não identificados entre as células suficientemente avaliáveis neste campo
-
-  ✓ População blástica significativa não estabelecida neste campo
-
-  ✓ Células imaturas críticas não identificadas entre as células suficientemente avaliáveis neste campo
-
-  ✓ Esquizócitos clinicamente relevantes não identificados entre os eritrócitos suficientemente avaliáveis neste campo
-
-  ⚠ A não visualização neste campo não permite exclusão global na lâmina`;
+  const defaultAbsentFindings =
+    "A avaliabilidade dos achados negativos depende do domínio morfológico correspondente; elementos não avaliáveis não devem ser descritos como ausentes.";
 
   const atypicalLymphocyteSubtype =
     findings.atypicalLymphocyteSubtype ||
@@ -6496,6 +6491,10 @@ app.get("/runtime-version", (_req, res) => {
       MARROW_PHYSIOLOGIC_PRECURSOR_COHERENCE_VERSION,
     marrowGlobalPatternCoherenceVersion:
       MARROW_GLOBAL_PATTERN_COHERENCE_VERSION,
+    marrowFinalResultCoherenceVersion:
+      MARROW_FINAL_RESULT_COHERENCE_VERSION,
+    assessabilityConsistentNegativeFindingsVersion:
+      ASSESSABILITY_CONSISTENT_NEGATIVE_FINDINGS_VERSION,
     reactiveLymphoidEvidenceSentinelVersion:
       REACTIVE_LYMPHOID_EVIDENCE_SENTINEL_VERSION,
     canonicalClinicalResultArchitectureVersion:
@@ -8152,6 +8151,11 @@ finalResult =
   applyFieldScopedNegativeFindings(
     finalResult,
   );
+
+// BE-FIX-005.32 — final marrow result coherence lock.
+if (specimenGate.analysisType === "bone_marrow") {
+  finalResult = applyMarrowFinalResultCoherence(finalResult);
+}
 
 if (specimenGate.analysisType === "bone_marrow") {
   finalResult = applyMarrowPrecursorDiscrimination(finalResult);

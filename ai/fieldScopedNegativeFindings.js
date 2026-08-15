@@ -134,6 +134,55 @@ function positiveSentence(label) {
   return `${label}: achado positivo/suspeito no campo analisado; não converter em achado negativo.`;
 }
 
+
+function explicitDomainState(result = {}, key = "") {
+  const local = asObject(result.localMorphologyEvidence);
+  const critical = asObject(local.criticalMorphology);
+  const field = asObject(result.fieldAdequacy);
+  const blastAssessability = asObject(field.blastAssessability);
+  const findings = asObject(result.findings);
+
+  if (key === "blasts" || key === "immatureCells") {
+    const state = String(
+      findings.blastEvidenceState ||
+      critical.blastLikeMorphology ||
+      blastAssessability.state ||
+      result.rawResponse?.blastAssessment?.evidenceState ||
+      "",
+    ).toUpperCase();
+    if (state === "NOT_ASSESSABLE") return "NOT_ASSESSABLE";
+    if (state === "NOT_OBSERVED_IN_EVALUABLE_FIELD") return state;
+  }
+
+  if (key === "auerRods") {
+    const state = String(critical.auerRod || "").toUpperCase();
+    if (state === "NOT_ASSESSABLE") return "NOT_ASSESSABLE";
+    if (state === "NOT_OBSERVED_IN_EVALUABLE_FIELD") return state;
+  }
+
+  if (key === "schistocytes") {
+    const state = String(critical.schistocytes || "").toUpperCase();
+    if (state === "NOT_ASSESSABLE") return "NOT_ASSESSABLE";
+    if (state === "NOT_OBSERVED_IN_EVALUABLE_FIELD") return state;
+  }
+
+  if (key === "hemoparasites") {
+    const state = String(
+      asObject(critical.parasiteEvidence).evidenceState ||
+      critical.parasites || "",
+    ).toUpperCase();
+    if (state === "NOT_ASSESSABLE") return "NOT_ASSESSABLE";
+    if (state === "NOT_OBSERVED_IN_EVALUABLE_FIELD") return state;
+  }
+
+  if (key === "plateletAggregates") {
+    const platelets = asObject(local.platelets);
+    if (platelets.evaluable === false) return "NOT_ASSESSABLE";
+  }
+
+  return "";
+}
+
 function buildStatus(result, key, definition) {
   if (positiveObserved(result, definition)) {
     return {
@@ -146,7 +195,9 @@ function buildStatus(result, key, definition) {
     };
   }
 
-  if (!evidenceAvailable(result)) {
+  const domainState = explicitDomainState(result, key);
+
+  if (domainState === "NOT_ASSESSABLE" || !evidenceAvailable(result)) {
     return {
       key,
       label: definition.label,
