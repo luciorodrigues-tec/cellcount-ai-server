@@ -30,6 +30,12 @@ import {
 } from "./ai/boneMarrow/marrowBlastEvidenceReconciliationEngine.js";
 
 import {
+  MARROW_NARRATIVE_STRUCTURE_CONTRADICTION_VERSION,
+  MARROW_PHYSIOLOGIC_DOMINANCE_RECOVERY_VERSION,
+  resolveMarrowNarrativeStructureContradiction,
+} from "./ai/boneMarrow/marrowNarrativeStructureContradictionResolutionEngine.js";
+
+import {
   MARROW_POSITIVE_BLAST_E2E_PRESERVATION_VERSION,
   applyMarrowPositiveBlastEvidencePreservation,
 } from "./ai/boneMarrow/marrowPositiveBlastEvidencePreservationEngine.js";
@@ -4080,6 +4086,13 @@ BE-FIX-005.28 — REFORÇO DA AQUISIÇÃO DE EVIDÊNCIA BLASTOIDE MEDULAR:
 - Não transformar diversidade maturativa em veto contra subpopulação blastoide.
 - Não transformar linguagem narrativa em diagnóstico. O backend fará reconciliação e scoring determinísticos.
 
+BE-FIX-005.31 — COERÊNCIA NARRATIVA-ESTRUTURA E RECUPERAÇÃO FISIOLÓGICA:
+- Se a narrativa disser que NÃO há população/subpopulação blastoide monomórfica, distinta ou separada do continuum maturativo, os campos blastoidSubpopulationContext NÃO podem marcar simultaneamente distinctFromMaturationContinuum=true, morphologicallyCoherent=true e repeatedSubsetAcrossField=true sem suporte citomorfológico independente convincente.
+- A expressão "múltiplas células imaturas/precursoras" não significa "subpopulação blastoide repetida". Diferenciar repetição de precursores fisiológicos de repetição de um subconjunto blastoide.
+- Quando houver continuidade maturativa, heterogeneidade e formas maduras coexistentes, e a própria narrativa negar arquitetura blastoide distinta, usar populationPattern="heterogeneous" e registrar subpopulação blastoide como false/null conforme avaliabilidade.
+- Nunca marcar monomorphism=true apenas porque a palavra "monomórfica" aparece em frase negativa como "não há população blastoide monomórfica".
+- Uma população verdadeiramente blastoide continua protegida quando houver arquitetura positiva coerente E critérios citomorfológicos independentes sustentados; a regra 005.31 não deve apagar OBSERVED_POPULATION.
+
 `;
 
 
@@ -4455,6 +4468,22 @@ BE-FIX-005.28 — REFORÇO DA AQUISIÇÃO DE EVIDÊNCIA BLASTOIDE MEDULAR:
       console.log(
         "BE-FIX-005.28 — MARROW BLAST EVIDENCE RECONCILIATION",
         JSON.stringify(parsed.marrowBlastEvidenceReconciliation || {}, null, 2),
+      );
+
+      // BE-FIX-005.31 — resolve the narrow contradiction in which the model's
+      // own observation narrative describes physiologic maturation and
+      // explicitly denies a distinct/monomorphic blastoid subset while
+      // structured booleans simultaneously claim blastoid architecture.
+      // This runs before LME/005.27/005.29 so false positive evidence never
+      // enters the positive-preservation path.
+      parsed = resolveMarrowNarrativeStructureContradiction(parsed);
+      console.log(
+        "BE-FIX-005.31 — MARROW NARRATIVE-STRUCTURE CONTRADICTION RESOLUTION",
+        JSON.stringify(
+          parsed.marrowNarrativeStructureContradictionResolution || {},
+          null,
+          2,
+        ),
       );
     }
 
@@ -6457,6 +6486,10 @@ app.get("/runtime-version", (_req, res) => {
       MARROW_DUAL_AXIS_SCORING_VERSION,
     marrowBlastEvidenceReconciliationVersion:
       MARROW_BLAST_EVIDENCE_RECONCILIATION_VERSION,
+    marrowNarrativeStructureContradictionVersion:
+      MARROW_NARRATIVE_STRUCTURE_CONTRADICTION_VERSION,
+    marrowPhysiologicDominanceRecoveryVersion:
+      MARROW_PHYSIOLOGIC_DOMINANCE_RECOVERY_VERSION,
     marrowPositiveBlastE2EPreservationVersion:
       MARROW_POSITIVE_BLAST_E2E_PRESERVATION_VERSION,
     marrowPhysiologicPrecursorCoherenceVersion:
