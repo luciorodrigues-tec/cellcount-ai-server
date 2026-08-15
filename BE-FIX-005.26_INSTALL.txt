@@ -1,0 +1,167 @@
+BE-FIX-005.26 — BONE MARROW POSITIVE EVIDENCE PROJECTION & FINAL GOVERNOR PRIORITY LOCK
+
+BASE UTILIZADA
+--------------
+- server.js enviado em 15/08/2026, pós-BE-FIX-005.25
+- ai (2).zip enviado em 15/08/2026
+
+DIAGNÓSTICO
+-----------
+A BE-FIX-005.25 restaurou corretamente a aquisição visual medular:
+- reasoning_effort efetivo = none
+- containers medulares completos
+- blastAssessment estruturado
+- repair/fail-closed preservados.
+
+O defeito remanescente ocorria depois da aquisição:
+1. blastAssessment medular positivo não era projetado de forma suficiente para LME-1.0.
+2. evidenceAvailable podia permanecer false em medula por ausência de estruturas periféricas RBC/WBC/PLT.
+3. o Final Clinical Governor ainda utilizava visibleLeukocytes/adequacy periféricos e podia rebaixar
+   evidência medular positiva para CLASS_1_LIMITED_FIELD.
+4. layers finais podiam voltar a escrever classificação/narrativa de campo limitado depois da
+   BE-FIX-005.24.
+
+OBJETIVO
+--------
+Garantir a cadeia:
+
+blastAssessment medular
+→ LME-1.0 positivo
+→ marrowBlastPopulationSentinel
+→ Final Clinical Governor com prioridade medular
+→ sentinelas finais
+→ lock medular final
+→ CRA-001.1
+
+sem permitir que LIMITED_FIELD apague evidência medular positiva.
+
+ARQUIVOS A SUBSTITUIR
+---------------------
+C:\CELLCOUNT_V1.0.0-beta.4_10_08\backend\server.js
+
+C:\CELLCOUNT_V1.0.0-beta.4_10_08\backend\ai\localMorphologyEvidenceContract.js
+
+C:\CELLCOUNT_V1.0.0-beta.4_10_08\backend\ai\finalClinicalGovernor.js
+
+C:\CELLCOUNT_V1.0.0-beta.4_10_08\backend\ai\boneMarrow\marrowBlastPopulationSentinel.js
+
+NOVO TESTE
+----------
+C:\CELLCOUNT_V1.0.0-beta.4_10_08\backend\tests\be_fix_005_26_bone_marrow_positive_evidence_projection_final_governor_priority_lock_test.mjs
+
+CORREÇÕES
+---------
+1. NOVA IDENTIDADE:
+   MARROW_POSITIVE_EVIDENCE_PROJECTION_VERSION = BE-FIX-005.26
+   MARROW_POSITIVE_EVIDENCE_PRIORITY_LOCK_VERSION = BE-FIX-005.26
+
+2. A identidade histórica BE-FIX-005.24 é preservada:
+   MARROW_BLAST_POPULATION_GOVERNANCE_VERSION continua BE-FIX-005.24.
+
+3. LME-1.0 passa a reconhecer containers medulares:
+   - specimenAssessment
+   - marrowAdequacy
+   - myeloidSeries
+   - erythroidSeries
+   - megakaryocyticSeries
+   - blastAssessment
+
+4. blastAssessment com:
+   OBSERVED_POPULATION
+   SUSPICIOUS_POPULATION
+   FOCAL_SUSPICION
+   passa a constituir evidência morfológica local medular positiva.
+
+5. A descrição leucocitária canônica pode ser alimentada pelo summary de blastAssessment/myeloidSeries
+   quando o payload medular não possui o layout periférico tradicional.
+
+6. evidenceAvailable=true deixa de depender de visibleLeukocytes periféricos quando existe
+   evidência medular positiva estruturada.
+
+7. A criticalMorphology do LME projeta:
+   OBSERVED_POPULATION -> OBSERVED
+   SUSPICIOUS_POPULATION/FOCAL_SUSPICION -> SUSPICIOUS_INDETERMINATE.
+
+8. O marrowBlastPopulationSentinel injeta a evidência positiva no namespace canônico
+   localMorphologyEvidence.marrow.
+
+9. O Final Clinical Governor reconhece marrowBlastPopulationEvidence antes do fallback LIMITED_FIELD.
+
+10. Classes medulares preservadas:
+    MARROW_BLASTOID_POPULATION_OBSERVED
+    MARROW_BLASTOID_POPULATION_SUSPICIOUS
+    MARROW_BLASTOID_FOCAL_SUSPICION
+
+11. Representatividade limitada permanece registrada, mas passa a ser apenas qualificador de
+    quantificação/generalização. Não é mais a classe clínica dominante diante de evidência positiva.
+
+12. O server reaplica a governança medular:
+    - imediatamente após o Final Clinical Governor;
+    - depois das sentinelas blast/parasite/reactive;
+    - depois do rebuild de negativos, antes do CRA-001.1.
+
+13. Segurança de linhagem permanece obrigatória:
+    - não diagnosticar LLA/LMA
+    - não atribuir linhagem
+    - não afirmar clonalidade
+    - não estimar percentual global por campo não representativo.
+
+14. /runtime-version passa a expor:
+    marrowPositiveEvidencePriorityLockVersion = BE-FIX-005.26
+
+INVARIANTES PRESERVADAS
+-----------------------
+- BE-FIX-005.25 reasoning_effort=none em medula.
+- OPENAI_MARROW_MAX_COMPLETION_TOKENS default 4000.
+- repair medular e zero-evidence fail-closed.
+- BE-FIX-005.24 permanece registrada.
+- FA-4.0 não foi alterado.
+- campo limitado != ausência de morfologia.
+- ausência global de blastos não pode ser inferida por campo isolado.
+
+VALIDAÇÃO EXECUTADA NA PREPARAÇÃO
+---------------------------------
+node --check server.js: PASS
+node --check ai\localMorphologyEvidenceContract.js: PASS
+node --check ai\finalClinicalGovernor.js: PASS
+node --check ai\boneMarrow\marrowBlastPopulationSentinel.js: PASS
+
+BE-FIX-005.26:
+tests 10
+pass 10
+fail 0
+
+VALIDAÇÃO LOCAL APÓS SUBSTITUIÇÃO
+---------------------------------
+cd /d C:\CELLCOUNT_V1.0.0-beta.4_10_08\backend
+
+node --check server.js
+node --check ai\localMorphologyEvidenceContract.js
+node --check ai\finalClinicalGovernor.js
+node --check ai\boneMarrow\marrowBlastPopulationSentinel.js
+
+node --test tests\be_fix_005_26_bone_marrow_positive_evidence_projection_final_governor_priority_lock_test.mjs
+node --test tests\be_fix_005_25_vme_gpt55_effective_reasoning_zero_evidence_containment_test.mjs
+node --test tests\be_fix_005_24_marrow_blast_population_recognition_test.mjs
+node --test tests\be_fix_005_23_high_salience_hemoparasite_acquisition_test.mjs
+node --test tests\be_fix_005_18_critical_blast_presentation_priority_governance_test.mjs
+node --test tests\be_fix_005_16_blast_assessability_limited_field_reactive_gate_test.mjs
+
+git status
+
+NÃO FAZER COMMIT/PUSH ANTES DA VALIDAÇÃO.
+
+RESULTADO ESPERADO NO TESTE CLÍNICO
+----------------------------------
+No mesmo aspirado medular de referência conhecida de LLA, sem informar LLA à IA:
+
+- VME COMPLETE
+- reasoningEffort none
+- evidenceAvailable true quando blastAssessment for positivo
+- marrowBlastPopulationEvidence positivo
+- SUSPICIOUS_POPULATION deve resultar em:
+  MARROW_BLASTOID_POPULATION_SUSPICIOUS
+- OBSERVED_POPULATION deve resultar em:
+  MARROW_BLASTOID_POPULATION_OBSERVED
+- LIMITED_FIELD pode coexistir como limitação de representatividade, mas não dominar a conclusão.
+- não afirmar LLA, LMA ou linhagem pela imagem isolada.

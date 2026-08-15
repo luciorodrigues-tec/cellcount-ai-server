@@ -13,6 +13,7 @@ import {
 
 import {
   MARROW_BLAST_POPULATION_GOVERNANCE_VERSION,
+  MARROW_POSITIVE_EVIDENCE_PRIORITY_LOCK_VERSION,
   applyMarrowBlastPopulationGovernance,
 } from "./ai/boneMarrow/marrowBlastPopulationSentinel.js";
 
@@ -6329,6 +6330,8 @@ app.get("/runtime-version", (_req, res) => {
       HEMOPARASITE_HIGH_SALIENCE_SENTINEL_VERSION,
     marrowBlastPopulationGovernanceVersion:
       MARROW_BLAST_POPULATION_GOVERNANCE_VERSION,
+    marrowPositiveEvidencePriorityLockVersion:
+      MARROW_POSITIVE_EVIDENCE_PRIORITY_LOCK_VERSION,
     reactiveLymphoidEvidenceSentinelVersion:
       REACTIVE_LYMPHOID_EVIDENCE_SENTINEL_VERSION,
     canonicalClinicalResultArchitectureVersion:
@@ -7228,6 +7231,12 @@ let finalResult =
     validation.result,
   );
 
+// BE-FIX-005.26 — the generic final governor may qualify representativity,
+// but it cannot be the last writer over structured positive marrow evidence.
+if (specimenGate.analysisType === "bone_marrow") {
+  finalResult = applyMarrowBlastPopulationGovernance(finalResult);
+}
+
 // BE-FIX-005.7 — preserve acquisition provenance through final governor and
 // validator layers. An incomplete VME response may be safely limited, but it
 // must never be represented as complete negative morphology.
@@ -7896,10 +7905,22 @@ finalResult =
     finalResult,
   );
 
+// BE-FIX-005.26 — FINAL MARROW POSITIVE-EVIDENCE PRIORITY LOCK.
+// Runs after generic blast/parasite/reactive sentinels. It preserves the
+// medullary evidence class while allowing field adequacy to remain a separate
+// representativity qualifier.
+if (specimenGate.analysisType === "bone_marrow") {
+  finalResult = applyMarrowBlastPopulationGovernance(finalResult);
+}
+
 finalResult =
   applyFieldScopedNegativeFindings(
     finalResult,
   );
+
+if (specimenGate.analysisType === "bone_marrow") {
+  finalResult = applyMarrowBlastPopulationGovernance(finalResult);
+}
 
 // ============================================================================
 // CRA-001.1 — CANONICAL CLINICAL TRUTH FOUNDATION

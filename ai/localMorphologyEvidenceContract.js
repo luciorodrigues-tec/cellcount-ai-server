@@ -11,6 +11,7 @@ export const LOCAL_MORPHOLOGY_EVIDENCE_VERSION = "LME-1.0";
 export const BLAST_ASSESSABILITY_LME_VERSION = "BE-FIX-005.16";
 export const SINGLE_BLAST_CONFIRMATION_LME_VERSION = "BE-FIX-005.17";
 export const HEMOPARASITE_HIGH_SALIENCE_LME_VERSION = "BE-FIX-005.23";
+export const MARROW_POSITIVE_EVIDENCE_PROJECTION_VERSION = "BE-FIX-005.26";
 
 const GENERIC_LIMITATION_PATTERNS = [
   /campo microsc[oó]pico limitado/i,
@@ -114,6 +115,7 @@ function blastAssessabilityOf(raw = {}, explicit = {}) {
 }
 function normalizeCriticalMorphology(explicit = {}, raw = {}) {
   const findings = asObject(raw.findings);
+  const marrowBlast = normalizeMarrowBlastEvidence(raw);
   const visual = asObject(raw.visualEvidence);
   const assessability = blastAssessabilityOf(raw, explicit);
 
@@ -172,6 +174,13 @@ function normalizeCriticalMorphology(explicit = {}, raw = {}) {
     blastLikeMorphology = "NOT_ASSESSABLE";
   }
 
+  if (marrowBlast.positive) {
+    blastLikeMorphology =
+      marrowBlast.evidenceState === "OBSERVED_POPULATION"
+        ? "OBSERVED"
+        : "SUSPICIOUS_INDETERMINATE";
+  }
+
   return {
     blastLikeMorphology,
     blastEvidenceGovernanceVersion: SINGLE_BLAST_CONFIRMATION_LME_VERSION,
@@ -223,6 +232,58 @@ function normalizeCriticalMorphology(explicit = {}, raw = {}) {
   };
 }
 
+function normalizeMarrowBlastEvidence(raw = {}) {
+  const specimen = asObject(raw.specimenAssessment);
+  const blast = asObject(raw.blastAssessment);
+  const support = asObject(blast.morphologySupport);
+  const specimenType = asText(specimen.specimenType).toUpperCase();
+  const marrowLike =
+    specimenType.includes("BONE_MARROW") ||
+    Object.keys(asObject(raw.marrowAdequacy)).length > 0 ||
+    Object.keys(blast).length > 0 && (
+      Object.keys(asObject(raw.myeloidSeries)).length > 0 ||
+      Object.keys(asObject(raw.erythroidSeries)).length > 0 ||
+      Object.keys(asObject(raw.megakaryocyticSeries)).length > 0
+    );
+
+  const state = asText(blast.evidenceState).toUpperCase();
+  const positiveState = ["OBSERVED_POPULATION", "SUSPICIOUS_POPULATION", "FOCAL_SUSPICION"].includes(state);
+  const repeated =
+    blast.populationPattern === "repeated" ||
+    blast.populationPattern === "dominant" ||
+    support.repeatedAcrossField === true ||
+    (finiteNumber(blast.approximateBlastLikeCells) ?? 0) >= 3;
+
+  const supportCount = [
+    support.highNCRatio,
+    support.openFineChromatin,
+    support.nucleoli,
+    support.scantBasophilicCytoplasm,
+    support.monomorphism,
+    support.repeatedAcrossField,
+  ].filter((value) => value === true).length;
+
+  return {
+    version: MARROW_POSITIVE_EVIDENCE_PROJECTION_VERSION,
+    marrowLike,
+    evidenceState: state || "NOT_ASSESSABLE",
+    positive: marrowLike && positiveState,
+    repeated,
+    supportCount,
+    approximateBlastLikeCells: finiteNumber(blast.approximateBlastLikeCells),
+    populationPattern: asText(blast.populationPattern).toLowerCase() || "indeterminate",
+    summary: asText(blast.summary),
+    morphologySupport: {
+      highNCRatio: support.highNCRatio === true,
+      openFineChromatin: support.openFineChromatin === true,
+      nucleoli: support.nucleoli === true,
+      scantBasophilicCytoplasm: support.scantBasophilicCytoplasm === true,
+      monomorphism: support.monomorphism === true,
+      repeatedAcrossField: support.repeatedAcrossField === true,
+    },
+  };
+}
+
 export function createLocalMorphologyEvidence({
   visionResponse = {},
   analysisSource = "ai_visual",
@@ -233,6 +294,10 @@ export function createLocalMorphologyEvidence({
   const morphology = asObject(raw.morphologyAnalysis);
   const seeing = asObject(raw.whatAISees);
   const fieldAdequacy = asObject(raw.fieldAdequacy);
+  const marrowBlastEvidence = normalizeMarrowBlastEvidence(raw);
+  const marrowMyeloid = asObject(raw.myeloidSeries);
+  const marrowErythroid = asObject(raw.erythroidSeries);
+  const marrowMegakaryocytic = asObject(raw.megakaryocyticSeries);
 
   const explicitField = asObject(explicit.field);
   const explicitRbc = asObject(explicit.erythrocytes);
@@ -247,15 +312,19 @@ export function createLocalMorphologyEvidence({
 
   const fieldDescription = safeObservation(
     explicitField.description, legacy.globalField, seeing.globalField, morphology.overview,
+    asObject(raw.marrowAdequacy).summary, asObject(raw.specimenAssessment).summary,
   );
   const erythrocyteDescription = safeObservation(
     explicitRbc.description, legacyRbc.description, seeing.erythrocytes, morphology.erythrocyteReview,
+    marrowErythroid.summary,
   );
   const leukocyteDescription = safeObservation(
     explicitWbc.description, legacyWbc.description, seeing.leukocytes, morphology.leukocyteReview,
+    marrowBlastEvidence.summary, marrowMyeloid.summary,
   );
   const plateletDescription = safeObservation(
     explicitPlt.description, legacyPlt.description, seeing.platelets, morphology.plateletReview,
+    marrowMegakaryocytic.summary,
   );
 
   const positiveEvidence = [
@@ -271,7 +340,7 @@ export function createLocalMorphologyEvidence({
   ];
   const evidenceAvailable = Boolean(
     fieldDescription || erythrocyteDescription || leukocyteDescription ||
-    plateletDescription || positiveEvidence.length > 0,
+    plateletDescription || positiveEvidence.length > 0 || marrowBlastEvidence.positive,
   );
   const observedCellCount =
     finiteNumber(explicitWbc.observedCellCount) ??
@@ -353,6 +422,13 @@ export function createLocalMorphologyEvidence({
       morphology: firstText(explicitPlt.morphology),
       positiveFindings: asArray(explicitPlt.positiveFindings),
       uncertainties: asArray(explicitPlt.uncertainties),
+    },
+    marrow: {
+      projectionVersion: MARROW_POSITIVE_EVIDENCE_PROJECTION_VERSION,
+      blastPopulationEvidence: marrowBlastEvidence,
+      myeloidSummary: asText(marrowMyeloid.summary),
+      erythroidSummary: asText(marrowErythroid.summary),
+      megakaryocyticSummary: asText(marrowMegakaryocytic.summary),
     },
     criticalMorphology: normalizeCriticalMorphology(
       asObject(explicit.criticalMorphology), raw,

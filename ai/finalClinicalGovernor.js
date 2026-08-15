@@ -265,6 +265,21 @@ export function applyFinalClinicalGovernor(result = {}) {
     safeBool(f.monomorphicPopulation) &&
     !reactivePattern;
 
+  // BE-FIX-005.26 — marrow-positive evidence is a separate clinical axis.
+  // Peripheral visible-leukocyte thresholds must never be used to erase a
+  // structured medullary blast-population finding.
+  const marrowBlastEvidence = asObject(final.marrowBlastPopulationEvidence);
+  const marrowBlastGovernance = asObject(final.marrowBlastPopulationGovernance);
+  const marrowPositiveObserved = marrowBlastEvidence.observedPopulation === true;
+  const marrowPositiveSuspicious =
+    marrowPositiveObserved || marrowBlastEvidence.suspiciousPopulation === true;
+  const marrowPositiveFocal =
+    !marrowPositiveSuspicious && marrowBlastEvidence.focalSuspicion === true;
+  const marrowPositiveLocked =
+    marrowPositiveSuspicious || marrowPositiveFocal ||
+    marrowBlastGovernance.positiveEvidencePriorityLockVersion === "BE-FIX-005.26" &&
+      final.localMorphologyEvidence?.marrow?.blastPopulationEvidence?.positive === true;
+
   const sustainedAtypicalPopulation =
     adequatePopulation &&
     visibleLeukocytes >= 8 &&
@@ -289,7 +304,26 @@ export function applyFinalClinicalGovernor(result = {}) {
     "Campo sem alterações morfológicas relevantes no material analisado.";
   let requiresHumanReview = false;
 
-  if (strongBlastEvidence) {
+  if (marrowPositiveLocked) {
+    const observed = marrowPositiveObserved;
+    const population = marrowPositiveSuspicious;
+    finalClass = observed
+      ? "MARROW_BLASTOID_POPULATION_OBSERVED"
+      : population
+        ? "MARROW_BLASTOID_POPULATION_SUSPICIOUS"
+        : "MARROW_BLASTOID_FOCAL_SUSPICION";
+    riskLevel = observed
+      ? "Achado medular crítico — população blastoide/imatura"
+      : population
+        ? "Alta prioridade — suspeita de população blastoide/imatura"
+        : "Prioridade de revisão — suspeita focal blastoide/imatura";
+    mainFinding = observed
+      ? "POPULAÇÃO BLASTOIDE/IMATURA OBSERVADA: evidência medular positiva estruturada preservada. Representatividade limitada restringe quantificação, mas não apaga o achado."
+      : population
+        ? "SUSPEITA DE POPULAÇÃO BLASTOIDE/IMATURA: evidência medular positiva estruturada preservada. Representatividade limitada restringe quantificação, mas não invalida a suspeita."
+        : "SUSPEITA FOCAL DE ELEMENTO BLASTOIDE/IMATURO: requer revisão especializada; não permite inferir frequência global.";
+    requiresHumanReview = true;
+  } else if (strongBlastEvidence) {
     finalClass = "CLASS_4_BLAST_SUSPICION";
     riskLevel = observedBlastEvidence
       ? "ALERTA CRÍTICO — blasto/blastoide observado"

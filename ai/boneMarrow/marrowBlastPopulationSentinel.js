@@ -12,6 +12,7 @@
 // ============================================================================
 
 export const MARROW_BLAST_POPULATION_GOVERNANCE_VERSION = "BE-FIX-005.24";
+export const MARROW_POSITIVE_EVIDENCE_PRIORITY_LOCK_VERSION = "BE-FIX-005.26";
 
 const MARROW_TYPES = new Set([
   "BONE_MARROW_ASPIRATE",
@@ -119,6 +120,7 @@ export function evaluateMarrowBlastPopulationEvidence(result = {}) {
 
   return {
     version: MARROW_BLAST_POPULATION_GOVERNANCE_VERSION,
+    priorityLockVersion: MARROW_POSITIVE_EVIDENCE_PRIORITY_LOCK_VERSION,
     marrow,
     evidenceState,
     approximateBlastLikeCells: count,
@@ -155,6 +157,7 @@ export function applyMarrowBlastPopulationGovernance(result = {}) {
   output.marrowBlastPopulationEvidence = evidence;
   output.marrowBlastPopulationGovernance = {
     version: MARROW_BLAST_POPULATION_GOVERNANCE_VERSION,
+    positiveEvidencePriorityLockVersion: MARROW_POSITIVE_EVIDENCE_PRIORITY_LOCK_VERSION,
     applied: true,
   };
 
@@ -165,6 +168,20 @@ export function applyMarrowBlastPopulationGovernance(result = {}) {
   output.normalityBlocked = true;
   output.requiresHumanReview = true;
   output.overallAssessment.requiresHumanReview = true;
+
+  // BE-FIX-005.26 — project marrow-positive evidence into the canonical local
+  // evidence namespace so AMR/final governors do not interpret a medullary
+  // positive finding as evidenceAvailable=false merely because peripheral WBC
+  // counters are absent.
+  output.localMorphologyEvidence = {
+    ...obj(output.localMorphologyEvidence),
+    evidenceAvailable: true,
+    marrow: {
+      ...obj(obj(output.localMorphologyEvidence).marrow),
+      projectionVersion: MARROW_POSITIVE_EVIDENCE_PRIORITY_LOCK_VERSION,
+      blastPopulationEvidence: evidence,
+    },
+  };
 
   if (evidence.observedPopulation) {
     const finding =
@@ -240,6 +257,13 @@ export function applyMarrowBlastPopulationGovernance(result = {}) {
     "Revisão hematológica prioritária e correlação com mielograma, hemograma e imunofenotipagem/citometria de fluxo quando indicada.";
   output.morphologyAnalysis.summary = finding;
   output.interpretiveSynthesis = finding;
+  output.hematologicReasoning.whatISee = evidence.suspiciousPopulation
+    ? "População repetida de elementos medulares com características de imaturidade/blastoidia."
+    : "Elemento focal com características de imaturidade/blastoidia.";
+  output.hematologicReasoning.whatItResembles =
+    "Morfologia de precursores/blastoides que requer caracterização complementar.";
+  output.hematologicReasoning.whatICannotConfirm =
+    "A imagem isolada não confirma LLA, LMA, linhagem, clonalidade, subtipo genético nem percentual global de blastos.";
   output.hematologicReasoning.finalInterpretation = finding;
   output.blockNormalReason = [
     ...new Set([
