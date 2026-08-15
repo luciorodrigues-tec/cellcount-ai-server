@@ -35,6 +35,12 @@ import {
 } from "./ai/boneMarrow/marrowPositiveBlastEvidencePreservationEngine.js";
 
 import {
+  MARROW_PHYSIOLOGIC_PRECURSOR_COHERENCE_VERSION,
+  MARROW_GLOBAL_PATTERN_COHERENCE_VERSION,
+  applyMarrowPhysiologicPrecursorCoherence,
+} from "./ai/boneMarrow/marrowPhysiologicPrecursorCoherenceEngine.js";
+
+import {
   applyClinicalSafetyGovernor,
 } from "./ai/clinicalSafety/index.js";
 
@@ -4519,6 +4525,7 @@ BE-FIX-005.28 — REFORÇO DA AQUISIÇÃO DE EVIDÊNCIA BLASTOIDE MEDULAR:
     // field-adequacy evaluates NEGATIVE screening assessability.
     if (analysisType === "bone_marrow") {
       mergedAnalysis = applyMarrowPositiveBlastEvidencePreservation(mergedAnalysis);
+      mergedAnalysis = applyMarrowPhysiologicPrecursorCoherence(mergedAnalysis);
     }
 
     mergedAnalysis =
@@ -4534,6 +4541,7 @@ BE-FIX-005.28 — REFORÇO DA AQUISIÇÃO DE EVIDÊNCIA BLASTOIDE MEDULAR:
     // a previously acquired SUSPICIOUS/OBSERVED marrow population.
     if (analysisType === "bone_marrow") {
       mergedAnalysis = applyMarrowPositiveBlastEvidencePreservation(mergedAnalysis);
+      mergedAnalysis = applyMarrowPhysiologicPrecursorCoherence(mergedAnalysis);
     }
 
 // =====================================================
@@ -4612,6 +4620,7 @@ if (
 
     if (analysisType === "bone_marrow") {
       mergedAnalysis = applyMarrowPositiveBlastEvidencePreservation(mergedAnalysis);
+      mergedAnalysis = applyMarrowPhysiologicPrecursorCoherence(mergedAnalysis);
     }
 
     mergedAnalysis.morphologyAnalysis =
@@ -6450,6 +6459,10 @@ app.get("/runtime-version", (_req, res) => {
       MARROW_BLAST_EVIDENCE_RECONCILIATION_VERSION,
     marrowPositiveBlastE2EPreservationVersion:
       MARROW_POSITIVE_BLAST_E2E_PRESERVATION_VERSION,
+    marrowPhysiologicPrecursorCoherenceVersion:
+      MARROW_PHYSIOLOGIC_PRECURSOR_COHERENCE_VERSION,
+    marrowGlobalPatternCoherenceVersion:
+      MARROW_GLOBAL_PATTERN_COHERENCE_VERSION,
     reactiveLymphoidEvidenceSentinelVersion:
       REACTIVE_LYMPHOID_EVIDENCE_SENTINEL_VERSION,
     canonicalClinicalResultArchitectureVersion:
@@ -6885,6 +6898,10 @@ app.post(
           applyMarrowPositiveBlastEvidencePreservation(
             validation.result,
           );
+        validation.result =
+          applyMarrowPhysiologicPrecursorCoherence(
+            validation.result,
+          );
 
         validation.result =
           applyMarrowPrecursorDiscrimination(
@@ -6893,6 +6910,10 @@ app.post(
 
         validation.result =
           applyMarrowBlastPopulationGovernance(
+            validation.result,
+          );
+        validation.result =
+          applyMarrowPhysiologicPrecursorCoherence(
             validation.result,
           );
 
@@ -6908,6 +6929,10 @@ app.post(
           applyMarrowPositiveBlastEvidencePreservation(
             validation.result,
           );
+        validation.result =
+          applyMarrowPhysiologicPrecursorCoherence(
+            validation.result,
+          );
 
         validation.result =
           applyMarrowPrecursorDiscrimination(
@@ -6916,6 +6941,10 @@ app.post(
 
         validation.result =
           applyMarrowBlastPopulationGovernance(
+            validation.result,
+          );
+        validation.result =
+          applyMarrowPhysiologicPrecursorCoherence(
             validation.result,
           );
 
@@ -6950,6 +6979,10 @@ app.post(
             validation.result,
           );
         validation.result =
+          applyMarrowPhysiologicPrecursorCoherence(
+            validation.result,
+          );
+        validation.result =
           applyMarrowPrecursorDiscrimination(
             validation.result,
           );
@@ -6958,7 +6991,15 @@ app.post(
             validation.result,
           );
         validation.result =
+          applyMarrowPhysiologicPrecursorCoherence(
+            validation.result,
+          );
+        validation.result =
           applyMarrowPositiveBlastEvidencePreservation(
+            validation.result,
+          );
+        validation.result =
+          applyMarrowPhysiologicPrecursorCoherence(
             validation.result,
           );
       }
@@ -7388,6 +7429,7 @@ if (specimenGate.analysisType === "bone_marrow") {
   finalResult = applyMarrowPrecursorDiscrimination(finalResult);
   finalResult = applyMarrowBlastPopulationGovernance(finalResult);
   finalResult = applyMarrowPositiveBlastEvidencePreservation(finalResult);
+  finalResult = applyMarrowPhysiologicPrecursorCoherence(finalResult);
 }
 
 // BE-FIX-005.7 — preserve acquisition provenance through final governor and
@@ -8034,6 +8076,7 @@ finalResult =
 // ============================================================================
 if (specimenGate.analysisType === "bone_marrow") {
   finalResult = applyMarrowPrecursorDiscrimination(finalResult);
+  finalResult = applyMarrowPhysiologicPrecursorCoherence(finalResult);
 }
 
 finalResult =
@@ -8069,6 +8112,7 @@ finalResult =
 if (specimenGate.analysisType === "bone_marrow") {
   finalResult = applyMarrowPrecursorDiscrimination(finalResult);
   finalResult = applyMarrowBlastPopulationGovernance(finalResult);
+  finalResult = applyMarrowPhysiologicPrecursorCoherence(finalResult);
 }
 
 finalResult =
@@ -8079,6 +8123,7 @@ finalResult =
 if (specimenGate.analysisType === "bone_marrow") {
   finalResult = applyMarrowPrecursorDiscrimination(finalResult);
   finalResult = applyMarrowBlastPopulationGovernance(finalResult);
+  finalResult = applyMarrowPhysiologicPrecursorCoherence(finalResult);
 }
 
 // ============================================================================

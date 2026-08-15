@@ -1,6 +1,6 @@
 // ============================================================================
 // GLOBAL PATTERN ENGINE
-// CELLCOUNT HEMATOLOGY AI — V2 / BE-FIX-005.16 + BE-FIX-005.17.1
+// CELLCOUNT HEMATOLOGY AI — V2 / BE-FIX-005.16 + BE-FIX-005.17.1 + BE-FIX-005.30
 // ============================================================================
 
 import { evaluateReactiveLymphoidEvidence } from "./reactiveLymphoidEvidenceSentinel.js";
@@ -31,6 +31,22 @@ function hasPositiveMarrowBlastEvidence(result = {}) {
     projected.focalSuspicion === true;
 }
 
+function readPhysiologicPrecursorDiscrimination(result = {}) {
+  const candidates = [
+    asObject(result?.marrowPhysiologicPrecursorCoherence),
+    asObject(result?.marrowPrecursorDiscrimination),
+    asObject(result?.marrowBlastPopulationEvidence?.precursorDiscrimination),
+    asObject(result?.localMorphologyEvidence?.marrow?.precursorDiscrimination),
+  ];
+
+  for (const candidate of candidates) {
+    if (candidate.classification || candidate.physiologicDominance === true) {
+      return candidate;
+    }
+  }
+  return {};
+}
+
 export function analyzeGlobalPattern(result = {}) {
   const findings = result.findings || {};
   const visualEvidence = result.visualEvidence || {};
@@ -46,11 +62,22 @@ export function analyzeGlobalPattern(result = {}) {
   const reactiveMorphology = reactiveEvidence.reactivePatternSupported === true;
   const reactiveClassification = reactiveEvidence.reactiveClassificationAllowed === true;
   const blastAssessable = reactiveEvidence.blastAssessable === true;
+  const precursorDiscrimination = readPhysiologicPrecursorDiscrimination(result);
+  const physiologicPrecursorPattern =
+    precursorDiscrimination.classification === "PHYSIOLOGIC_PRECURSOR_PATTERN" &&
+    (precursorDiscrimination.strongPhysiologicPattern === true ||
+      precursorDiscrimination.physiologicDominance === true) &&
+    precursorDiscrimination.strongBlastoidPattern !== true &&
+    precursorDiscrimination.coherentBlastoidSubpopulation !== true;
+  const limitedMarrow =
+    result?.fieldAdequacy?.limitedField === true ||
+    result?.fieldAdequacy?.adequateForPopulationAssessment === false;
 
   const atypical = findings.atypicalLymphocytes === true || findings.largeMononuclearCells === true ||
     findings.atypicalPopulation === true || monomorphic;
   const marrowPositiveBlastEvidence = hasPositiveMarrowBlastEvidence(result);
-  const blastLike = marrowPositiveBlastEvidence || findings.blastSuspicion === true || findings.immatureCells === true;
+  const blastLike = marrowPositiveBlastEvidence || findings.blastSuspicion === true ||
+    (findings.immatureCells === true && !physiologicPrecursorPattern);
 
   if (monomorphic) reasons.push("Presença de população mononuclear relativamente uniforme/repetitiva no campo.");
   if (reactiveMorphology) reasons.push("Morfologia linfoide reacional sustentada por evidência estruturada.");
@@ -67,6 +94,9 @@ export function analyzeGlobalPattern(result = {}) {
 
   let dominantPattern = "GLOBAL_UNREMARKABLE_PATTERN";
   if (marrowPositiveBlastEvidence) dominantPattern = "MARROW_POSITIVE_BLASTOID_POPULATION_PATTERN";
+  else if (physiologicPrecursorPattern) dominantPattern = limitedMarrow || !blastAssessable
+    ? "MARROW_PHYSIOLOGIC_MATURATION_LIMITED_PATTERN"
+    : "MARROW_PHYSIOLOGIC_MATURATION_PATTERN";
   else if (blastLike) dominantPattern = "IMMATURE_OR_BLAST_LIKE_PATTERN";
   else if ((atypical || reactiveMorphology) && !blastAssessable)
     dominantPattern = "ATYPICAL_MONONUCLEAR_PATTERN_BLAST_ASSESSMENT_INDETERMINATE";
@@ -86,12 +116,18 @@ export function analyzeGlobalPattern(result = {}) {
     // A structured positive marrow blast signal remains positive even when a
     // field is inadequate for global negative exclusion.
     marrowPositiveBlastEvidence,
+    physiologicPrecursorPattern,
+    globalPatternCoherenceVersion: "BE-FIX-005.30",
     blastAssessmentIndeterminate: !blastAssessable && !marrowPositiveBlastEvidence,
     blastAssessmentState: marrowPositiveBlastEvidence
       ? "POSITIVE_EVIDENCE_PRESERVED"
       : (blastAssessable ? "EVALUABLE" : "NOT_ASSESSABLE"),
     globalSummary: marrowPositiveBlastEvidence
       ? "Evidência medular positiva de população blastoide/imatura preservada; a limitação do campo restringe exclusões e quantificação global, não o achado positivo."
+      : physiologicPrecursorPattern
+        ? (limitedMarrow || !blastAssessable
+            ? "Padrão medular maturativo heterogêneo em campo limitado; sem alerta blastoide estruturado e sem autorização para afirmar normalidade global."
+            : "Padrão medular maturativo heterogêneo sem alerta blastoide estruturado no campo analisado.")
       : physiologicAppearance
       ? "Padrão global sem alterações morfológicas relevantes no campo analisado."
       : (!blastAssessable && (atypical || reactiveMorphology)
@@ -101,7 +137,7 @@ export function analyzeGlobalPattern(result = {}) {
             : "A avaliação global identifica alteração morfológica não plenamente fisiológica, sem promover padrão reacional além da evidência visual disponível."),
     globalInterpretation: morphology.overview || morphology.summary || "",
     ruleVersion: "GLOBAL_PATTERN_ENGINE_V2_BE_FIX_005_16",
-    compatibilityGovernanceVersion: "BE-FIX-005.29",
+    compatibilityGovernanceVersion: "BE-FIX-005.30",
   };
 }
 export default analyzeGlobalPattern;
