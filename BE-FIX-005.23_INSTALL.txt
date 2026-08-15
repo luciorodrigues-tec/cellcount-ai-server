@@ -1,0 +1,54 @@
+BE-FIX-005.23 — HIGH-SALIENCE HEMOPARASITE ACQUISITION & TRYPANOSOMATID FALSE-NEGATIVE CONTAINMENT
+
+BASE:
+backend.zip + frontend.zip enviados em 14/08/2026.
+
+ARQUIVOS A SUBSTITUIR NO BACKEND:
+- server.js
+- ai/visualMorphologyEvidenceAcquisitionContract.js
+- ai/localMorphologyEvidenceContract.js
+- ai/parasiteEvidenceSentinel.js
+
+NOVO TESTE:
+- tests/be_fix_005_23_high_salience_hemoparasite_acquisition_test.mjs
+
+O QUE FOI CORRIGIDO:
+1. VME passa a fazer varredura obrigatória de alta saliência para hemoparasitas,
+   inclusive formas extracelulares.
+2. O schema estruturado agora registra estado da evidência, número aproximado de
+   formas, fenótipo, localização extracelular, formato alongado/curvo,
+   membrana ondulante-like, flagelo-like, kinetoplasto-like e diferencial artefatual.
+3. LME preserva a evidência parasitária estruturada antes dos governors.
+4. BE-FIX-005.14 continua impedindo promoção por texto livre, mas agora aceita a
+   nova evidência estruturada BE-FIX-005.23.
+5. Fenótipo TRYPANOSOMATID_LIKE observado, extracelular e sustentado por múltiplos
+   atributos morfológicos é projetado como TRYPANOSOMA_SUSPECT.
+6. O sistema NÃO identifica espécie e NÃO conclui Trypanosoma cruzi pela imagem.
+7. SUSPICIOUS_INDETERMINATE não é promovido para OBSERVED.
+8. Artefatos continuam no caminho conservador/fail-closed.
+9. /runtime-version passa a expor hemoparasiteHighSalienceVersion=BE-FIX-005.23.
+
+FRONTEND:
+Nenhuma mudança adicional é necessária para a 005.23. O frontend enviado já possui
+a apresentação prioritária de parasiteAnalysis/parasiteSuspected. Mantenha a
+BE-FIX-005.22.1 do ai_result_screen.dart instalada.
+
+VALIDAÇÃO LOCAL:
+cd /d C:\CELLCOUNT_V1.0.0-beta.4_10_08\backend
+node --check server.js
+node --test tests\be_fix_005_23_high_salience_hemoparasite_acquisition_test.mjs
+node --test tests\be_fix_005_14_parasite_evidence_artifact_discrimination_test.mjs
+node --test tests\be_fix_005_13_single_blast_sentinel_test.mjs
+node --test tests\be_fix_005_15_evidence_grounded_reactive_lymphoid_sentinel_test.mjs
+
+RESULTADOS OBTIDOS NA PREPARAÇÃO DO PACOTE:
+- 005.23: 8/8 PASS
+- 005.14: 9/9 PASS
+- 005.13: 7/7 PASS
+- 005.15: 15/15 PASS
+
+IMPORTANTE:
+Depois do deploy, repetir a análise da MESMA imagem com múltiplas formas
+extracelulares. O resultado esperado é alerta hemoparasitário com linguagem
+"morfologia compatível com tripanossomatídeo", sem identificação definitiva
+de espécie e sem ser apagado por campo limitado.

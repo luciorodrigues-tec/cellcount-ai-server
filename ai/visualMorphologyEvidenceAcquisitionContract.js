@@ -19,6 +19,7 @@ export const VISUAL_MORPHOLOGY_EVIDENCE_ACQUISITION_VERSION = "VME-1.0";
 export const PRODUCTION_VME_ENFORCEMENT_VERSION = "BE-FIX-005.8";
 export const LOCAL_MORPHOLOGY_ACQUISITION_RECOVERY_VERSION = "BE-FIX-005.9";
 export const SINGLE_BLAST_CONFIRMATION_ACQUISITION_VERSION = "BE-FIX-005.17";
+export const HEMOPARASITE_HIGH_SALIENCE_ACQUISITION_VERSION = "BE-FIX-005.23";
 
 const STATUS = Object.freeze({
   COMPLETE: "COMPLETE",
@@ -287,6 +288,11 @@ REGRAS OBRIGATÓRIAS:
 - Para núcleo/cromatina/nucléolos/citoplasma/maturação, descreva o observável;
 - Para blastos/blastoides, diferencie obrigatoriamente: OBSERVED (célula realmente observada), SUSPICIOUS_INDETERMINATE (suspeita sem confirmação), NOT_OBSERVED_IN_EVALUABLE_FIELD (somente se o campo for avaliável) e NOT_ASSESSABLE.
 - Se pelo menos uma célula blastoide for diretamente observada, informe observedBlastLikeCount >= 1. Nunca use blastSuspicion=true como sinônimo de confirmação.
+- Faça varredura obrigatória de ALTA SALIÊNCIA para estruturas hemoparasitárias em todo o campo, inclusive extracelulares.
+- Para formas alongadas/curvas, descreva separadamente: corpo alongado ou serpiginoso, membrana ondulante aparente, flagelo aparente e estrutura cromatínica/kinetoplasto-like.
+- Múltiplas formas extracelulares com combinação coerente desses atributos devem ser registradas como parasiteEvidenceState=OBSERVED, sem exigir identificação de espécie.
+- Fibra, precipitado, risco, dobra, debris ou artefato óptico NÃO são parasitas: registre o diferencial artefatual e use SUSPICIOUS_INDETERMINATE ou NOT_ASSESSABLE quando a morfologia não for suficiente.
+- Nunca conclua Trypanosoma cruzi por imagem isolada. Quando a morfologia for compatível, use apenas phenotype=TRYPANOSOMATID_LIKE e preserve necessidade de confirmação.
   quando não avaliável, escreva explicitamente "não avaliável".
 - Achado não observado deve ser restrito ao campo; não faça exclusão global.
 - Não invente contagens diferenciais, índices hematimétricos ou diagnóstico.
@@ -370,11 +376,30 @@ export function buildVisualMorphologyAcquisitionResponseFormat() {
                 },
                 required: ["description", "distribution", "size", "aggregates"],
               },
+              parasites: {
+                type: "object",
+                additionalProperties: false,
+                properties: {
+                  evidenceState: { type: "string", enum: ["OBSERVED", "SUSPICIOUS_INDETERMINATE", "NOT_OBSERVED_IN_EVALUABLE_FIELD", "NOT_ASSESSABLE"] },
+                  approximateVisibleForms: nullableIntegerSchema(),
+                  phenotype: { type: "string", enum: ["TRYPANOSOMATID_LIKE", "INTRAERYTHROCYTIC_LIKE", "MICROFILARIAL_LIKE", "OTHER_PARASITE_LIKE", "NONE", "INDETERMINATE"] },
+                  morphology: { type: "string" },
+                  extracellular: { type: "boolean" },
+                  elongatedOrCurved: { type: "boolean" },
+                  undulatingMembraneLike: { type: "boolean" },
+                  flagellumLike: { type: "boolean" },
+                  kinetoplastLike: { type: "boolean" },
+                  intracellularForms: { type: "boolean" },
+                  artifactDifferential: { type: "string" },
+                  confidence: { type: "string", enum: ["low", "moderate", "high"] }
+                },
+                required: ["evidenceState", "approximateVisibleForms", "phenotype", "morphology", "extracellular", "elongatedOrCurved", "undulatingMembraneLike", "flagellumLike", "kinetoplastLike", "intracellularForms", "artifactDifferential", "confidence"]
+              },
               artifacts: stringArraySchema(),
               positiveEvidence: stringArraySchema(),
               uncertainty: stringArraySchema(),
             },
-            required: ["globalField", "technicalQuality", "representativity", "erythrocytes", "leukocytes", "platelets", "artifacts", "positiveEvidence", "uncertainty"],
+            required: ["globalField", "technicalQuality", "representativity", "erythrocytes", "leukocytes", "platelets", "parasites", "artifacts", "positiveEvidence", "uncertainty"],
           },
           fieldAdequacy: {
             type: "object",

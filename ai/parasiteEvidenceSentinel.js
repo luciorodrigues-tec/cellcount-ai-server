@@ -4,6 +4,7 @@
 // ============================================================================
 
 export const PARASITE_EVIDENCE_SENTINEL_VERSION = "BE-FIX-005.14";
+export const HEMOPARASITE_HIGH_SALIENCE_SENTINEL_VERSION = "BE-FIX-005.23";
 
 function asObject(value) {
   return value && typeof value === "object" && !Array.isArray(value)
@@ -49,6 +50,31 @@ function explicitParasiteObserved(result = {}) {
   const critical = asObject(explicit.criticalMorphology);
 
   return critical.parasites === "OBSERVED";
+}
+
+
+function structuredParasiteProfile(result = {}) {
+  const lme = asObject(result.localMorphologyEvidence);
+  const profile = asObject(asObject(lme.criticalMorphology).parasiteEvidence);
+  const phenotype = String(profile.phenotype || "INDETERMINATE").toUpperCase();
+  const count = Number(profile.approximateVisibleForms);
+  const morphologySignals = [
+    profile.elongatedOrCurved === true,
+    profile.undulatingMembraneLike === true,
+    profile.flagellumLike === true,
+    profile.kinetoplastLike === true,
+  ].filter(Boolean).length;
+  return {
+    version: HEMOPARASITE_HIGH_SALIENCE_SENTINEL_VERSION,
+    evidenceState: String(profile.evidenceState || parasiteTriState(result)).toUpperCase(),
+    phenotype,
+    approximateVisibleForms: Number.isFinite(count) ? Math.max(0, Math.trunc(count)) : null,
+    extracellular: profile.extracellular === true,
+    morphologySignals,
+    morphology: String(profile.morphology || ""),
+    artifactDifferential: String(profile.artifactDifferential || ""),
+    confidence: String(profile.confidence || "low").toLowerCase(),
+  };
 }
 
 function collectArtifactEvidence(result = {}) {
@@ -236,15 +262,25 @@ export function evaluateParasiteArtifactEvidence(result = {}) {
   const state = parasiteTriState(result);
   const observed = explicitParasiteObserved(result);
   const artifact = classifyArtifact(result);
+  const profile = structuredParasiteProfile(result);
+  const structuredObserved = profile.evidenceState === "OBSERVED";
+  const trypanosomatidLike =
+    structuredObserved &&
+    profile.phenotype === "TRYPANOSOMATID_LIKE" &&
+    profile.extracellular === true &&
+    profile.morphologySignals >= 2;
 
   return {
     version: PARASITE_EVIDENCE_SENTINEL_VERSION,
-    parasiteTriState: state,
-    explicitPositiveParasiteEvidence: observed,
+    highSalienceVersion: HEMOPARASITE_HIGH_SALIENCE_SENTINEL_VERSION,
+    parasiteTriState: structuredObserved ? "OBSERVED" : state,
+    explicitPositiveParasiteEvidence: observed || structuredObserved,
+    structuredParasiteProfile: profile,
+    trypanosomatidLike,
     artifactLikely: artifact.likelyArtifact,
     artifactConfidence: artifact.confidence,
     artifactEvidence: artifact.evidence,
-    parasitePromotionAllowed: observed,
+    parasitePromotionAllowed: observed || structuredObserved,
   };
 }
 
@@ -261,7 +297,16 @@ export function applyParasiteEvidenceSentinel(result = {}) {
       ...asObject(result.parasiteAnalysis),
       suspected: true,
       evidenceAuthority: "LME-1.0",
+      highSalienceGovernanceVersion: HEMOPARASITE_HIGH_SALIENCE_SENTINEL_VERSION,
       parasiteTriState: "OBSERVED",
+      parasiteType: assessment.trypanosomatidLike ? "TRYPANOSOMATID_LIKE" : (asObject(result.parasiteAnalysis).parasiteType || "HEMOPARASITE_SUSPECT"),
+      parasiteName: assessment.trypanosomatidLike ? "Morfologia compatível com tripanossomatídeo" : (asObject(result.parasiteAnalysis).parasiteName || "Hemoparasita suspeito"),
+      phenotype: assessment.structuredParasiteProfile?.phenotype || "INDETERMINATE",
+      approximateVisibleForms: assessment.structuredParasiteProfile?.approximateVisibleForms ?? null,
+      interpretation: assessment.trypanosomatidLike
+        ? "Múltiplos atributos morfológicos estruturados sustentam forma extracelular compatível com tripanossomatídeo no campo analisado; a imagem isolada não confirma espécie."
+        : (asObject(result.parasiteAnalysis).interpretation || "Evidência visual estruturada positiva para forma parasitária no campo analisado."),
+      recommendation: "Revisão microscópica profissional e confirmação parasitológica/laboratorial conforme protocolo; não inferir espécie ou parasitemia pela imagem isolada.",
     };
     result.normalityBlocked = true;
     result.requiresHumanReview = true;

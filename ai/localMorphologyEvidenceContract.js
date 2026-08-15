@@ -10,6 +10,7 @@
 export const LOCAL_MORPHOLOGY_EVIDENCE_VERSION = "LME-1.0";
 export const BLAST_ASSESSABILITY_LME_VERSION = "BE-FIX-005.16";
 export const SINGLE_BLAST_CONFIRMATION_LME_VERSION = "BE-FIX-005.17";
+export const HEMOPARASITE_HIGH_SALIENCE_LME_VERSION = "BE-FIX-005.23";
 
 const GENERIC_LIMITATION_PATTERNS = [
   /campo microsc[oó]pico limitado/i,
@@ -183,9 +184,34 @@ function normalizeCriticalMorphology(explicit = {}, raw = {}) {
     schistocytes: normalizeTriState(
       explicit.schistocytes ?? explicit.schistocytesObserved ?? findings.schistocytes,
     ),
-    parasites: normalizeTriState(
-      explicit.parasites ?? explicit.parasitesObserved ?? findings.parasiteSuspected,
-    ),
+    parasites: (() => {
+      const parasiteEvidence = asObject(asObject(raw.observedMorphology).parasites);
+      const parasiteState = asText(parasiteEvidence.evidenceState).toUpperCase();
+      if (["OBSERVED", "SUSPICIOUS_INDETERMINATE", "NOT_OBSERVED_IN_EVALUABLE_FIELD", "NOT_ASSESSABLE"].includes(parasiteState)) {
+        return parasiteState;
+      }
+      return normalizeTriState(
+        explicit.parasites ?? explicit.parasitesObserved ?? findings.parasiteSuspected,
+      );
+    })(),
+    parasiteEvidence: (() => {
+      const parasite = asObject(asObject(raw.observedMorphology).parasites);
+      return {
+        version: HEMOPARASITE_HIGH_SALIENCE_LME_VERSION,
+        evidenceState: asText(parasite.evidenceState).toUpperCase() || "NOT_ASSESSABLE",
+        approximateVisibleForms: finiteNumber(parasite.approximateVisibleForms),
+        phenotype: asText(parasite.phenotype).toUpperCase() || "INDETERMINATE",
+        morphology: asText(parasite.morphology),
+        extracellular: parasite.extracellular === true,
+        elongatedOrCurved: parasite.elongatedOrCurved === true,
+        undulatingMembraneLike: parasite.undulatingMembraneLike === true,
+        flagellumLike: parasite.flagellumLike === true,
+        kinetoplastLike: parasite.kinetoplastLike === true,
+        intracellularForms: parasite.intracellularForms === true,
+        artifactDifferential: asText(parasite.artifactDifferential),
+        confidence: asText(parasite.confidence).toLowerCase() || "low",
+      };
+    })(),
     supportingBlastFeatures: {
       prominentNucleolus: visual.prominentNucleolus === true ? true : null,
       cellSizeIncrease: visual.cellSizeIncrease === true ? true : null,

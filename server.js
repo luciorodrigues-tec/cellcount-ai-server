@@ -166,6 +166,7 @@ import {
 
 import {
   PARASITE_EVIDENCE_SENTINEL_VERSION,
+  HEMOPARASITE_HIGH_SALIENCE_SENTINEL_VERSION,
   applyParasiteEvidenceSentinel,
   evaluateParasiteArtifactEvidence,
 } from "./ai/parasiteEvidenceSentinel.js";
@@ -1146,13 +1147,15 @@ function detectHemoparasitePattern(result = {}) {
     };
   }
 
+  const trypanosomatidLike = assessment.trypanosomatidLike === true;
   return {
     suspected: true,
-    type: "HEMOPARASITE_SUSPECT",
-    confidence: "moderate",
-    blockPlasmodium: false,
-    label:
-      "Evidência visual estruturada positiva para forma parasitária no campo analisado; requer confirmação laboratorial.",
+    type: trypanosomatidLike ? "TRYPANOSOMA_SUSPECT" : "HEMOPARASITE_SUSPECT",
+    confidence: trypanosomatidLike ? "high" : "moderate",
+    blockPlasmodium: trypanosomatidLike,
+    label: trypanosomatidLike
+      ? "Formas extracelulares com morfologia compatível com tripanossomatídeos observadas no campo; requer confirmação laboratorial e não permite identificação de espécie pela imagem isolada."
+      : "Evidência visual estruturada positiva para forma parasitária no campo analisado; requer confirmação laboratorial.",
     artifactLikely: assessment.artifactLikely,
   };
 }
@@ -1313,7 +1316,7 @@ function applyLimitedFieldFinalLock(result = {}) {
           : parasite.type === "BABESIA_SUSPECT"
             ? "Babesia spp."
             : parasite.type === "TRYPANOSOMA_SUSPECT"
-              ? "Estrutura extracelular inespecífica"
+              ? "Morfologia compatível com tripanossomatídeo"
               : parasite.type === "MICROFILARIA_SUSPECT"
                 ? "Microfilária suspeita"
                 : "Hemoparasita ou artefato não definido",
@@ -6251,6 +6254,8 @@ app.get("/runtime-version", (_req, res) => {
       SINGLE_BLAST_SENTINEL_VERSION,
     parasiteEvidenceSentinelVersion:
       PARASITE_EVIDENCE_SENTINEL_VERSION,
+    hemoparasiteHighSalienceVersion:
+      HEMOPARASITE_HIGH_SALIENCE_SENTINEL_VERSION,
     reactiveLymphoidEvidenceSentinelVersion:
       REACTIVE_LYMPHOID_EVIDENCE_SENTINEL_VERSION,
     canonicalClinicalResultArchitectureVersion:
