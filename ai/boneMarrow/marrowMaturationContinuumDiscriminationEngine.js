@@ -6,6 +6,7 @@
 
 export const MARROW_MATURATION_CONTINUUM_DISCRIMINATION_VERSION = "BE-FIX-005.37";
 export const MARROW_PHYSIOLOGIC_IMMATURITY_CONTAINMENT_VERSION = "BE-FIX-005.37";
+export const MARROW_MATURATION_EVIDENCE_PROJECTION_VERSION = "BE-FIX-005.41";
 
 function obj(v){return v&&typeof v==="object"&&!Array.isArray(v)?v:{};}
 function txt(v){return typeof v==="string"?v.trim():"";}
@@ -31,7 +32,7 @@ function maturationNarrative(result={}){
   const bl={...obj(raw.blastAssessment),...obj(result.blastAssessment)};
   const ctx={...obj(obj(raw.blastAssessment).precursorContext),...obj(bl.precursorContext)};
   return norm([
-    my.maturation,my.summary,my.findings,
+    my.maturation,my.maturationSpectrum,my.morphologicNotes,my.summary,my.findings,
     er.maturation,er.summary,er.findings,
     ctx.summary,ctx.interpretation,
     bl.summary,bl.morphologicInterpretation
@@ -46,16 +47,27 @@ export function evaluateMarrowMaturationContinuum(result={}){
   const sub={...obj(obj(raw.blastAssessment).blastoidSubpopulationContext),...obj(assessment.blastoidSubpopulationContext)};
   const ctx={...obj(obj(raw.blastAssessment).precursorContext),...obj(assessment.precursorContext)};
   const narrative=maturationNarrative(result);
+  const my={...obj(raw.myeloidSeries),...obj(result.myeloidSeries)};
+  const exp={...obj(obj(raw.myeloidSeries).expansionContext),...obj(my.expansionContext)};
+  const structuredMaturationPresent =
+    my.maturation===true ||
+    ["present","preserved","progressive","orderly","maturing"].includes(norm(my.maturation)) ||
+    exp.broadMaturationSpectrum===true ||
+    exp.matureNeutrophilicFormsPresent===true ||
+    exp.leftShiftedMaturationSpectrum===true ||
+    /maturation present|maturacao presente|maturacao granulocit|granulocytic maturation|segmented|band forms|formas maduras|formas em maturacao/.test(narrative);
 
   const maturationHeterogeneity =
     ctx.maturationHeterogeneity===true ||
     /heterogeneidade maturativa|diversidade maturativa|diferentes estagios|varios estagios|multiplos estagios/.test(narrative);
   const maturationContinuum =
     ctx.maturationContinuum===true ||
+    structuredMaturationPresent ||
     /continuum maturativo|maturacao progressiva|maturacao preservada|maturacao ordenada|maturacao sequencial/.test(narrative);
   const matureFormsPresent =
     ctx.matureFormsPresent===true ||
-    /formas maduras|segmentad|metamieloc|mieloc|neutrofil|granulocit/.test(narrative);
+    exp.matureNeutrophilicFormsPresent===true ||
+    /formas maduras|segmentad|metamieloc|mieloc|neutrofil|granulocit|band forms/.test(narrative);
   const lineageDiversity =
     ctx.lineageDiversity===true ||
     ((Object.keys(obj(result.myeloidSeries)).length>0 || Object.keys(obj(raw.myeloidSeries)).length>0) &&
@@ -127,7 +139,12 @@ export function evaluateMarrowMaturationContinuum(result={}){
   return {
     version:MARROW_MATURATION_CONTINUUM_DISCRIMINATION_VERSION,
     marrow:marrowScope(result),
+    maturationHeterogeneity,
+    maturationContinuum,
+    matureFormsPresent,
     physiologicSignals,physiologicScore,
+    structuredMaturationPresent,
+    maturationEvidenceProjectionVersion:MARROW_MATURATION_EVIDENCE_PROJECTION_VERSION,
     cytologyScore,architectureScore,
     distinctFromMaturationContinuum:distinct,
     morphologicallyCoherent:coherent,

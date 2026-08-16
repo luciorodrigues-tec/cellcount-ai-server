@@ -21,6 +21,7 @@ export const MARROW_PRECURSOR_DISCRIMINATION_VERSION = "BE-FIX-005.27";
 export const MARROW_PRECURSOR_REBALANCING_VERSION = "BE-FIX-005.27.1";
 export const MARROW_DUAL_AXIS_SCORING_VERSION = MARROW_DUAL_AXIS_BLAST_SCORING_VERSION;
 export const MARROW_ARCHITECTURE_GATED_BLAST_ESCALATION_VERSION = "BE-FIX-005.40";
+export const MARROW_SCOPE_PROPAGATION_RECOVERY_VERSION = "BE-FIX-005.41";
 
 const MARROW_TYPES = new Set([
   "BONE_MARROW_ASPIRATE",
@@ -66,8 +67,12 @@ function fallbackMaturationSignals(result = {}) {
   const rawErythroid = obj(obj(result.rawResponse).erythroidSeries);
   const combined = norm([
     myeloid.maturation,
+    myeloid.maturationSpectrum,
+    myeloid.morphologicNotes,
     myeloid.summary,
     rawMyeloid.maturation,
+    rawMyeloid.maturationSpectrum,
+    rawMyeloid.morphologicNotes,
     rawMyeloid.summary,
     erythroid.maturation,
     erythroid.summary,
@@ -75,8 +80,15 @@ function fallbackMaturationSignals(result = {}) {
     rawErythroid.summary,
   ].filter(Boolean).join(" "));
 
-  const orderly = /maturacao preservada|maturacao progressiva|continuum maturativo|diversidade maturativa|diferentes estagios|varios estagios|heterogeneidade maturativa/.test(combined);
-  const matureForms = /segmentad|metamieloc|mieloc|neutrofil|formas maduras|granulocit/.test(combined);
+  const expansion = { ...obj(rawMyeloid.expansionContext), ...obj(myeloid.expansionContext) };
+  const orderly =
+    expansion.broadMaturationSpectrum === true ||
+    expansion.leftShiftedMaturationSpectrum === true ||
+    ["present","preserved","progressive","orderly","maturing"].includes(norm(myeloid.maturation || rawMyeloid.maturation)) ||
+    /maturacao preservada|maturacao progressiva|continuum maturativo|diversidade maturativa|diferentes estagios|varios estagios|heterogeneidade maturativa|maturation present|granulocytic maturation/.test(combined);
+  const matureForms =
+    expansion.matureNeutrophilicFormsPresent === true ||
+    /segmentad|metamieloc|mieloc|neutrofil|formas maduras|granulocit|band forms/.test(combined);
   return { orderly, matureForms };
 }
 
@@ -86,7 +98,15 @@ export function evaluateMarrowPrecursorDiscrimination(result = {}) {
     obj(result.specimenAssessment).specimenType ||
     obj(result.rawResponse).specimenAssessment?.specimenType
   ).toUpperCase();
-  const marrow = MARROW_TYPES.has(specimenType) || specimenType.includes("BONE_MARROW");
+  const rawRoot = obj(result.rawResponse);
+  const acquisitionScope = text(result.visualMorphologyEvidenceAcquisition?.specimenScope).toUpperCase();
+  const marrow =
+    MARROW_TYPES.has(specimenType) ||
+    specimenType.includes("BONE_MARROW") ||
+    specimenType.includes("BONEMARROW") ||
+    acquisitionScope.includes("BONE_MARROW") ||
+    Object.keys(obj(result.marrowAdequacy)).length > 0 ||
+    Object.keys(obj(rawRoot.marrowAdequacy)).length > 0;
   const assessment = obj(result.blastAssessment);
   const rawAssessment = obj(obj(result.rawResponse).blastAssessment);
   const support = { ...obj(rawAssessment.morphologySupport), ...obj(assessment.morphologySupport) };
@@ -267,6 +287,7 @@ export function evaluateMarrowPrecursorDiscrimination(result = {}) {
     rebalancingVersion: MARROW_PRECURSOR_REBALANCING_VERSION,
     dualAxisScoringVersion: MARROW_DUAL_AXIS_SCORING_VERSION,
     marrow,
+    marrowScopePropagationRecoveryVersion: MARROW_SCOPE_PROPAGATION_RECOVERY_VERSION,
     classification,
     evidenceState,
     populationPattern,

@@ -16,6 +16,8 @@
 
 export const MARROW_MYELOID_EXPANSION_DISCRIMINATION_VERSION = "BE-FIX-005.38";
 export const MARROW_PATHOLOGIC_MATURATION_CONTINUUM_VERSION = "BE-FIX-005.38";
+export const MARROW_MYELOID_MATURATION_EVIDENCE_PROJECTION_VERSION = "BE-FIX-005.41";
+export const MARROW_EXPANSION_CLASSIFICATION_RECOVERY_VERSION = "BE-FIX-005.41";
 
 function obj(v) {
   return v && typeof v === "object" && !Array.isArray(v) ? v : {};
@@ -35,6 +37,9 @@ function finite(v) {
 }
 function countTrue(values = []) {
   return values.filter((v) => v === true).length;
+}
+function structuredBoolean(value, narrativeFallback = false) {
+  return typeof value === "boolean" ? value : narrativeFallback;
 }
 function marrowScope(result = {}) {
   const raw = obj(result.rawResponse);
@@ -70,6 +75,8 @@ function collectMyeloidNarrative(result = {}) {
   return norm(
     [
       my.maturation,
+      my.maturationSpectrum,
+      my.morphologicNotes,
       my.summary,
       my.findings,
       my.distribution,
@@ -174,6 +181,23 @@ export function evaluateMarrowMyeloidExpansion(result = {}) {
   const exp = structuredExpansionContext(result);
   const narrative = collectMyeloidNarrative(result);
   const blast = blastArchitecture(result);
+  const my = {
+    ...obj(raw.myeloidSeries),
+    ...obj(result.myeloidSeries),
+  };
+
+  // BE-FIX-005.41 — project structured myeloid maturation evidence into the
+  // 005.38 maturation axis. Production VME may acquire maturation=present,
+  // broad spectrum and mature neutrophilic forms while precursorContext does
+  // not explicitly mark a maturation continuum. That omission must not erase
+  // directly acquired maturation evidence.
+  const structuredMaturationPresent =
+    my.maturation === true ||
+    ["present", "preserved", "progressive", "orderly", "maturing"].includes(norm(my.maturation)) ||
+    exp.broadMaturationSpectrum === true ||
+    exp.matureNeutrophilicFormsPresent === true ||
+    exp.leftShiftedMaturationSpectrum === true ||
+    /maturation present|maturacao presente|maturacao granulocit|granulocytic maturation|segmented|band forms|formas maduras|formas em maturacao/.test(narrative);
 
   const immatureCount = finite(
     a.approximateImmatureCellCount ??
@@ -185,47 +209,66 @@ export function evaluateMarrowMyeloidExpansion(result = {}) {
   const maturationContinuum =
     ctx.maturationContinuum === true ||
     ctx.orderlyGranulocyticMaturation === true ||
+    structuredMaturationPresent ||
     /continuum maturativo|maturacao progressiva|maturacao ordenada|espectro maturativo|varios estagios|diferentes estagios/.test(narrative);
 
   const matureFormsPresent =
     ctx.matureFormsPresent === true ||
-    exp.matureNeutrophilicFormsPresent === true ||
-    /formas maduras|segmentad|bastonet|metamieloc|mieloc|neutrofil/.test(narrative);
+    structuredBoolean(
+      exp.matureNeutrophilicFormsPresent,
+      /formas maduras|segmentad|bastonet|metamieloc|mieloc|neutrofil/.test(narrative),
+    );
 
   const broadMaturationSpectrum =
-    exp.broadMaturationSpectrum === true ||
-    /amplo espectro maturativo|espectro granulocitico|diferentes estagios|varios estagios|precursores.*formas maduras|formas precursoras.*maduras/.test(narrative);
+    structuredBoolean(
+      exp.broadMaturationSpectrum,
+      /amplo espectro maturativo|espectro granulocitico|diferentes estagios|varios estagios|precursores.*formas maduras|formas precursoras.*maduras/.test(narrative),
+    );
 
   const relativeMyeloidPredominance =
-    exp.relativeMyeloidPredominance === true ||
-    /predominio mieloide|predominio granulocit|predominio da serie granulocit|serie mieloide predominante|granulopoese predominante/.test(narrative);
+    structuredBoolean(
+      exp.relativeMyeloidPredominance,
+      /predominio mieloide|predominio granulocit|predominio da serie granulocit|serie mieloide predominante|granulopoese predominante/.test(narrative),
+    );
 
   const disproportionateMyeloidRepresentation =
-    exp.disproportionateMyeloidRepresentation === true ||
-    /expansao mieloide|expansao granulocit|hiperplasia mieloide|hiperplasia granulocit|representacao mieloide desproporcional|granulopoese aumentada/.test(narrative);
+    structuredBoolean(
+      exp.disproportionateMyeloidRepresentation,
+      /expansao mieloide|expansao granulocit|hiperplasia mieloide|hiperplasia granulocit|representacao mieloide desproporcional|granulopoese aumentada/.test(narrative),
+    );
 
   const numerousGranulocyticPrecursors =
-    exp.numerousGranulocyticPrecursors === true ||
-    burden === "numerous" ||
-    burden === "dominant" ||
-    (immatureCount !== null && immatureCount >= 12) ||
-    /numerosos precursores|muitos precursores|abundantes precursores|grande numero de precursores/.test(narrative);
+    structuredBoolean(
+      exp.numerousGranulocyticPrecursors,
+      burden === "numerous" ||
+        burden === "dominant" ||
+        (immatureCount !== null && immatureCount >= 12) ||
+        /numerosos precursores|muitos precursores|abundantes precursores|grande numero de precursores/.test(narrative),
+    );
 
   const leftShiftedMaturationSpectrum =
-    exp.leftShiftedMaturationSpectrum === true ||
-    /desvio a esquerda|espectro maturativo deslocado|aumento de formas imaturas|formas intermediarias aumentadas/.test(narrative);
+    structuredBoolean(
+      exp.leftShiftedMaturationSpectrum,
+      /desvio a esquerda|espectro maturativo deslocado|aumento de formas imaturas|formas intermediarias aumentadas/.test(narrative),
+    );
 
   const erythroidRelativeReduction =
-    exp.erythroidRelativeReduction === true ||
-    /serie eritroide relativamente reduzida|eritropoese relativamente reduzida|reducao relativa eritroide/.test(narrative);
+    structuredBoolean(
+      exp.erythroidRelativeReduction,
+      /serie eritroide relativamente reduzida|eritropoese relativamente reduzida|reducao relativa eritroide/.test(narrative),
+    );
 
   const basophilEosinophilEnrichment =
-    exp.basophilEosinophilEnrichment === true ||
-    /basofilia aumentada|basofilos aumentados|eosinofilos aumentados|eosinofilia associada/.test(narrative);
+    structuredBoolean(
+      exp.basophilEosinophilEnrichment,
+      /basofilia aumentada|basofilos aumentados|eosinofilos aumentados|eosinofilia associada/.test(narrative),
+    );
 
   const denseMyeloidField =
-    exp.denseMyeloidField === true ||
-    /campo densamente celular|alta densidade de celulas mieloides|campo muito celular|numerosos elementos mieloides/.test(narrative);
+    structuredBoolean(
+      exp.denseMyeloidField,
+      /campo densamente celular|alta densidade de celulas mieloides|campo muito celular|numerosos elementos mieloides/.test(narrative),
+    );
 
   const expansionSignals = {
     relativeMyeloidPredominance,
@@ -280,6 +323,11 @@ export function evaluateMarrowMyeloidExpansion(result = {}) {
     immatureCellBurden: burden || null,
     populationPattern: populationPattern || null,
     maturationContinuum,
+    structuredMaturationPresent,
+    maturationEvidenceProjectionVersion:
+      MARROW_MYELOID_MATURATION_EVIDENCE_PROJECTION_VERSION,
+    expansionClassificationRecoveryVersion:
+      MARROW_EXPANSION_CLASSIFICATION_RECOVERY_VERSION,
     matureFormsPresent,
     broadMaturationSpectrum,
     expansionSignals,

@@ -22,6 +22,7 @@ import {
   MARROW_PRECURSOR_REBALANCING_VERSION,
   MARROW_DUAL_AXIS_SCORING_VERSION,
   MARROW_ARCHITECTURE_GATED_BLAST_ESCALATION_VERSION,
+  MARROW_SCOPE_PROPAGATION_RECOVERY_VERSION,
   applyMarrowPrecursorDiscrimination,
 } from "./ai/boneMarrow/marrowPrecursorDiscriminationEngine.js";
 
@@ -69,12 +70,15 @@ import {
 import {
   MARROW_MATURATION_CONTINUUM_DISCRIMINATION_VERSION,
   MARROW_PHYSIOLOGIC_IMMATURITY_CONTAINMENT_VERSION,
+  MARROW_MATURATION_EVIDENCE_PROJECTION_VERSION,
   applyMarrowMaturationContinuumDiscrimination,
 } from "./ai/boneMarrow/marrowMaturationContinuumDiscriminationEngine.js";
 
 import {
   MARROW_MYELOID_EXPANSION_DISCRIMINATION_VERSION,
   MARROW_PATHOLOGIC_MATURATION_CONTINUUM_VERSION,
+  MARROW_MYELOID_MATURATION_EVIDENCE_PROJECTION_VERSION,
+  MARROW_EXPANSION_CLASSIFICATION_RECOVERY_VERSION,
   applyMarrowMyeloidExpansionDiscrimination,
 } from "./ai/boneMarrow/marrowMyeloidExpansionDiscriminationEngine.js";
 
@@ -4607,6 +4611,26 @@ BE-FIX-005.31 — COERÊNCIA NARRATIVA-ESTRUTURA E RECUPERAÇÃO FISIOLÓGICA:
         ),
       );
 
+      console.log(
+        "BE-FIX-005.41 — MARROW MYELOID MATURATION EVIDENCE PROJECTION / EXPANSION CLASSIFICATION RECOVERY",
+        JSON.stringify(
+          {
+            maturationEvidenceProjectionVersion:
+              MARROW_MYELOID_MATURATION_EVIDENCE_PROJECTION_VERSION,
+            expansionClassificationRecoveryVersion:
+              MARROW_EXPANSION_CLASSIFICATION_RECOVERY_VERSION,
+            marrowScopePropagationRecoveryVersion:
+              MARROW_SCOPE_PROPAGATION_RECOVERY_VERSION,
+            classification:
+              parsed.marrowMyeloidExpansionDiscrimination?.classification || null,
+            maturationAxis:
+              parsed.marrowMyeloidExpansionDiscrimination?.maturationAxis ?? null,
+          },
+          null,
+          2,
+        ),
+      );
+
       parsed = applyMarrowMaturationContinuumDiscrimination(parsed);
       console.log(
         "BE-FIX-005.37 — MARROW MATURATION CONTINUUM VS PATHOLOGIC BLAST POPULATION",
@@ -6677,6 +6701,14 @@ app.get("/runtime-version", (_req, res) => {
       MARROW_DUAL_AXIS_SCORING_VERSION,
     marrowArchitectureGatedBlastEscalationVersion:
       MARROW_ARCHITECTURE_GATED_BLAST_ESCALATION_VERSION,
+    marrowMyeloidMaturationEvidenceProjectionVersion:
+      MARROW_MYELOID_MATURATION_EVIDENCE_PROJECTION_VERSION,
+    marrowExpansionClassificationRecoveryVersion:
+      MARROW_EXPANSION_CLASSIFICATION_RECOVERY_VERSION,
+    marrowMaturationEvidenceProjectionVersion:
+      MARROW_MATURATION_EVIDENCE_PROJECTION_VERSION,
+    marrowScopePropagationRecoveryVersion:
+      MARROW_SCOPE_PROPAGATION_RECOVERY_VERSION,
     marrowBlastEvidenceReconciliationVersion:
       MARROW_BLAST_EVIDENCE_RECONCILIATION_VERSION,
     marrowNarrativeStructureContradictionVersion:
