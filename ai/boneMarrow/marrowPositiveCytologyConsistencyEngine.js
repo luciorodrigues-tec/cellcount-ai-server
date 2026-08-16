@@ -92,8 +92,17 @@ export function evaluateMarrowPositiveCytologyDiscordance(result={}){
   ].includes(upper(assessment.evidenceState));
   const physiologicContinuumLock =
     obj(result.marrowPhysiologicMaturationContinuumLock).active===true;
+  const repairArchitectureProvenance = obj(result.marrowRepairEvidenceMerge);
+  const repairAttempted =
+    obj(result.visualMorphologyEvidenceAcquisition).repairAttempted===true ||
+    Object.keys(repairArchitectureProvenance).length>0;
+  const singlePassArchitectureCore =
+    repairArchitectureProvenance.singlePassArchitectureCore===true;
+  const architectureQualifiedForStructuredPositive =
+    !repairAttempted || singlePassArchitectureCore;
   const structuredPositive =
     !physiologicContinuumLock &&
+    architectureQualifiedForStructuredPositive &&
     (
       positiveState ||
       obj(result.marrowPositiveBlastEvidenceLock).active===true ||
@@ -119,6 +128,10 @@ export function evaluateMarrowPositiveCytologyDiscordance(result={}){
     characterizedCytologyCount,positiveCytologyCount,
     narrativeStructuredDiscordance,structuredRepeat,
     coherentSubset,distinctSubset,physiologicContinuumLock,structuredPositive,
+    repairArchitectureProvenanceVersion:
+      repairArchitectureProvenance.repairArchitectureProvenanceVersion || null,
+    repairAttempted,singlePassArchitectureCore,
+    architectureQualifiedForStructuredPositive,
     unresolvedPositiveCytology,
     state:unresolvedPositiveCytology
       ?"UNRESOLVED_BLASTOID_CYTOLOGY"

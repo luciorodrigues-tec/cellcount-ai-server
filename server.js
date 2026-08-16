@@ -291,6 +291,8 @@ import {
   VME_EFFECTIVE_REASONING_ZERO_EVIDENCE_VERSION,
   MARROW_REPAIR_EVIDENCE_MERGE_VERSION,
   MARROW_POSITIVE_CYTOLOGY_CARDINALITY_PRESERVATION_VERSION,
+  MARROW_REPAIR_ARCHITECTURE_PROVENANCE_VERSION,
+  MARROW_CYTOLOGY_TO_ARCHITECTURE_ANTIFABRICATION_VERSION,
   BONE_MARROW_COMPACT_ACQUISITION_VERSION,
   BONE_MARROW_COMPLETE_LENGTH_RECOVERY_VERSION,
 } from "./ai/visualMorphologyEvidenceAcquisitionContract.js";
@@ -4456,12 +4458,35 @@ BE-FIX-005.31 — COERÊNCIA NARRATIVA-ESTRUTURA E RECUPERAÇÃO FISIOLÓGICA:
           repairCompletion?.choices?.[0]?.message?.content || "{}",
         );
 
-        parsed = mergeVisualMorphologyRepair(parsed, repaired);
+        parsed = mergeVisualMorphologyRepair(parsed, repaired, {
+          repairMode:
+            analysisType === "bone_marrow"
+              ? (marrowLengthRecovery
+                  ? "COMPLETE_LENGTH_RECOVERY"
+                  : "FOCAL_MORPHOLOGY_REPAIR")
+              : "GENERAL_REPAIR",
+        });
 
         console.log(
           "BE-FIX-005.36 — MARROW REPAIR EVIDENCE MERGE / POSITIVE CYTOLOGY CARDINALITY PRESERVATION",
           JSON.stringify(parsed?.marrowRepairEvidenceMerge || {}, null, 2),
         );
+
+        if (analysisType === "bone_marrow") {
+          console.log(
+            "BE-FIX-005.45 — MARROW REPAIR ARCHITECTURE PROVENANCE / CYTOLOGY-TO-ARCHITECTURE ANTI-FABRICATION",
+            JSON.stringify(
+              {
+                version: MARROW_REPAIR_ARCHITECTURE_PROVENANCE_VERSION,
+                antiFabricationVersion:
+                  MARROW_CYTOLOGY_TO_ARCHITECTURE_ANTIFABRICATION_VERSION,
+                provenance: parsed?.marrowRepairEvidenceMerge || {},
+              },
+              null,
+              2,
+            ),
+          );
+        }
 
         visualMorphologyEvidenceAcquisition =
           analysisType === "bone_marrow"
@@ -6794,6 +6819,10 @@ app.get("/runtime-version", (_req, res) => {
       MARROW_REPAIR_EVIDENCE_MERGE_VERSION,
     marrowPositiveCytologyCardinalityPreservationVersion:
       MARROW_POSITIVE_CYTOLOGY_CARDINALITY_PRESERVATION_VERSION,
+    marrowRepairArchitectureProvenanceVersion:
+      MARROW_REPAIR_ARCHITECTURE_PROVENANCE_VERSION,
+    marrowCytologyToArchitectureAntiFabricationVersion:
+      MARROW_CYTOLOGY_TO_ARCHITECTURE_ANTIFABRICATION_VERSION,
     marrowMaturationContinuumDiscriminationVersion:
       MARROW_MATURATION_CONTINUUM_DISCRIMINATION_VERSION,
     marrowPhysiologicImmaturityContainmentVersion:

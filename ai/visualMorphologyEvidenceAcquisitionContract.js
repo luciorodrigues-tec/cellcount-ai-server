@@ -23,6 +23,8 @@ export const HEMOPARASITE_HIGH_SALIENCE_ACQUISITION_VERSION = "BE-FIX-005.23";
 export const VME_EFFECTIVE_REASONING_ZERO_EVIDENCE_VERSION = "BE-FIX-005.25";
 export const MARROW_REPAIR_EVIDENCE_MERGE_VERSION = "BE-FIX-005.36";
 export const MARROW_POSITIVE_CYTOLOGY_CARDINALITY_PRESERVATION_VERSION = "BE-FIX-005.36";
+export const MARROW_REPAIR_ARCHITECTURE_PROVENANCE_VERSION = "BE-FIX-005.45";
+export const MARROW_CYTOLOGY_TO_ARCHITECTURE_ANTIFABRICATION_VERSION = "BE-FIX-005.45";
 export const BONE_MARROW_COMPACT_ACQUISITION_VERSION = "BE-FIX-005.39";
 export const BONE_MARROW_COMPLETE_LENGTH_RECOVERY_VERSION = "BE-FIX-005.39";
 
@@ -532,6 +534,7 @@ Se a citologia continuar insuficiente, preserve null/indeterminado; não convert
 export function mergeVisualMorphologyRepair(
   originalResponse = {},
   repairResponse = {},
+  { repairMode = "UNSPECIFIED_REPAIR" } = {},
 ) {
   const original = asObject(originalResponse);
   const repair = asObject(repairResponse);
@@ -672,33 +675,100 @@ export function mergeVisualMorphologyRepair(
 
   const originalCytology = asObject(originalBlast.immatureCellCytology);
   const repairCytology = asObject(repairBlast.immatureCellCytology);
+  const originalSub = asObject(originalBlast.blastoidSubpopulationContext);
+  const repairSub = asObject(repairBlast.blastoidSubpopulationContext);
+
+  // BE-FIX-005.45 — cytology may be accumulated across passes, but blastoid
+  // ARCHITECTURE must be attributable to one acquisition pass. Independent
+  // true values from primary + repair may not be OR-composed into a synthetic
+  // distinct/coherent/repeated blastoid subpopulation.
+  const architectureSnapshot = (cytology = {}, subpopulation = {}, support = {}) => ({
+    distinct:
+      subpopulation.distinctFromMaturationContinuum === true ||
+      cytology.distinctFromMaturationContinuum === true,
+    coherent:
+      subpopulation.morphologicallyCoherent === true ||
+      subpopulation.coherentBlastoidSubsetObserved === true ||
+      cytology.morphologicallyCoherent === true,
+    repeated:
+      subpopulation.repeatedSubsetAcrossField === true ||
+      subpopulation.repeatedCellsWithSimilarFeatures === true ||
+      cytology.repeatedSubsetAcrossField === true ||
+      support.repeatedAcrossField === true,
+    monomorphic: support.monomorphism === true,
+  });
+
+  const originalArchitecture = architectureSnapshot(
+    originalCytology,
+    originalSub,
+    originalSupport,
+  );
+  const repairArchitecture = architectureSnapshot(
+    repairCytology,
+    repairSub,
+    repairSupport,
+  );
+  const architectureCore = (snapshot) =>
+    snapshot.distinct === true &&
+    snapshot.coherent === true &&
+    snapshot.repeated === true;
+
+  const originalArchitectureCore = architectureCore(originalArchitecture);
+  const repairArchitectureCore = architectureCore(repairArchitecture);
+
+  let architectureSource = "NONE";
+  if (originalArchitectureCore) architectureSource = "PRIMARY_ACQUISITION";
+  else if (repairArchitectureCore) {
+    architectureSource =
+      repairMode === "COMPLETE_LENGTH_RECOVERY"
+        ? "COMPLETE_LENGTH_RECOVERY"
+        : "FOCAL_MORPHOLOGY_REPAIR";
+  }
+
+  const selectedCytology =
+    architectureSource === "PRIMARY_ACQUISITION"
+      ? originalCytology
+      : architectureSource === "NONE"
+        ? originalCytology
+        : repairCytology;
+  const selectedSub =
+    architectureSource === "PRIMARY_ACQUISITION"
+      ? originalSub
+      : architectureSource === "NONE"
+        ? originalSub
+        : repairSub;
+
   blast.immatureCellCytology = mergeNestedObject(
     originalCytology,
     repairCytology,
   );
 
+  // Cytologic traits remain additive. Architecture-bearing fields are copied
+  // only from the single pass that independently established the architecture
+  // core; if neither pass did, primary architecture is retained without OR.
   for (const key of [
     "highNCRatio",
     "openFineChromatin",
     "nucleoli",
     "scantBasophilicCytoplasm",
-    "morphologicallyCoherent",
-    "repeatedSubsetAcrossField",
-    "distinctFromMaturationContinuum",
   ]) {
     blast.immatureCellCytology[key] = positiveBoolean(
       repairCytology[key],
       originalCytology[key],
     );
   }
+  for (const key of [
+    "morphologicallyCoherent",
+    "repeatedSubsetAcrossField",
+    "distinctFromMaturationContinuum",
+  ]) {
+    blast.immatureCellCytology[key] = selectedCytology[key];
+  }
 
-  const originalSub = asObject(originalBlast.blastoidSubpopulationContext);
-  const repairSub = asObject(repairBlast.blastoidSubpopulationContext);
   blast.blastoidSubpopulationContext = mergeNestedObject(
     originalSub,
     repairSub,
   );
-
   for (const key of [
     "morphologicallyCoherent",
     "repeatedSubsetAcrossField",
@@ -706,11 +776,17 @@ export function mergeVisualMorphologyRepair(
     "coherentBlastoidSubsetObserved",
     "distinctFromMaturationContinuum",
   ]) {
-    blast.blastoidSubpopulationContext[key] = positiveBoolean(
-      repairSub[key],
-      originalSub[key],
-    );
+    blast.blastoidSubpopulationContext[key] = selectedSub[key];
   }
+
+  const crossPassArchitectureSynthesisWouldOccur =
+    !originalArchitectureCore &&
+    !repairArchitectureCore &&
+    (
+      (originalArchitecture.distinct || repairArchitecture.distinct) &&
+      (originalArchitecture.coherent || repairArchitecture.coherent) &&
+      (originalArchitecture.repeated || repairArchitecture.repeated)
+    );
 
   // Preserve repeated/multiple immature evidence even when the repair focuses
   // on cytology and omits or nulls population cardinality.
@@ -787,6 +863,22 @@ export function mergeVisualMorphologyRepair(
     finalEvidenceState: blast.evidenceState || null,
     compactAcquisitionVersion: BONE_MARROW_COMPACT_ACQUISITION_VERSION,
     completeLengthRecoveryVersion: BONE_MARROW_COMPLETE_LENGTH_RECOVERY_VERSION,
+    repairArchitectureProvenanceVersion:
+      MARROW_REPAIR_ARCHITECTURE_PROVENANCE_VERSION,
+    cytologyToArchitectureAntiFabricationVersion:
+      MARROW_CYTOLOGY_TO_ARCHITECTURE_ANTIFABRICATION_VERSION,
+    repairMode,
+    architectureSource,
+    originalArchitectureCore,
+    repairArchitectureCore,
+    singlePassArchitectureCore:
+      originalArchitectureCore || repairArchitectureCore,
+    crossPassArchitectureSynthesisBlocked:
+      crossPassArchitectureSynthesisWouldOccur,
+    architecture: {
+      original: originalArchitecture,
+      repair: repairArchitecture,
+    },
   };
 
   return merged;

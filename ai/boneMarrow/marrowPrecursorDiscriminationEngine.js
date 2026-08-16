@@ -117,6 +117,14 @@ export function evaluateMarrowPrecursorDiscrimination(result = {}) {
     ...obj(obj(result.blastAssessment).blastoidSubpopulationContext),
   };
   const fallback = fallbackMaturationSignals(result);
+  const repairArchitectureProvenance = obj(result.marrowRepairEvidenceMerge);
+  const repairAttempted =
+    obj(result.visualMorphologyEvidenceAcquisition).repairAttempted===true ||
+    Object.keys(repairArchitectureProvenance).length>0;
+  const singlePassArchitectureCore =
+    repairArchitectureProvenance.singlePassArchitectureCore===true;
+  const architectureProvenanceQualified =
+    !repairAttempted || singlePassArchitectureCore;
 
   const evidenceState = text(assessment.evidenceState || rawAssessment.evidenceState || "NOT_ASSESSABLE").toUpperCase();
   const populationPattern = text(assessment.populationPattern || rawAssessment.populationPattern || "indeterminate").toLowerCase();
@@ -251,6 +259,7 @@ export function evaluateMarrowPrecursorDiscrimination(result = {}) {
   const protectedSuspiciousBlastoid =
     marrow &&
     dualAxis.suspiciousEscalation &&
+    architectureProvenanceQualified &&
     !explicitlyNotDistinctFromContinuum &&
     !cytologyOnlyEscalationBlockedByMyeloidExpansion;
 
@@ -271,7 +280,8 @@ export function evaluateMarrowPrecursorDiscrimination(result = {}) {
     !strongBlastoidPattern &&
     (dualAxis.indeterminateZone || unresolvedImmatureCandidate);
 
-  const coherentBlastoidSubpopulation = dualAxis.subpopulationCore;
+  const coherentBlastoidSubpopulation =
+    dualAxis.subpopulationCore && architectureProvenanceQualified;
   const legacyStructuredSuspiciousSubset =
     !hasStructuredBlastoidSubpopulationContext &&
     protectedSuspiciousBlastoid;
@@ -288,6 +298,11 @@ export function evaluateMarrowPrecursorDiscrimination(result = {}) {
     dualAxisScoringVersion: MARROW_DUAL_AXIS_SCORING_VERSION,
     marrow,
     marrowScopePropagationRecoveryVersion: MARROW_SCOPE_PROPAGATION_RECOVERY_VERSION,
+    repairArchitectureProvenanceVersion:
+      repairArchitectureProvenance.repairArchitectureProvenanceVersion || null,
+    repairAttempted,
+    singlePassArchitectureCore,
+    architectureProvenanceQualified,
     classification,
     evidenceState,
     populationPattern,

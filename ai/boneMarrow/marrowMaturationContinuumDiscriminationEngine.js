@@ -111,9 +111,20 @@ export function evaluateMarrowMaturationContinuum(result={}){
   const observed =
     assessment.observed===true ||
     txt(assessment.evidenceState).toUpperCase()==="OBSERVED_POPULATION";
+  const repairArchitectureProvenance = obj(result.marrowRepairEvidenceMerge);
+  const repairAttempted =
+    obj(result.visualMorphologyEvidenceAcquisition).repairAttempted===true ||
+    Object.keys(repairArchitectureProvenance).length>0;
+  const singlePassArchitectureCore =
+    repairArchitectureProvenance.singlePassArchitectureCore===true;
+  const architectureProvenanceQualified =
+    !repairAttempted || singlePassArchitectureCore;
   const structuredPathologicSubset =
     observed ||
-    (distinct && coherent && repeated && architectureScore>=3);
+    (
+      architectureProvenanceQualified &&
+      distinct && coherent && repeated && architectureScore>=3
+    );
 
   const pathologicMaturationContinuumLock =
     obj(result.marrowPathologicMaturationContinuumLock).active===true ||
@@ -151,6 +162,9 @@ export function evaluateMarrowMaturationContinuum(result={}){
     repeatedSubset:repeated,
     monomorphicSubset:monomorphic,
     observedStructuredPopulation:observed,
+    repairArchitectureProvenanceVersion:
+      repairArchitectureProvenance.repairArchitectureProvenanceVersion || null,
+    repairAttempted,singlePassArchitectureCore,architectureProvenanceQualified,
     structuredPathologicSubset,
     pathologicMaturationContinuumLock,
     strongPhysiologicContinuum,
