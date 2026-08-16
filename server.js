@@ -83,6 +83,13 @@ import {
 } from "./ai/boneMarrow/marrowMyeloidExpansionDiscriminationEngine.js";
 
 import {
+  MARROW_DOMINANT_PATTERN_STATE_RECONCILIATION_VERSION,
+  MARROW_PRECURSOR_BLAST_SEMANTIC_SEPARATION_VERSION,
+  MARROW_GLOBAL_PATTERN_RECONCILIATION_VERSION,
+  applyMarrowDominantPatternStateReconciliation,
+} from "./ai/boneMarrow/marrowDominantPatternStateReconciliationEngine.js";
+
+import {
   MARROW_POSITIVE_CYTOLOGY_CONSISTENCY_VERSION,
   MARROW_ACQUISITION_DISCORDANCE_RECOVERY_VERSION,
   applyMarrowPositiveCytologyConsistency,
@@ -6705,6 +6712,12 @@ app.get("/runtime-version", (_req, res) => {
       MARROW_MYELOID_MATURATION_EVIDENCE_PROJECTION_VERSION,
     marrowExpansionClassificationRecoveryVersion:
       MARROW_EXPANSION_CLASSIFICATION_RECOVERY_VERSION,
+    marrowDominantPatternStateReconciliationVersion:
+      MARROW_DOMINANT_PATTERN_STATE_RECONCILIATION_VERSION,
+    marrowPrecursorBlastSemanticSeparationVersion:
+      MARROW_PRECURSOR_BLAST_SEMANTIC_SEPARATION_VERSION,
+    marrowGlobalPatternReconciliationVersion:
+      MARROW_GLOBAL_PATTERN_RECONCILIATION_VERSION,
     marrowMaturationEvidenceProjectionVersion:
       MARROW_MATURATION_EVIDENCE_PROJECTION_VERSION,
     marrowScopePropagationRecoveryVersion:
@@ -8431,6 +8444,14 @@ if (specimenGate.analysisType === "bone_marrow") {
   // "continuum => physiologic" coupling, but never suppresses a structured
   // blastoid subpopulation.
   finalResult = applyMarrowMyeloidExpansionDiscrimination(finalResult);
+
+  // BE-FIX-005.42 — reconcile all dependent marrow states only after the
+  // protected 005.38/005.41 dominant pattern has been established.
+  finalResult = applyMarrowDominantPatternStateReconciliation(finalResult);
+  console.log(
+    "BE-FIX-005.42 — MARROW DOMINANT PATTERN STATE RECONCILIATION",
+    JSON.stringify(finalResult.marrowDominantPatternStateReconciliation || {}, null, 2),
+  );
 }
 
 // ============================================================================
