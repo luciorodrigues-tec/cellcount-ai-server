@@ -6,6 +6,7 @@
 // ============================================================================
 
 export const MARROW_FINAL_CONFIDENCE_RECONCILIATION_VERSION = "BE-FIX-005.43";
+export const MARROW_TERMINAL_MORPHOLOGY_ADEQUACY_PROJECTION_LOCK_VERSION = "BE-FIX-005.47";
 
 export function buildConfidenceAnalysis({
   analysis,
@@ -23,6 +24,12 @@ export function buildConfidenceAnalysis({
   }
 
   const isLimitedField =
+    analysis?.fieldAdequacy?.limitedField === true ||
+    analysis?.fieldAdequacy?.adequateForPopulationAssessment === false ||
+    analysis?.marrowAdequacyMorphologyAxis?.adequacyClassification ===
+      "CLASS_1_LIMITED_FIELD" ||
+    analysis?.finalMarrowAuthority?.adequacyClassification ===
+      "CLASS_1_LIMITED_FIELD" ||
     analysis?.finalClassification === "CLASS_1_LIMITED_FIELD" ||
     analysis?.morphologicRiskClass === "CLASS_1_LIMITED_FIELD" ||
     analysis?.morphologicRiskClass === "CLASS_1_LIMITED_FIELD_ATYPICAL_CELL";
@@ -76,6 +83,8 @@ export function buildConfidenceAnalysis({
           limitedFieldLock: true,
           marrowFinalConfidenceReconciliationVersion:
             MARROW_FINAL_CONFIDENCE_RECONCILIATION_VERSION,
+          marrowTerminalMorphologyAdequacyProjectionLockVersion:
+            MARROW_TERMINAL_MORPHOLOGY_ADEQUACY_PROJECTION_LOCK_VERSION,
         },
 
         safetySignals: {

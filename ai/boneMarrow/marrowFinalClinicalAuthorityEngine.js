@@ -20,6 +20,7 @@
 export const MARROW_FINAL_CLINICAL_AUTHORITY_VERSION = "BE-FIX-005.46";
 export const MARROW_POST_LEGACY_RECONCILIATION_VERSION = "BE-FIX-005.46";
 export const MARROW_ADEQUACY_MORPHOLOGY_AXIS_SEPARATION_VERSION = "BE-FIX-005.46";
+export const MARROW_TERMINAL_MORPHOLOGY_ADEQUACY_PROJECTION_LOCK_VERSION = "BE-FIX-005.47";
 
 function obj(value) {
   return value && typeof value === "object" && !Array.isArray(value)
@@ -190,9 +191,14 @@ export function applyFinalMarrowAuthority(result = {}) {
     finalMarrowAuthority: authority,
     marrowAdequacyMorphologyAxis: {
       version: MARROW_ADEQUACY_MORPHOLOGY_AXIS_SEPARATION_VERSION,
+      terminalProjectionLockVersion:
+        MARROW_TERMINAL_MORPHOLOGY_ADEQUACY_PROJECTION_LOCK_VERSION,
       morphologyClassification: authority.morphologyClassification,
       adequacyClassification: authority.adequacyClassification,
       limitedField: authority.limitedField,
+      morphologyOverridesAdequacy:
+        authority.limitedField === true &&
+        authority.morphologyClassification !== null,
     },
   };
 

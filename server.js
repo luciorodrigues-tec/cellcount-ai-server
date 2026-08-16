@@ -103,6 +103,12 @@ import {
 } from "./ai/boneMarrow/marrowFinalClinicalAuthorityEngine.js";
 
 import {
+  applyMarrowMorphologyAdequacyProjectionLock,
+  MARROW_TERMINAL_MORPHOLOGY_ADEQUACY_PROJECTION_LOCK_VERSION,
+  MARROW_LIMITED_FIELD_AXIS_NON_OVERRIDE_VERSION,
+} from "./ai/boneMarrow/marrowMorphologyAdequacyProjectionLockEngine.js";
+
+import {
   MARROW_POSITIVE_CYTOLOGY_CONSISTENCY_VERSION,
   MARROW_ACQUISITION_DISCORDANCE_RECOVERY_VERSION,
   applyMarrowPositiveCytologyConsistency,
@@ -312,6 +318,7 @@ import {
 import {
   buildConfidenceAnalysis,
   MARROW_FINAL_CONFIDENCE_RECONCILIATION_VERSION,
+  MARROW_TERMINAL_MORPHOLOGY_ADEQUACY_PROJECTION_LOCK_VERSION as CONFIDENCE_MARROW_TERMINAL_MORPHOLOGY_ADEQUACY_PROJECTION_LOCK_VERSION,
 } from "./ai/confidenceEngine.js";
 
 import {
@@ -1271,6 +1278,42 @@ function detectHemoparasitePattern(result = {}) {
   };
 }
 
+function shouldPreserveTerminalMarrowMorphology(result = {}) {
+  const axis = result?.marrowAdequacyMorphologyAxis || {};
+  const authority = result?.finalMarrowAuthority || {};
+  const expansion = result?.marrowMyeloidExpansionDiscrimination || {};
+  const globalPattern = result?.globalPattern || {};
+
+  const morphologyClassification =
+    axis.morphologyClassification ||
+    authority.morphologyClassification ||
+    result?.finalClassification ||
+    null;
+
+  const protectedExpansion =
+    morphologyClassification ===
+      "MARROW_MYELOID_EXPANSION_WITH_MATURATION_PATTERN" ||
+    expansion.classification ===
+      "PATHOLOGIC_MYELOID_EXPANSION_WITH_MATURATION" ||
+    globalPattern.dominantPattern ===
+      "MARROW_PATHOLOGIC_MYELOID_EXPANSION_WITH_MATURATION";
+
+  const trueBlastoid =
+    authority?.structuredBlast?.observed === true ||
+    authority?.structuredBlast?.suspicious === true ||
+    result?.marrowBlastPopulationEvidence?.observedPopulation === true ||
+    result?.marrowBlastPopulationEvidence?.suspiciousPopulation === true;
+
+  return (
+    trueBlastoid ||
+    protectedExpansion ||
+    (
+      typeof morphologyClassification === "string" &&
+      morphologyClassification.startsWith("MARROW_")
+    )
+  );
+}
+
 function applyLimitedFieldFinalLock(result = {}) {
   if (!result || typeof result !== "object") return result;
 
@@ -1501,7 +1544,33 @@ function applyLimitedFieldFinalLock(result = {}) {
     return locked;
   }
 
-  // BE-FIX — final lock protects safety without erasing upstream morphology.
+  // BE-FIX-005.47 — adequacy cannot replace a terminal positive marrow
+  // morphology. Preserve the morphology axis and project CLASS_1 only into
+  // adequacy metadata.
+  if (isLimited && shouldPreserveTerminalMarrowMorphology(locked)) {
+    const projected =
+      applyMarrowMorphologyAdequacyProjectionLock(locked);
+
+    projected.normalityBlocked = true;
+    projected.requiresHumanReview = true;
+    projected.evidenceGovernance = {
+      ...(projected.evidenceGovernance || {}),
+      limitedField: true,
+      evidenceScope: "FIELD_SCOPED",
+      adequacyClassification: "CLASS_1_LIMITED_FIELD",
+      populationInferenceAllowed: false,
+      globalNegativeExclusionAllowed: false,
+    };
+
+    projected.confidenceAnalysis = {
+      ...(projected.confidenceAnalysis || {}),
+    };
+
+    return projected;
+  }
+
+  // Generic limited field remains a valid final class only when no positive
+  // terminal marrow morphology has been established.
   locked.finalClassification = "CLASS_1_LIMITED_FIELD";
   locked.morphologicRiskClass = "CLASS_1_LIMITED_FIELD";
   locked.riskLevel = "Campo limitado";
@@ -6797,6 +6866,12 @@ app.get("/runtime-version", (_req, res) => {
       MARROW_ADEQUACY_MORPHOLOGY_AXIS_SEPARATION_VERSION,
     marrowFinalGovernorAxisSeparationVersion:
       MARROW_FINAL_GOVERNOR_AXIS_SEPARATION_VERSION,
+    marrowTerminalMorphologyAdequacyProjectionLockVersion:
+      MARROW_TERMINAL_MORPHOLOGY_ADEQUACY_PROJECTION_LOCK_VERSION,
+    marrowLimitedFieldAxisNonOverrideVersion:
+      MARROW_LIMITED_FIELD_AXIS_NON_OVERRIDE_VERSION,
+    confidenceMarrowTerminalMorphologyAdequacyProjectionLockVersion:
+      CONFIDENCE_MARROW_TERMINAL_MORPHOLOGY_ADEQUACY_PROJECTION_LOCK_VERSION,
     marrowMaturationEvidenceProjectionVersion:
       MARROW_MATURATION_EVIDENCE_PROJECTION_VERSION,
     marrowScopePropagationRecoveryVersion:
@@ -7774,6 +7849,11 @@ if (isAtypicalPopulation) {
 
       console.log("================================");
      
+      if (specimenGate.analysisType === "bone_marrow") {
+        finalResult =
+          applyMarrowMorphologyAdequacyProjectionLock(finalResult);
+      }
+
       console.log("FINAL VALIDATED RESULT");
       console.log(
         JSON.stringify(
@@ -8137,11 +8217,30 @@ if (
   isLimitedFieldFinal &&
   !hasCriticalHematologicFinding
 ) {
-  // BE-FIX — LIMITED FIELD PRESERVATION GATE
-  // Safety remains strict, but observed morphology is not replaced by generic text.
-  finalResult.finalClassification = "CLASS_1_LIMITED_FIELD";
-  finalResult.morphologicRiskClass = "CLASS_1_LIMITED_FIELD";
-  finalResult.riskLevel = "Campo limitado";
+  const preserveTerminalMarrowMorphology =
+    shouldPreserveTerminalMarrowMorphology(finalResult);
+
+  if (preserveTerminalMarrowMorphology) {
+    // BE-FIX-005.47 — terminal morphology/adequacy axis lock.
+    finalResult =
+      applyMarrowMorphologyAdequacyProjectionLock(finalResult);
+
+    finalResult.normalityBlocked = true;
+    finalResult.requiresHumanReview = true;
+    finalResult.evidenceGovernance = {
+      ...(finalResult.evidenceGovernance || {}),
+      limitedField: true,
+      evidenceScope: "FIELD_SCOPED",
+      adequacyClassification: "CLASS_1_LIMITED_FIELD",
+      populationInferenceAllowed: false,
+      globalNegativeExclusionAllowed: false,
+    };
+  } else {
+    // Generic limited field is still valid when no positive terminal marrow
+    // morphology exists.
+    finalResult.finalClassification = "CLASS_1_LIMITED_FIELD";
+    finalResult.morphologicRiskClass = "CLASS_1_LIMITED_FIELD";
+    finalResult.riskLevel = "Campo limitado";
   finalResult.normalityBlocked = true;
   finalResult.requiresHumanReview = true;
 
@@ -8217,8 +8316,31 @@ if (
       "Avaliação de múltiplos campos da lâmina",
     ]),
   ];
+  }
 }
 
+
+if (specimenGate.analysisType === "bone_marrow") {
+  finalResult =
+    applyMarrowMorphologyAdequacyProjectionLock(finalResult);
+
+  console.log(
+    "BE-FIX-005.47 — TERMINAL MARROW MORPHOLOGY / ADEQUACY AXIS PROJECTION LOCK",
+    JSON.stringify(
+      {
+        projectionLock:
+          finalResult.marrowTerminalMorphologyAdequacyProjectionLock || {},
+        axis:
+          finalResult.marrowAdequacyMorphologyAxis || {},
+        finalClassification: finalResult.finalClassification,
+        morphologicRiskClass: finalResult.morphologicRiskClass,
+        riskCategory: finalResult.overallAssessment?.riskCategory,
+      },
+      null,
+      2,
+    ),
+  );
+}
 
 if (
   shouldClassifyAsBlast === true &&
