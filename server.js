@@ -115,7 +115,15 @@ import {
   MARROW_CONFIDENCE_CRITICALITY_AXIS_SEPARATION_VERSION,
   MARROW_BCR_ABL1_RECOMMENDATION_GATE_VERSION,
   MARROW_HIGH_SALIENCE_CRITICALITY_LOCK_VERSION,
+  MARROW_EVIDENCE_WEIGHTED_CRITICALITY_VERSION,
+  MARROW_CORE_MYELOID_SALIENCE_CALIBRATION_VERSION,
 } from "./ai/boneMarrow/marrowMyeloproliferativePatternCriticalityEngine.js";
+
+import {
+  applyMarrowResidualBlastSemanticCleanup,
+  MARROW_RESIDUAL_BLAST_SEMANTIC_CLEANUP_VERSION,
+  MARROW_IMMATURITY_MATURATION_SEMANTIC_SEPARATION_VERSION,
+} from "./ai/boneMarrow/marrowResidualBlastSemanticCleanupEngine.js";
 
 import {
   MARROW_POSITIVE_CYTOLOGY_CONSISTENCY_VERSION,
@@ -4276,6 +4284,14 @@ BE-FIX-005.50.2 — AUTORIDADE CLÍNICA TERMINAL E NARRATIVA CANÔNICA:
 - Contexto clínico conhecido (inclusive LMA) NÃO autoriza fabricar blastos, bastonetes de Auer ou qualquer morfologia ausente da evidência visual.
 - Evitar repetir a mesma conclusão em interpretiveSynthesis, clinicalMeaning, hematologicReasoning e structuredReport; cada camada deve acrescentar informação nova.
 
+BE-FIX-005.50.3 — CRITICIDADE MEDULAR PONDERADA POR EVIDÊNCIA E LIMPEZA SEMÂNTICA BLASTOIDE RESIDUAL:
+- Em expansão mieloide patológica com maturação, priorizar o núcleo morfológico: predomínio/desproporção mieloide, numerosos precursores granulocíticos, amplo espectro maturativo, formas maduras coexistentes, desvio à esquerda e campo mieloide denso.
+- Redução eritroide relativa e enriquecimento basofílico/eosinofílico são modificadores de saliência, não requisitos obrigatórios para criticidade morfológica muito alta.
+- Campo limitado e baixa confiança diagnóstica NÃO reduzem a criticidade de uma morfologia positiva robusta.
+- Suspeita blastoide residual sem arquitetura distinta, coerente e estruturada NÃO deve sobreviver como população blastoide positiva quando o padrão terminal é expansão mieloide patológica com maturação.
+- Preservar citologia imatura/focal como evidência local; nunca convertê-la em exclusão global de blastos.
+- Nunca diagnosticar LMC/LMA/MPN ou BCR::ABL1 pela imagem isolada.
+
 BE-FIX-005.31 — COERÊNCIA NARRATIVA-ESTRUTURA E RECUPERAÇÃO FISIOLÓGICA:
 - Se a narrativa disser que NÃO há população/subpopulação blastoide monomórfica, distinta ou separada do continuum maturativo, os campos blastoidSubpopulationContext NÃO podem marcar simultaneamente distinctFromMaturationContinuum=true, morphologicallyCoherent=true e repeatedSubsetAcrossField=true sem suporte citomorfológico independente convincente.
 - A expressão "múltiplas células imaturas/precursoras" não significa "subpopulação blastoide repetida". Diferenciar repetição de precursores fisiológicos de repetição de um subconjunto blastoide.
@@ -6920,11 +6936,19 @@ app.get("/runtime-version", (_req, res) => {
     marrowHighSalienceCriticalityLockVersion:
       MARROW_HIGH_SALIENCE_CRITICALITY_LOCK_VERSION,
     terminalClinicalCriticalityAuthorityVersion:
-      "BE-FIX-005.50.2",
+      "BE-FIX-005.50.3",
     canonicalNarrativeAuthorityVersion:
       "BE-FIX-005.50.2",
     positiveRbcMorphologyPreservationVersion:
       "BE-FIX-005.50.2",
+    marrowEvidenceWeightedCriticalityVersion:
+      MARROW_EVIDENCE_WEIGHTED_CRITICALITY_VERSION,
+    marrowCoreMyeloidSalienceCalibrationVersion:
+      MARROW_CORE_MYELOID_SALIENCE_CALIBRATION_VERSION,
+    marrowResidualBlastSemanticCleanupVersion:
+      MARROW_RESIDUAL_BLAST_SEMANTIC_CLEANUP_VERSION,
+    marrowImmaturityMaturationSemanticSeparationVersion:
+      MARROW_IMMATURITY_MATURATION_SEMANTIC_SEPARATION_VERSION,
     marrowMaturationEvidenceProjectionVersion:
       MARROW_MATURATION_EVIDENCE_PROJECTION_VERSION,
     marrowScopePropagationRecoveryVersion:
@@ -8768,6 +8792,28 @@ if (specimenGate.analysisType === "bone_marrow") {
 }
 
 // ============================================================================
+// BE-FIX-005.50.3 — RESIDUAL BLAST SEMANTIC CLEANUP
+// Runs after terminal marrow authority and before criticality calibration.
+// It clears stale population-level blast suspicion only when terminal evidence
+// supports pathologic myeloid expansion with maturation and lacks qualified
+// distinct/coherent/structured blastoid architecture. Local immature cytology
+// is preserved and global blast-negative exclusion remains forbidden.
+// ============================================================================
+if (specimenGate.analysisType === "bone_marrow") {
+  finalResult =
+    applyMarrowResidualBlastSemanticCleanup(finalResult);
+
+  console.log(
+    "BE-FIX-005.50.3 — RESIDUAL BLAST SEMANTIC CLEANUP",
+    JSON.stringify(
+      finalResult.marrowResidualBlastSemanticCleanup || {},
+      null,
+      2,
+    ),
+  );
+}
+
+// ============================================================================
 // BE-FIX-005.49 — MARROW MYELOPROLIFERATIVE PATTERN CORRELATION
 //                 & SEVERITY-CRITICALITY CALIBRATION
 // Runs after terminal marrow authority and before CRA so the canonical result
@@ -8788,6 +8834,20 @@ if (specimenGate.analysisType === "bone_marrow") {
           finalResult.marrowSeverityCriticality || {},
         clinicalCriticality:
           finalResult.clinicalCriticality || {},
+        evidenceWeightedCore: {
+          version:
+            finalResult.marrowMyeloproliferativePatternCorrelation
+              ?.evidenceWeightedCriticalityVersion || null,
+          coreMyeloidSignalCount:
+            finalResult.marrowMyeloproliferativePatternCorrelation
+              ?.coreMyeloidSignalCount ?? null,
+          completeCoreMyeloidSignature:
+            finalResult.marrowMyeloproliferativePatternCorrelation
+              ?.completeCoreMyeloidSignature ?? false,
+          highSalienceCriticalSignature:
+            finalResult.marrowMyeloproliferativePatternCorrelation
+              ?.highSalienceCriticalSignature ?? false,
+        },
         finalClassification:
           finalResult.finalClassification,
         morphologicRiskClass:
@@ -8840,7 +8900,8 @@ try {
 }
 
 // ============================================================================
-// BE-FIX-005.50.2 — TERMINAL CLINICAL CRITICALITY / CANONICAL PRESENTATION LOCK
+// BE-FIX-005.50.2 — TERMINAL CLINICAL CRITICALITY AUTHORITY (compatibility invariant)
+// BE-FIX-005.50.3 — TERMINAL CLINICAL CRITICALITY / CANONICAL PRESENTATION LOCK
 // Runs after CRA projection so no late presentation writer can downgrade the
 // calibrated clinical criticality.
 // ============================================================================
@@ -8873,7 +8934,7 @@ if (specimenGate.analysisType === "bone_marrow") {
         Number.isFinite(Number(clinicalCriticality.score))
           ? Number(clinicalCriticality.score)
           : null,
-      terminalClinicalCriticalityAuthorityVersion: "BE-FIX-005.50.2",
+      terminalClinicalCriticalityAuthorityVersion: "BE-FIX-005.50.3",
     };
 
     v2.presentation = {
@@ -8895,14 +8956,14 @@ if (specimenGate.analysisType === "bone_marrow") {
           (level === "CRITICAL"
             ? "PRIORITY_HEMATOLOGY_REVIEW"
             : "EXPEDITED_HEMATOLOGY_REVIEW"),
-        terminalClinicalCriticalityAuthorityVersion: "BE-FIX-005.50.2",
+        terminalClinicalCriticalityAuthorityVersion: "BE-FIX-005.50.3",
       },
-      terminalClinicalCriticalityAuthorityVersion: "BE-FIX-005.50.2",
+      terminalClinicalCriticalityAuthorityVersion: "BE-FIX-005.50.3",
     };
   }
 
   console.log(
-    "BE-FIX-005.50.2 — TERMINAL CLINICAL CRITICALITY AUTHORITY",
+    "BE-FIX-005.50.3 — TERMINAL CLINICAL CRITICALITY AUTHORITY",
     JSON.stringify(
       {
         level,

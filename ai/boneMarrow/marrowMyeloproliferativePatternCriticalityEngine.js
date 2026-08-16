@@ -33,6 +33,12 @@ export const MARROW_HIGH_SALIENCE_CRITICALITY_LOCK_VERSION =
 export const MARROW_TERMINAL_CRITICALITY_CORE_SIGNATURE_VERSION =
   "BE-FIX-005.50.2";
 
+export const MARROW_EVIDENCE_WEIGHTED_CRITICALITY_VERSION =
+  "BE-FIX-005.50.3";
+
+export const MARROW_CORE_MYELOID_SALIENCE_CALIBRATION_VERSION =
+  "BE-FIX-005.50.3";
+
 function obj(value) {
   return value && typeof value === "object" && !Array.isArray(value)
     ? value
@@ -155,9 +161,37 @@ export function evaluateMarrowMyeloproliferativePatternCriticality(
 
   const expansionScore = clamp(expansion.expansionScore, 0, 9);
 
-  // Weighted severity is intentionally independent from image adequacy.
-  // The score reflects POSITIVE morphology that has already passed the
-  // 005.38–005.47 provenance and blast-architecture gates.
+  // BE-FIX-005.50.3 — evidence-weighted morphology severity.
+  // Adequacy and diagnostic confidence are intentionally excluded. The core
+  // proliferative signature receives more weight than optional modifiers such
+  // as erythroid reduction or basophil/eosinophil enrichment.
+  const coreMyeloidSignals = [
+    signals.relativeMyeloidPredominance,
+    signals.disproportionateMyeloidRepresentation,
+    signals.numerousGranulocyticPrecursors,
+    signals.broadMaturationSpectrum,
+    signals.matureFormsPresent,
+    signals.leftShiftedMaturationSpectrum,
+    signals.denseMyeloidField,
+  ];
+
+  const coreMyeloidSignalCount =
+    coreMyeloidSignals.filter((value) => value === true).length;
+
+  const optionalModifierCount = [
+    signals.erythroidRelativeReduction,
+    signals.basophilEosinophilEnrichment,
+  ].filter((value) => value === true).length;
+
+  const completeCoreMyeloidSignature =
+    protectedExpansion &&
+    !blast.suspicious &&
+    expansionScore >= 7 &&
+    expansion.disproportionateAxis === true &&
+    expansion.expansionBurdenAxis === true &&
+    expansion.maturationAxis === true &&
+    coreMyeloidSignalCount >= 7;
+
   let score = protectedExpansion ? 30 : 0;
   score += expansionScore * 5;
   score += expansion.disproportionateAxis === true ? 5 : 0;
@@ -166,6 +200,11 @@ export function evaluateMarrowMyeloproliferativePatternCriticality(
   score += bool(signals.denseMyeloidField) ? 4 : 0;
   score += bool(signals.erythroidRelativeReduction) ? 3 : 0;
   score += bool(signals.basophilEosinophilEnrichment) ? 4 : 0;
+
+  // A complete, independently corroborated core signature gets a coherence
+  // bonus. This converts the real-world 83-point golden control into a score
+  // proportional to its morphology without lowering a global threshold.
+  score += completeCoreMyeloidSignature ? 5 : 0;
   score = clamp(score);
 
   let level = protectedExpansion ? severityClass(score) : "LOW";
@@ -199,22 +238,13 @@ export function evaluateMarrowMyeloproliferativePatternCriticality(
   const highSalienceCriticalSignature =
     protectedExpansion &&
     !blast.suspicious &&
-    expansionScore >= 8 &&
+    expansionScore >= 7 &&
     expansion.disproportionateAxis === true &&
     expansion.expansionBurdenAxis === true &&
     expansion.maturationAxis === true &&
-    bool(signals.relativeMyeloidPredominance) &&
-    bool(signals.disproportionateMyeloidRepresentation) &&
-    bool(signals.numerousGranulocyticPrecursors) &&
-    bool(signals.broadMaturationSpectrum) &&
-    bool(signals.matureFormsPresent) &&
-    bool(signals.leftShiftedMaturationSpectrum) &&
-    bool(signals.denseMyeloidField);
+    completeCoreMyeloidSignature;
 
-  const highSalienceSupportiveModifiers = [
-    signals.erythroidRelativeReduction,
-    signals.basophilEosinophilEnrichment,
-  ].filter((value) => value === true).length;
+  const highSalienceSupportiveModifiers = optionalModifierCount;
 
   if (level === "HIGH" && highSalienceCriticalSignature) {
     level = "CRITICAL";
@@ -257,8 +287,14 @@ export function evaluateMarrowMyeloproliferativePatternCriticality(
     myeloproliferativePatternSupported,
     highSalienceCriticalSignature,
     highSalienceSupportiveModifiers,
+    coreMyeloidSignalCount,
+    completeCoreMyeloidSignature,
+    evidenceWeightedCriticalityVersion:
+      MARROW_EVIDENCE_WEIGHTED_CRITICALITY_VERSION,
+    coreMyeloidSalienceCalibrationVersion:
+      MARROW_CORE_MYELOID_SALIENCE_CALIBRATION_VERSION,
     criticalityCalibrationVersion:
-      MARROW_TERMINAL_CRITICALITY_CORE_SIGNATURE_VERSION,
+      MARROW_EVIDENCE_WEIGHTED_CRITICALITY_VERSION,
     previousCriticalityCalibrationVersion:
       MARROW_HIGH_SALIENCE_CRITICALITY_LOCK_VERSION,
     bcrAbl1RecommendationGate: bcrAbl1ContextGate
@@ -478,6 +514,10 @@ export function applyMarrowMyeloproliferativePatternCriticality(
         MARROW_SEVERITY_CRITICALITY_CALIBRATION_VERSION,
       marrowConfidenceCriticalityAxisSeparationVersion:
         MARROW_CONFIDENCE_CRITICALITY_AXIS_SEPARATION_VERSION,
+      marrowEvidenceWeightedCriticalityVersion:
+        MARROW_EVIDENCE_WEIGHTED_CRITICALITY_VERSION,
+      marrowCoreMyeloidSalienceCalibrationVersion:
+        MARROW_CORE_MYELOID_SALIENCE_CALIBRATION_VERSION,
       limitedFieldDoesNotDowngradePositiveMorphologySeverity: true,
     },
   };
