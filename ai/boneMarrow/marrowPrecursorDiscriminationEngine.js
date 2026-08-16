@@ -80,7 +80,11 @@ function fallbackMaturationSignals(result = {}) {
 }
 
 export function evaluateMarrowPrecursorDiscrimination(result = {}) {
-  const specimenType = text(result.specimenType || obj(result.rawResponse).specimenAssessment?.specimenType).toUpperCase();
+  const specimenType = text(
+    result.specimenType ||
+    obj(result.specimenAssessment).specimenType ||
+    obj(result.rawResponse).specimenAssessment?.specimenType
+  ).toUpperCase();
   const marrow = MARROW_TYPES.has(specimenType) || specimenType.includes("BONE_MARROW");
   const assessment = obj(result.blastAssessment);
   const rawAssessment = obj(obj(result.rawResponse).blastAssessment);
@@ -102,6 +106,9 @@ export function evaluateMarrowPrecursorDiscrimination(result = {}) {
     assessment.evidenceState ||
     rawAssessment.evidenceState
   ).toUpperCase();
+  const maturationContinuumLock = obj(result.marrowPhysiologicMaturationContinuumLock);
+  const physiologicContinuumProtected =
+    maturationContinuumLock.active === true;
   const positiveCytologyConsistency = obj(result.marrowPositiveCytologyConsistency);
   const unresolvedPositiveCytology =
     positiveCytologyConsistency.unresolvedPositiveCytology === true ||
@@ -211,7 +218,7 @@ export function evaluateMarrowPrecursorDiscrimination(result = {}) {
 
   const strongPhysiologicPattern =
     marrow &&
-    !unresolvedImmatureCandidate &&
+    (physiologicContinuumProtected || !unresolvedImmatureCandidate) &&
     !protectedObservedBlastoid &&
     !protectedSuspiciousBlastoid &&
     dualAxis.physiologicDominance;
@@ -252,6 +259,8 @@ export function evaluateMarrowPrecursorDiscrimination(result = {}) {
       : null,
     immatureCellCytologyRecoveryVersion: "BE-FIX-005.33",
     positiveCytologyConsistencyVersion: "BE-FIX-005.35",
+    maturationContinuumDiscriminationVersion: "BE-FIX-005.37",
+    physiologicContinuumProtected,
     unresolvedPositiveCytology,
     physiologicSignals,
     blastSpecificSignals,

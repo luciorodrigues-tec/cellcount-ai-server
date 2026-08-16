@@ -73,11 +73,16 @@ export function readRecoveredMarrowBlastEvidence(result={}){
     up(b.spatialDistribution).includes("ACROSS_FIELD");
   const coherentSubset=morphologicallyCoherent===true ||
     sub.coherentBlastoidSubsetObserved===true;
+  const physiologicContinuumLock =
+    obj(result.marrowPhysiologicMaturationContinuumLock).active===true;
   const structuredPositive =
-    positiveState(b.evidenceState) ||
-    (blastLikeCount!==null&&blastLikeCount>=1&&positiveCytologyCount>=2) ||
-    (blastLikeCount!==null&&blastLikeCount>=1&&featureCount!==null&&featureCount>=2&&repeatedPattern) ||
-    (positiveCytologyCount>=3&&repeatedPattern&&coherentSubset);
+    !physiologicContinuumLock &&
+    (
+      positiveState(b.evidenceState) ||
+      (blastLikeCount!==null&&blastLikeCount>=1&&positiveCytologyCount>=2) ||
+      (blastLikeCount!==null&&blastLikeCount>=1&&featureCount!==null&&featureCount>=2&&repeatedPattern) ||
+      (positiveCytologyCount>=3&&repeatedPattern&&coherentSubset)
+    );
 
   return {
     version:MARROW_RECOVERED_CYTOLOGY_PROJECTION_VERSION,
@@ -87,7 +92,7 @@ export function readRecoveredMarrowBlastEvidence(result={}){
     highNCRatio,openFineChromatin,nucleoli,scantBasophilicCytoplasm,
     morphologicallyCoherent,repeatedSubsetAcrossField,distinctFromMaturationContinuum,
     positiveCytologyCount,characterizedCytologyCount,repeatedPattern,coherentSubset,
-    structuredPositive,
+    physiologicContinuumLock,structuredPositive,
   };
 }
 

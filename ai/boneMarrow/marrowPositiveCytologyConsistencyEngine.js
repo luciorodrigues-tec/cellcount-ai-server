@@ -90,10 +90,15 @@ export function evaluateMarrowPositiveCytologyDiscordance(result={}){
   const positiveState=[
     "OBSERVED_POPULATION","SUSPICIOUS_POPULATION","FOCAL_SUSPICION"
   ].includes(upper(assessment.evidenceState));
+  const physiologicContinuumLock =
+    obj(result.marrowPhysiologicMaturationContinuumLock).active===true;
   const structuredPositive =
-    positiveState ||
-    obj(result.marrowPositiveBlastEvidenceLock).active===true ||
-    obj(result.marrowRecoveredCytologyProjection).structuredPositive===true;
+    !physiologicContinuumLock &&
+    (
+      positiveState ||
+      obj(result.marrowPositiveBlastEvidenceLock).active===true ||
+      obj(result.marrowRecoveredCytologyProjection).structuredPositive===true
+    );
 
   // Narrow 005.35 state: there is acquired positive cytology in a repeated
   // immature population, but not enough architecture to call blasts.
@@ -102,6 +107,7 @@ export function evaluateMarrowPositiveCytologyDiscordance(result={}){
     multipleImmature &&
     repeatedImmature &&
     positiveCytologyCount>=1 &&
+    !physiologicContinuumLock &&
     !structuredPositive &&
     (!structuredRepeat || !coherentSubset || !distinctSubset ||
       narrativeStructuredDiscordance);
@@ -112,7 +118,7 @@ export function evaluateMarrowPositiveCytologyDiscordance(result={}){
     immatureCount,multipleImmature,repeatedImmature,
     characterizedCytologyCount,positiveCytologyCount,
     narrativeStructuredDiscordance,structuredRepeat,
-    coherentSubset,distinctSubset,structuredPositive,
+    coherentSubset,distinctSubset,physiologicContinuumLock,structuredPositive,
     unresolvedPositiveCytology,
     state:unresolvedPositiveCytology
       ?"UNRESOLVED_BLASTOID_CYTOLOGY"

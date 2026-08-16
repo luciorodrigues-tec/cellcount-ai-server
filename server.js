@@ -65,6 +65,12 @@ import {
 } from "./ai/boneMarrow/marrowRecoveredCytologyProjectionEngine.js";
 
 import {
+  MARROW_MATURATION_CONTINUUM_DISCRIMINATION_VERSION,
+  MARROW_PHYSIOLOGIC_IMMATURITY_CONTAINMENT_VERSION,
+  applyMarrowMaturationContinuumDiscrimination,
+} from "./ai/boneMarrow/marrowMaturationContinuumDiscriminationEngine.js";
+
+import {
   MARROW_POSITIVE_CYTOLOGY_CONSISTENCY_VERSION,
   MARROW_ACQUISITION_DISCORDANCE_RECOVERY_VERSION,
   applyMarrowPositiveCytologyConsistency,
@@ -4513,6 +4519,19 @@ BE-FIX-005.31 — COERÊNCIA NARRATIVA-ESTRUTURA E RECUPERAÇÃO FISIOLÓGICA:
         ),
       );
 
+      parsed = applyMarrowMaturationContinuumDiscrimination(parsed);
+      console.log(
+        "BE-FIX-005.37 — MARROW MATURATION CONTINUUM VS PATHOLOGIC BLAST POPULATION",
+        JSON.stringify(
+          {
+            discrimination: parsed.marrowMaturationContinuumDiscrimination || {},
+            lock: parsed.marrowPhysiologicMaturationContinuumLock || {},
+          },
+          null,
+          2,
+        ),
+      );
+
       parsed = applyMarrowImmatureCellCytologyRecovery(parsed);
       console.log(
         "BE-FIX-005.33 — MARROW IMMATURE-CELL CYTOLOGY RECOVERY",
@@ -6574,6 +6593,10 @@ app.get("/runtime-version", (_req, res) => {
       MARROW_REPAIR_EVIDENCE_MERGE_VERSION,
     marrowPositiveCytologyCardinalityPreservationVersion:
       MARROW_POSITIVE_CYTOLOGY_CARDINALITY_PRESERVATION_VERSION,
+    marrowMaturationContinuumDiscriminationVersion:
+      MARROW_MATURATION_CONTINUUM_DISCRIMINATION_VERSION,
+    marrowPhysiologicImmaturityContainmentVersion:
+      MARROW_PHYSIOLOGIC_IMMATURITY_CONTAINMENT_VERSION,
     reactiveLymphoidEvidenceSentinelVersion:
       REACTIVE_LYMPHOID_EVIDENCE_SENTINEL_VERSION,
     canonicalClinicalResultArchitectureVersion:
