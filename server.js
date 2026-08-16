@@ -90,6 +90,12 @@ import {
 } from "./ai/boneMarrow/marrowDominantPatternStateReconciliationEngine.js";
 
 import {
+  applyMarrowPositiveBlastEvidenceSemanticSupersession,
+  MARROW_POSITIVE_BLAST_EVIDENCE_SEMANTIC_SUPERSESSION_VERSION,
+  MARROW_FINAL_BLAST_PROJECTION_LOCK_VERSION,
+} from "./ai/boneMarrow/marrowPositiveBlastEvidenceSemanticSupersessionEngine.js";
+
+import {
   MARROW_POSITIVE_CYTOLOGY_CONSISTENCY_VERSION,
   MARROW_ACQUISITION_DISCORDANCE_RECOVERY_VERSION,
   applyMarrowPositiveCytologyConsistency,
