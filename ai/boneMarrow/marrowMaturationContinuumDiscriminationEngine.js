@@ -103,10 +103,15 @@ export function evaluateMarrowMaturationContinuum(result={}){
     observed ||
     (distinct && coherent && repeated && architectureScore>=3);
 
+  const pathologicMaturationContinuumLock =
+    obj(result.marrowPathologicMaturationContinuumLock).active===true ||
+    obj(obj(result.rawResponse).marrowPathologicMaturationContinuumLock).active===true;
+
   const strongPhysiologicContinuum =
     marrowScope(result) &&
     physiologicScore>=3 &&
     maturationContinuum &&
+    !pathologicMaturationContinuumLock &&
     !structuredPathologicSubset;
 
   const isolatedImmaturityTraits =
@@ -130,6 +135,7 @@ export function evaluateMarrowMaturationContinuum(result={}){
     monomorphicSubset:monomorphic,
     observedStructuredPopulation:observed,
     structuredPathologicSubset,
+    pathologicMaturationContinuumLock,
     strongPhysiologicContinuum,
     isolatedImmaturityTraits,
     falseBlastPromotionRisk,

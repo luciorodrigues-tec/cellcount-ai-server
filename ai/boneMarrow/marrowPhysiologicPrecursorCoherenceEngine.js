@@ -130,7 +130,13 @@ export function applyMarrowPhysiologicPrecursorCoherence(result = {}) {
   if (!result || typeof result !== "object") return result;
 
   const discrimination = pickDiscrimination(result);
-  const physiologicDominance = isPhysiologicDominant(discrimination);
+  const pathologicMyeloidExpansion =
+    obj(result.marrowPathologicMaturationContinuumLock).active === true ||
+    obj(obj(result.rawResponse).marrowPathologicMaturationContinuumLock).active === true ||
+    discrimination.pathologicMyeloidExpansionProtected === true;
+  const physiologicDominance =
+    !pathologicMyeloidExpansion &&
+    isPhysiologicDominant(discrimination);
 
   if (!physiologicDominance) {
     return {
@@ -139,6 +145,7 @@ export function applyMarrowPhysiologicPrecursorCoherence(result = {}) {
         version: MARROW_PHYSIOLOGIC_PRECURSOR_COHERENCE_VERSION,
         active: false,
         physiologicDominance: false,
+        pathologicMyeloidExpansion,
         positiveBlastEvidenceSuppressed: false,
       },
     };

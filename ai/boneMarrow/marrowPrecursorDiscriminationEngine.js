@@ -109,6 +109,12 @@ export function evaluateMarrowPrecursorDiscrimination(result = {}) {
   const maturationContinuumLock = obj(result.marrowPhysiologicMaturationContinuumLock);
   const physiologicContinuumProtected =
     maturationContinuumLock.active === true;
+  const pathologicMaturationContinuumLock = {
+    ...obj(obj(result.rawResponse).marrowPathologicMaturationContinuumLock),
+    ...obj(result.marrowPathologicMaturationContinuumLock),
+  };
+  const pathologicMyeloidExpansionProtected =
+    pathologicMaturationContinuumLock.active === true;
   const positiveCytologyConsistency = obj(result.marrowPositiveCytologyConsistency);
   const unresolvedPositiveCytology =
     positiveCytologyConsistency.unresolvedPositiveCytology === true ||
@@ -218,6 +224,7 @@ export function evaluateMarrowPrecursorDiscrimination(result = {}) {
 
   const strongPhysiologicPattern =
     marrow &&
+    !pathologicMyeloidExpansionProtected &&
     (physiologicContinuumProtected || !unresolvedImmatureCandidate) &&
     !protectedObservedBlastoid &&
     !protectedSuspiciousBlastoid &&
@@ -239,6 +246,7 @@ export function evaluateMarrowPrecursorDiscrimination(result = {}) {
 
   let classification = "NOT_APPLICABLE";
   if (protectedObservedBlastoid || strongBlastoidPattern) classification = "BLASTOID_PATTERN_SUPPORTED";
+  else if (pathologicMyeloidExpansionProtected) classification = "PATHOLOGIC_MYELOID_EXPANSION_WITH_MATURATION";
   else if (strongPhysiologicPattern) classification = "PHYSIOLOGIC_PRECURSOR_PATTERN";
   else if (ambiguousPrecursorVsBlast) classification = "INDETERMINATE_PRECURSOR_VS_BLAST";
 
@@ -260,7 +268,9 @@ export function evaluateMarrowPrecursorDiscrimination(result = {}) {
     immatureCellCytologyRecoveryVersion: "BE-FIX-005.33",
     positiveCytologyConsistencyVersion: "BE-FIX-005.35",
     maturationContinuumDiscriminationVersion: "BE-FIX-005.37",
+    myeloidExpansionDiscriminationVersion: "BE-FIX-005.38",
     physiologicContinuumProtected,
+    pathologicMyeloidExpansionProtected,
     unresolvedPositiveCytology,
     physiologicSignals,
     blastSpecificSignals,
@@ -306,7 +316,22 @@ export function applyMarrowPrecursorDiscrimination(result = {}) {
     whatAISees: { ...obj(result.whatAISees) },
   };
 
-  if (discrimination.strongPhysiologicPattern) {
+  if (discrimination.pathologicMyeloidExpansionProtected) {
+    output.findings.blastSuspicion = false;
+    output.findings.monomorphicPopulation = false;
+    output.findings.immatureCells = false;
+    output.findings.myeloidExpansionPattern = true;
+    output.finalClassification =
+      "MARROW_MYELOID_EXPANSION_WITH_MATURATION_PATTERN";
+    output.morphologicRiskClass =
+      "MARROW_MYELOID_EXPANSION_WITH_MATURATION_PATTERN";
+    output.riskLevel =
+      "Expansão mieloide/granulocítica relevante com maturação preservada";
+    output.normalityBlocked = true;
+    output.requiresHumanReview = true;
+  }
+
+  else if (discrimination.strongPhysiologicPattern) {
     output.findings.blastSuspicion = false;
     output.findings.blastEvidenceState = "NOT_OBSERVED_IN_EVALUABLE_FIELD";
     output.findings.monomorphicPopulation = false;

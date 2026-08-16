@@ -71,6 +71,12 @@ import {
 } from "./ai/boneMarrow/marrowMaturationContinuumDiscriminationEngine.js";
 
 import {
+  MARROW_MYELOID_EXPANSION_DISCRIMINATION_VERSION,
+  MARROW_PATHOLOGIC_MATURATION_CONTINUUM_VERSION,
+  applyMarrowMyeloidExpansionDiscrimination,
+} from "./ai/boneMarrow/marrowMyeloidExpansionDiscriminationEngine.js";
+
+import {
   MARROW_POSITIVE_CYTOLOGY_CONSISTENCY_VERSION,
   MARROW_ACQUISITION_DISCORDANCE_RECOVERY_VERSION,
   applyMarrowPositiveCytologyConsistency,
@@ -3980,7 +3986,18 @@ CONTRATO JSON MEDULAR OBRIGATÓRIO:
     "status": "present|notObserved|notAssessable|indeterminate",
     "maturation": "",
     "dysplasia": "",
-    "summary": ""
+    "summary": "",
+    "expansionContext": {
+      "relativeMyeloidPredominance": null,
+      "broadMaturationSpectrum": null,
+      "numerousGranulocyticPrecursors": null,
+      "matureNeutrophilicFormsPresent": null,
+      "leftShiftedMaturationSpectrum": null,
+      "basophilEosinophilEnrichment": null,
+      "erythroidRelativeReduction": null,
+      "disproportionateMyeloidRepresentation": null,
+      "denseMyeloidField": null
+    }
   },
   "erythroidSeries": {
     "status": "present|notObserved|notAssessable|indeterminate",
@@ -4106,6 +4123,19 @@ BE-FIX-005.28 — REFORÇO DA AQUISIÇÃO DE EVIDÊNCIA BLASTOIDE MEDULAR:
 - repeatedAcrossField=true somente se a morfologia imatura/blastoide se repetir em múltiplas células/regiões do campo; se a narrativa disser repetição, este campo deve refletir isso.
 - Não transformar diversidade maturativa em veto contra subpopulação blastoide.
 - Não transformar linguagem narrativa em diagnóstico. O backend fará reconciliação e scoring determinísticos.
+
+BE-FIX-005.38 — EXPANSÃO MIELOIDE COM MATURAÇÃO:
+- Continuidade maturativa NÃO significa automaticamente padrão fisiológico.
+- Avaliar myeloidSeries.expansionContext em separado da pesquisa de blastos.
+- relativeMyeloidPredominance=true somente quando a série mieloide/granulocítica estiver visualmente desproporcional em relação às demais linhagens no campo.
+- broadMaturationSpectrum=true quando coexistirem múltiplos estágios granulocíticos, incluindo precursores/intermediários e formas maduras.
+- numerousGranulocyticPrecursors=true quando a carga de precursores granulocíticos for claramente aumentada no campo; não usar apenas pela presença fisiológica de precursores.
+- disproportionateMyeloidRepresentation=true requer expansão visual relativa da série mieloide, não apenas alta celularidade.
+- leftShiftedMaturationSpectrum=true quando houver aumento relativo de formas precursoras/intermediárias mantendo maturação.
+- erythroidRelativeReduction=true somente quando a série eritroide estiver relativamente menos representada no campo, sem inferir relação M:E global por imagem isolada.
+- basophilEosinophilEnrichment=true somente quando houver aumento visual sustentado dessas formas; se não avaliável, usar null.
+- Um padrão com expansão mieloide + amplo espectro maturativo + formas maduras, SEM subpopulação blastoide distinta/coerente/repetida, deve ser descrito como expansão mieloide com maturação, não como padrão fisiológico automático e não como blastose.
+- NÃO diagnosticar LMC, neoplasia mieloproliferativa ou BCR::ABL1 pela imagem. O backend fará a discriminação morfológica determinística.
 
 BE-FIX-005.31 — COERÊNCIA NARRATIVA-ESTRUTURA E RECUPERAÇÃO FISIOLÓGICA:
 - Se a narrativa disser que NÃO há população/subpopulação blastoide monomórfica, distinta ou separada do continuum maturativo, os campos blastoidSubpopulationContext NÃO podem marcar simultaneamente distinctFromMaturationContinuum=true, morphologicallyCoherent=true e repeatedSubsetAcrossField=true sem suporte citomorfológico independente convincente.
@@ -4519,6 +4549,19 @@ BE-FIX-005.31 — COERÊNCIA NARRATIVA-ESTRUTURA E RECUPERAÇÃO FISIOLÓGICA:
         ),
       );
 
+      parsed = applyMarrowMyeloidExpansionDiscrimination(parsed);
+      console.log(
+        "BE-FIX-005.38 — MARROW MYELOID EXPANSION / PATHOLOGIC MATURATION CONTINUUM",
+        JSON.stringify(
+          {
+            discrimination: parsed.marrowMyeloidExpansionDiscrimination || {},
+            lock: parsed.marrowPathologicMaturationContinuumLock || {},
+          },
+          null,
+          2,
+        ),
+      );
+
       parsed = applyMarrowMaturationContinuumDiscrimination(parsed);
       console.log(
         "BE-FIX-005.37 — MARROW MATURATION CONTINUUM VS PATHOLOGIC BLAST POPULATION",
@@ -4626,6 +4669,12 @@ BE-FIX-005.31 — COERÊNCIA NARRATIVA-ESTRUTURA E RECUPERAÇÃO FISIOLÓGICA:
     // Compatibility layer for current UI. The canonical source is now
     // localMorphologyEvidence; observedMorphology remains a legacy projection.
     mergedAnalysis = applyMorphologyEvidencePreservation(mergedAnalysis);
+
+    // BE-FIX-005.38 — preserve the third marrow continuum state after
+    // legacy normalization, before physiologic anti-escalation can run.
+    if (analysisType === "bone_marrow") {
+      mergedAnalysis = applyMarrowMyeloidExpansionDiscrimination(mergedAnalysis);
+    }
 
     // BE-FIX-005.29 — project structured positive marrow evidence before
     // field-adequacy evaluates NEGATIVE screening assessability.
@@ -6597,6 +6646,10 @@ app.get("/runtime-version", (_req, res) => {
       MARROW_MATURATION_CONTINUUM_DISCRIMINATION_VERSION,
     marrowPhysiologicImmaturityContainmentVersion:
       MARROW_PHYSIOLOGIC_IMMATURITY_CONTAINMENT_VERSION,
+    marrowMyeloidExpansionDiscriminationVersion:
+      MARROW_MYELOID_EXPANSION_DISCRIMINATION_VERSION,
+    marrowPathologicMaturationContinuumVersion:
+      MARROW_PATHOLOGIC_MATURATION_CONTINUUM_VERSION,
     reactiveLymphoidEvidenceSentinelVersion:
       REACTIVE_LYMPHOID_EVIDENCE_SENTINEL_VERSION,
     canonicalClinicalResultArchitectureVersion:
@@ -8263,6 +8316,12 @@ if (specimenGate.analysisType === "bone_marrow") {
   finalResult = applyMarrowPrecursorDiscrimination(finalResult);
   finalResult = applyMarrowBlastPopulationGovernance(finalResult);
   finalResult = applyMarrowPhysiologicPrecursorCoherence(finalResult);
+
+  // BE-FIX-005.38 — final third-axis lock. It may recover a pathologic
+  // myeloid-expansion pattern from legacy "immatureCells => blast" or
+  // "continuum => physiologic" coupling, but never suppresses a structured
+  // blastoid subpopulation.
+  finalResult = applyMarrowMyeloidExpansionDiscrimination(finalResult);
 }
 
 // ============================================================================
