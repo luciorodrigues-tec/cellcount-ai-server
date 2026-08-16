@@ -4,6 +4,10 @@
 // ============================================================================
 
 import { evaluateReactiveLymphoidEvidence } from "./reactiveLymphoidEvidenceSentinel.js";
+import {
+  evaluateMarrowPositiveBlastEvidenceSemanticSupersession,
+  MARROW_POSITIVE_BLAST_EVIDENCE_SEMANTIC_SUPERSESSION_VERSION,
+} from "./boneMarrow/marrowPositiveBlastEvidenceSemanticSupersessionEngine.js";
 
 export const MARROW_GLOBAL_PATTERN_COHERENCE_RECONCILIATION_VERSION = "BE-FIX-005.43";
 
@@ -12,6 +16,13 @@ function asObject(value) {
 }
 
 function hasPositiveMarrowBlastEvidence(result = {}) {
+  const semanticSupersession =
+    evaluateMarrowPositiveBlastEvidenceSemanticSupersession(result);
+
+  if (semanticSupersession.active === true) {
+    return false;
+  }
+
   const rawBlast = asObject(result?.rawResponse?.blastAssessment);
   const directBlast = asObject(result?.blastAssessment);
   const lmeBlast = asObject(result?.localMorphologyEvidence?.marrow?.blastPopulationEvidence);
@@ -119,6 +130,8 @@ export function analyzeGlobalPattern(result = {}) {
   const atypical = findings.atypicalLymphocytes === true || findings.largeMononuclearCells === true ||
     findings.atypicalPopulation === true || monomorphic;
   const marrowPositiveBlastEvidence = hasPositiveMarrowBlastEvidence(result);
+  const marrowBlastSemanticSupersession =
+    evaluateMarrowPositiveBlastEvidenceSemanticSupersession(result);
   const blastLike = marrowPositiveBlastEvidence || findings.blastSuspicion === true ||
     (findings.immatureCells === true && !physiologicPrecursorPattern);
 
@@ -167,6 +180,10 @@ export function analyzeGlobalPattern(result = {}) {
     marrowPositiveBlastEvidence,
     physiologicPrecursorPattern,
     pathologicMyeloidExpansionPattern,
+    marrowPositiveBlastEvidenceSemanticSupersession:
+      marrowBlastSemanticSupersession,
+    marrowPositiveBlastEvidenceSemanticSupersessionVersion:
+      MARROW_POSITIVE_BLAST_EVIDENCE_SEMANTIC_SUPERSESSION_VERSION,
     marrowFinalConfidenceReconciliationVersion: "BE-FIX-005.43",
     marrowGlobalPatternCoherenceReconciliationVersion: MARROW_GLOBAL_PATTERN_COHERENCE_RECONCILIATION_VERSION,
     globalPatternCoherenceVersion: MARROW_GLOBAL_PATTERN_COHERENCE_RECONCILIATION_VERSION,

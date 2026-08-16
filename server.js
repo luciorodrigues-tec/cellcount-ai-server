@@ -4608,6 +4608,7 @@ BE-FIX-005.31 — COERÊNCIA NARRATIVA-ESTRUTURA E RECUPERAÇÃO FISIOLÓGICA:
       );
 
       parsed = applyMarrowMyeloidExpansionDiscrimination(parsed);
+      parsed = applyMarrowPositiveBlastEvidenceSemanticSupersession(parsed);
       console.log(
         "BE-FIX-005.38 — MARROW MYELOID EXPANSION / PATHOLOGIC MATURATION CONTINUUM",
         JSON.stringify(
@@ -4772,6 +4773,7 @@ BE-FIX-005.31 — COERÊNCIA NARRATIVA-ESTRUTURA E RECUPERAÇÃO FISIOLÓGICA:
     // legacy normalization, before physiologic anti-escalation can run.
     if (analysisType === "bone_marrow") {
       mergedAnalysis = applyMarrowMyeloidExpansionDiscrimination(mergedAnalysis);
+      mergedAnalysis = applyMarrowPositiveBlastEvidenceSemanticSupersession(mergedAnalysis);
     }
 
     // BE-FIX-005.29 — project structured positive marrow evidence before
@@ -4863,6 +4865,13 @@ if (
         mergedAnalysis,
       );
 
+    if (analysisType === "bone_marrow") {
+      mergedAnalysis =
+        applyMarrowPositiveBlastEvidenceSemanticSupersession(
+          mergedAnalysis,
+        );
+    }
+
     const globalPattern =
       analyzeGlobalPattern(
         mergedAnalysis,
@@ -4872,6 +4881,10 @@ if (
       globalPattern;
 
     if (analysisType === "bone_marrow") {
+      mergedAnalysis =
+        applyMarrowPositiveBlastEvidenceSemanticSupersession(
+          mergedAnalysis,
+        );
       mergedAnalysis = applyMarrowPositiveBlastEvidencePreservation(mergedAnalysis);
       mergedAnalysis = applyMarrowPhysiologicPrecursorCoherence(mergedAnalysis);
     }
@@ -5499,6 +5512,15 @@ if (
       analysisSource,
     });
     const confidenceTiming = logStep(requestId, "CONFIDENCE ENGINE", confidenceStart);
+
+    if (analysisType === "bone_marrow") {
+      mergedAnalysis.confidenceAnalysis = confidenceAnalysis;
+      mergedAnalysis.executiveSummary = {
+        ...(mergedAnalysis.executiveSummary || {}),
+        confidence:
+          `${Number(confidenceAnalysis?.globalConfidenceScore || 0)}%`,
+      };
+    }
 
     let finalStructuredReport = mergedAnalysis?.structuredReport || {};
 
@@ -6724,6 +6746,10 @@ app.get("/runtime-version", (_req, res) => {
       MARROW_FINAL_CONFIDENCE_RECONCILIATION_VERSION,
     marrowFinalGlobalPatternCoherenceVersion:
       MARROW_GLOBAL_PATTERN_COHERENCE_RECONCILIATION_VERSION,
+    marrowPositiveBlastEvidenceSemanticSupersessionVersion:
+      MARROW_POSITIVE_BLAST_EVIDENCE_SEMANTIC_SUPERSESSION_VERSION,
+    marrowFinalBlastProjectionLockVersion:
+      MARROW_FINAL_BLAST_PROJECTION_LOCK_VERSION,
     marrowMaturationEvidenceProjectionVersion:
       MARROW_MATURATION_EVIDENCE_PROJECTION_VERSION,
     marrowScopePropagationRecoveryVersion:
@@ -8451,12 +8477,38 @@ if (specimenGate.analysisType === "bone_marrow") {
   // blastoid subpopulation.
   finalResult = applyMarrowMyeloidExpansionDiscrimination(finalResult);
 
+  // BE-FIX-005.44 — legacy focal positive evidence is contextualized after
+  // the protected myeloid-expansion state is known, without erasing focal
+  // cytology and without creating a global blast-negative conclusion.
+  finalResult =
+    applyMarrowPositiveBlastEvidenceSemanticSupersession(
+      finalResult,
+    );
+
   // BE-FIX-005.42 — reconcile all dependent marrow states only after the
   // protected 005.38/005.41 dominant pattern has been established.
   finalResult = applyMarrowDominantPatternStateReconciliation(finalResult);
+  finalResult =
+    applyMarrowPositiveBlastEvidenceSemanticSupersession(
+      finalResult,
+    );
   console.log(
     "BE-FIX-005.42 — MARROW DOMINANT PATTERN STATE RECONCILIATION",
     JSON.stringify(finalResult.marrowDominantPatternStateReconciliation || {}, null, 2),
+  );
+
+  console.log(
+    "BE-FIX-005.44 — MARROW POSITIVE BLAST EVIDENCE SEMANTIC SUPERSESSION / FINAL PROJECTION LOCK",
+    JSON.stringify(
+      {
+        semanticSupersession:
+          finalResult.marrowPositiveBlastEvidenceSemanticSupersession || {},
+        finalProjectionLock:
+          finalResult.marrowFinalBlastProjectionLock || {},
+      },
+      null,
+      2,
+    ),
   );
 }
 

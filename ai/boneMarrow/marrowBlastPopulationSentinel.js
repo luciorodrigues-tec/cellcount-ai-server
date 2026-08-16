@@ -6,6 +6,11 @@ import {
   MARROW_DUAL_AXIS_SCORING_VERSION,
 } from "./marrowPrecursorDiscriminationEngine.js";
 
+import {
+  evaluateMarrowPositiveBlastEvidenceSemanticSupersession,
+  MARROW_POSITIVE_BLAST_EVIDENCE_SEMANTIC_SUPERSESSION_VERSION,
+} from "./marrowPositiveBlastEvidenceSemanticSupersessionEngine.js";
+
 // ============================================================================
 // CELLCOUNT ENTERPRISE
 // BE-FIX-005.24 — MARROW BLAST-POPULATION RECOGNITION & FINDING-FIRST GOVERNANCE
@@ -134,11 +139,15 @@ export function evaluateMarrowBlastPopulationEvidence(result = {}) {
     !capAtIndeterminate &&
     dualAxis.suspiciousEscalation === true;
 
+  const semanticSupersession =
+    evaluateMarrowPositiveBlastEvidenceSemanticSupersession(result);
+
   const focalSuspicion =
     marrow &&
     !observedPopulation &&
     !suspiciousPopulation &&
-    evidenceState === "FOCAL_SUSPICION";
+    evidenceState === "FOCAL_SUSPICION" &&
+    semanticSupersession.active !== true;
 
   return {
     version: MARROW_BLAST_POPULATION_GOVERNANCE_VERSION,
@@ -155,6 +164,9 @@ export function evaluateMarrowBlastPopulationEvidence(result = {}) {
     focalSuspicion,
     positivePopulationFinding:
       observedPopulation || suspiciousPopulation,
+    semanticSupersession,
+    semanticSupersessionVersion:
+      MARROW_POSITIVE_BLAST_EVIDENCE_SEMANTIC_SUPERSESSION_VERSION,
     precursorDiscrimination,
     dualAxisScoring: precursorDiscrimination.dualAxis || null,
     physiologicPrecursorPattern:

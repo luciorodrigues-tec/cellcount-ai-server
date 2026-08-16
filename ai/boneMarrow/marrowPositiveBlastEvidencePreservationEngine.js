@@ -1,3 +1,9 @@
+import {
+  applyMarrowPositiveBlastEvidenceSemanticSupersession,
+  evaluateMarrowPositiveBlastEvidenceSemanticSupersession,
+  MARROW_POSITIVE_BLAST_EVIDENCE_SEMANTIC_SUPERSESSION_VERSION,
+} from "./marrowPositiveBlastEvidenceSemanticSupersessionEngine.js";
+
 // ============================================================================
 // CELLCOUNT ENTERPRISE
 // BE-FIX-005.29 — MARROW POSITIVE BLAST EVIDENCE END-TO-END PRESERVATION
@@ -148,6 +154,31 @@ function stripContradictoryNegativeArray(items = []) {
 
 export function applyMarrowPositiveBlastEvidencePreservation(result = {}) {
   if (!result || typeof result !== "object") return result;
+
+  const semanticSupersession =
+    evaluateMarrowPositiveBlastEvidenceSemanticSupersession(result);
+
+  if (semanticSupersession.active === true) {
+    const reconciled =
+      applyMarrowPositiveBlastEvidenceSemanticSupersession(result);
+
+    return {
+      ...reconciled,
+      marrowPositiveBlastEvidencePreservation: {
+        version: MARROW_POSITIVE_BLAST_E2E_PRESERVATION_VERSION,
+        active: false,
+        positiveEvidencePresent: false,
+        negativeOnlyAssessabilityGate: true,
+        semanticSupersessionActive: true,
+        semanticSupersessionVersion:
+          MARROW_POSITIVE_BLAST_EVIDENCE_SEMANTIC_SUPERSESSION_VERSION,
+        priorEvidenceState:
+          semanticSupersession.priorEvidenceState,
+        focalCytologyPreserved:
+          semanticSupersession.focalCytologyPreserved,
+      },
+    };
+  }
 
   const evidence = extractPositiveMarrowBlastEvidence(result);
   if (!evidence.positive) {
