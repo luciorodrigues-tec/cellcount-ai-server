@@ -5,6 +5,8 @@
 
 import { evaluateReactiveLymphoidEvidence } from "./reactiveLymphoidEvidenceSentinel.js";
 
+export const MARROW_GLOBAL_PATTERN_COHERENCE_RECONCILIATION_VERSION = "BE-FIX-005.43";
+
 function asObject(value) {
   return value && typeof value === "object" && !Array.isArray(value) ? value : {};
 }
@@ -51,6 +53,40 @@ function readPhysiologicPrecursorDiscrimination(result = {}) {
   return {};
 }
 
+
+function readPathologicMyeloidExpansion(result = {}) {
+  const candidates = [
+    asObject(result?.marrowDominantPatternStateReconciliation),
+    asObject(result?.marrowDominantPatternReconciliation),
+    asObject(result?.marrowMyeloidExpansionDiscrimination),
+    asObject(result?.marrowPrecursorDiscrimination),
+    asObject(result?.marrowBlastPopulationEvidence?.precursorDiscrimination),
+    asObject(result?.localMorphologyEvidence?.marrow?.blastPopulationEvidence?.precursorDiscrimination),
+  ];
+
+  for (const candidate of candidates) {
+    const classification =
+      candidate?.classification ||
+      candidate?.dominantClassification ||
+      "";
+
+    if (
+      classification === "PATHOLOGIC_MYELOID_EXPANSION_WITH_MATURATION" ||
+      candidate?.pathologicMyeloidExpansionProtected === true ||
+      candidate?.protectedMyeloidExpansion === true ||
+      candidate?.pathologicMyeloidExpansionSupported === true
+    ) {
+      return {
+        ...candidate,
+        classification: "PATHOLOGIC_MYELOID_EXPANSION_WITH_MATURATION",
+        protected: true,
+      };
+    }
+  }
+
+  return {};
+}
+
 export function analyzeGlobalPattern(result = {}) {
   const findings = result.findings || {};
   const visualEvidence = result.visualEvidence || {};
@@ -67,6 +103,9 @@ export function analyzeGlobalPattern(result = {}) {
   const reactiveClassification = reactiveEvidence.reactiveClassificationAllowed === true;
   const blastAssessable = reactiveEvidence.blastAssessable === true;
   const precursorDiscrimination = readPhysiologicPrecursorDiscrimination(result);
+  const pathologicMyeloidExpansion = readPathologicMyeloidExpansion(result);
+  const pathologicMyeloidExpansionPattern =
+    pathologicMyeloidExpansion.protected === true;
   const physiologicPrecursorPattern =
     precursorDiscrimination.classification === "PHYSIOLOGIC_PRECURSOR_PATTERN" &&
     (precursorDiscrimination.strongPhysiologicPattern === true ||
@@ -86,6 +125,9 @@ export function analyzeGlobalPattern(result = {}) {
   if (monomorphic) reasons.push("Presença de população mononuclear relativamente uniforme/repetitiva no campo.");
   if (reactiveMorphology) reasons.push("Morfologia linfoide reacional sustentada por evidência estruturada.");
   if (atypical) reasons.push("Há elementos celulares atípicos que impedem classificar a lâmina como morfologia preservada.");
+  if (pathologicMyeloidExpansionPattern) reasons.push(
+    "Há expansão mieloide/granulocítica desproporcional com espectro maturativo preservado; o padrão não deve colapsar para normalidade global nem ser convertido automaticamente em população blastoide."
+  );
   if (blastLike) reasons.push(
     marrowPositiveBlastEvidence
       ? "Há evidência medular positiva estruturada de população blastoide/imatura; a assessabilidade negativa não pode apagar esse achado."
@@ -94,10 +136,13 @@ export function analyzeGlobalPattern(result = {}) {
   if ((atypical || reactiveMorphology) && !blastAssessable) reasons.push("A triagem morfológica de blastos não é avaliável com segurança; não promover classificação reacional tranquilizadora.");
 
   const physiologicAppearance = !monomorphic && !atypical && !blastLike && !reactiveMorphology &&
+    !pathologicMyeloidExpansionPattern &&
     result.normalityBlocked !== true && blastAssessable;
 
   let dominantPattern = "GLOBAL_UNREMARKABLE_PATTERN";
   if (marrowPositiveBlastEvidence) dominantPattern = "MARROW_POSITIVE_BLASTOID_POPULATION_PATTERN";
+  else if (pathologicMyeloidExpansionPattern)
+    dominantPattern = "MARROW_PATHOLOGIC_MYELOID_EXPANSION_WITH_MATURATION";
   else if (physiologicPrecursorPattern) dominantPattern = limitedMarrow || !blastAssessable
     ? "MARROW_PHYSIOLOGIC_MATURATION_LIMITED_PATTERN"
     : "MARROW_PHYSIOLOGIC_MATURATION_PATTERN";
@@ -121,13 +166,18 @@ export function analyzeGlobalPattern(result = {}) {
     // field is inadequate for global negative exclusion.
     marrowPositiveBlastEvidence,
     physiologicPrecursorPattern,
-    globalPatternCoherenceVersion: "BE-FIX-005.30",
+    pathologicMyeloidExpansionPattern,
+    marrowFinalConfidenceReconciliationVersion: "BE-FIX-005.43",
+    marrowGlobalPatternCoherenceReconciliationVersion: MARROW_GLOBAL_PATTERN_COHERENCE_RECONCILIATION_VERSION,
+    globalPatternCoherenceVersion: MARROW_GLOBAL_PATTERN_COHERENCE_RECONCILIATION_VERSION,
     blastAssessmentIndeterminate: !blastAssessable && !marrowPositiveBlastEvidence,
     blastAssessmentState: marrowPositiveBlastEvidence
       ? "POSITIVE_EVIDENCE_PRESERVED"
       : (blastAssessable ? "EVALUABLE" : "NOT_ASSESSABLE"),
     globalSummary: marrowPositiveBlastEvidence
       ? "Evidência medular positiva de população blastoide/imatura preservada; a limitação do campo restringe exclusões e quantificação global, não o achado positivo."
+      : pathologicMyeloidExpansionPattern
+        ? "Padrão medular dominante de expansão mieloide/granulocítica desproporcional com maturação preservado. O achado é morfológico e requer correlação clínico-laboratorial; não estabelece etiologia nem entidade hematológica específica."
       : physiologicPrecursorPattern
         ? (limitedMarrow || !blastAssessable
             ? "Padrão medular maturativo heterogêneo em campo limitado; sem alerta blastoide estruturado e sem autorização para afirmar normalidade global."
@@ -141,7 +191,7 @@ export function analyzeGlobalPattern(result = {}) {
             : "A avaliação global identifica alteração morfológica não plenamente fisiológica, sem promover padrão reacional além da evidência visual disponível."),
     globalInterpretation: morphology.overview || morphology.summary || "",
     ruleVersion: "GLOBAL_PATTERN_ENGINE_V2_BE_FIX_005_16",
-    compatibilityGovernanceVersion: "BE-FIX-005.30",
+    compatibilityGovernanceVersion: MARROW_GLOBAL_PATTERN_COHERENCE_RECONCILIATION_VERSION,
     marrowPositiveBlastE2ELockVersion: "BE-FIX-005.34",
   };
 }

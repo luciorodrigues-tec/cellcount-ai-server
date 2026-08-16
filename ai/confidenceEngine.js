@@ -5,6 +5,8 @@
 // Safety V8.3 + Blast Engine + YOLO Fusion + Semantic Evidence
 // ============================================================================
 
+export const MARROW_FINAL_CONFIDENCE_RECONCILIATION_VERSION = "BE-FIX-005.43";
+
 export function buildConfidenceAnalysis({
   analysis,
   extractedText = "",
@@ -26,6 +28,70 @@ export function buildConfidenceAnalysis({
     analysis?.morphologicRiskClass === "CLASS_1_LIMITED_FIELD_ATYPICAL_CELL";
 
   if (isLimitedField) {
+    const marrowState = readMarrowDominantPatternState(analysis);
+
+    if (
+      marrowState.protectedExpansion === true &&
+      marrowState.trueBlastoidArchitecture !== true
+    ) {
+      return {
+        // BE-FIX-005.43 — confidence in the OBSERVED MORPHOLOGIC PATTERN is
+        // separated from diagnostic/etiologic confidence and from global
+        // representativity. A limited field may still sustain a coherent
+        // marrow expansion-with-maturation pattern.
+        globalConfidenceScore: 58,
+
+        hematologicRisk: {
+          level: "moderate",
+          score: 45,
+          label: "PADRÃO MORFOLÓGICO MEDULAR RELEVANTE — EXPANSÃO MIELOIDE COM MATURAÇÃO",
+        },
+
+        microscopyQuality: {
+          score: 55,
+          classification: "Moderada",
+        },
+
+        confidenceMatrix: {
+          blastConfidence: 0,
+          schistocyteConfidence: 0,
+          erythrocyteConfidence: 0,
+          plateletConfidence: 0,
+          inflammatoryPatternConfidence: 0,
+          dysplasiaConfidence: 0,
+          diagnosticCoherenceConfidence: 28,
+        },
+
+        confidenceHierarchy: {
+          cellLevel: 35,
+          morphologyLevel: 62,
+          diagnosticLevel: 20,
+          global: 58,
+        },
+
+        calibration: {
+          version: "V4_LIMITED_FIELD_MARROW_PATTERN_RECONCILIATION",
+          strategy: "limited_field_preserve_positive_marrow_pattern_without_etiologic_overcall",
+          safetyAware: true,
+          limitedFieldLock: true,
+          marrowFinalConfidenceReconciliationVersion:
+            MARROW_FINAL_CONFIDENCE_RECONCILIATION_VERSION,
+        },
+
+        safetySignals: {
+          visualEvidenceScore: 45,
+          diagnosticReliability: 25,
+          morphologyCoherence: 65,
+          artifactProbability: 0,
+          falsePositiveRisk: 0,
+          safeDiagnosticGate: false,
+        },
+
+        summary:
+          "Campo microscópico limitado para inferência populacional global, porém com padrão morfológico medular coerente de expansão mieloide/granulocítica com maturação. A confiança diagnóstica/etiológica permanece baixa e requer correlação clínico-laboratorial.",
+      };
+    }
+
     return {
       globalConfidenceScore: 35,
 
@@ -62,6 +128,8 @@ export function buildConfidenceAnalysis({
         strategy: "limited_field_no_global_normality",
         safetyAware: true,
         limitedFieldLock: true,
+        marrowFinalConfidenceReconciliationVersion:
+          MARROW_FINAL_CONFIDENCE_RECONCILIATION_VERSION,
       },
 
       safetySignals: {
@@ -222,6 +290,7 @@ export function buildConfidenceAnalysis({
       dysplasiaConfidence,
       diagnosticCoherenceConfidence,
       safetyProfile,
+      analysis,
     });
 
   const hematologicRisk =
@@ -232,6 +301,7 @@ export function buildConfidenceAnalysis({
       inflammatoryPatternConfidence,
       diagnosticCorrelation,
       safetyProfile,
+      analysis,
     });
 
   console.log(
@@ -315,6 +385,8 @@ export function buildConfidenceAnalysis({
       overcallingSuppression: true,
       undercallingProtection: true,
       semanticExtractionAware: true,
+      marrowFinalConfidenceReconciliationVersion: MARROW_FINAL_CONFIDENCE_RECONCILIATION_VERSION,
+      marrowGlobalPatternCoherenceReconciliationVersion: "BE-FIX-005.43",
     },
 
     safetySignals: {
@@ -1223,6 +1295,98 @@ function calculateDiagnosticCoherence({
 }
 
 // ============================================================================
+// BE-FIX-005.43 — MARROW FINAL CONFIDENCE & GLOBAL PATTERN COHERENCE
+// ============================================================================
+
+function readMarrowDominantPatternState(analysis = {}) {
+  const reconciliation =
+    analysis?.marrowDominantPatternStateReconciliation ||
+    analysis?.marrowDominantPatternReconciliation ||
+    {};
+
+  const expansion =
+    analysis?.marrowMyeloidExpansionDiscrimination ||
+    analysis?.marrowMyeloidExpansion ||
+    analysis?.localMorphologyEvidence?.marrow?.blastPopulationEvidence?.precursorDiscrimination ||
+    {};
+
+  const globalPattern =
+    analysis?.globalPattern ||
+    analysis?.globalPatternAnalysis ||
+    {};
+
+  const classification =
+    reconciliation?.classification ||
+    reconciliation?.dominantClassification ||
+    expansion?.classification ||
+    globalPattern?.dominantPattern ||
+    "";
+
+  const protectedExpansion =
+    classification === "PATHOLOGIC_MYELOID_EXPANSION_WITH_MATURATION" ||
+    reconciliation?.pathologicMyeloidExpansionProtected === true ||
+    reconciliation?.protectedMyeloidExpansion === true ||
+    expansion?.pathologicMyeloidExpansionSupported === true ||
+    expansion?.pathologicMyeloidExpansionProtected === true ||
+    globalPattern?.dominantPattern === "MARROW_PATHOLOGIC_MYELOID_EXPANSION_WITH_MATURATION";
+
+  const blastArchitecture =
+    analysis?.marrowBlastPopulationEvidence?.precursorDiscrimination?.blastoidSubpopulationSignals ||
+    analysis?.localMorphologyEvidence?.marrow?.blastPopulationEvidence?.precursorDiscrimination?.blastoidSubpopulationSignals ||
+    {};
+
+  const trueBlastoidArchitecture =
+    blastArchitecture?.structuredPathologicSubset === true ||
+    blastArchitecture?.coherentBlastoidSubpopulation === true ||
+    (
+      blastArchitecture?.distinctFromMaturationContinuum === true &&
+      blastArchitecture?.morphologicallyCoherent === true &&
+      blastArchitecture?.repeatedAcrossField === true
+    );
+
+  return {
+    version: "BE-FIX-005.43",
+    classification,
+    protectedExpansion,
+    trueBlastoidArchitecture,
+    reconciliationApplied:
+      reconciliation?.version === "BE-FIX-005.42" ||
+      reconciliation?.active === true ||
+      protectedExpansion,
+  };
+}
+
+function applyMarrowConfidenceReconciliation(score, analysis = {}, safetyProfile = {}) {
+  const marrowState = readMarrowDominantPatternState(analysis);
+
+  if (!marrowState.protectedExpansion || marrowState.trueBlastoidArchitecture) {
+    return {
+      score,
+      marrowState,
+      applied: false,
+    };
+  }
+
+  // Confidence here means confidence in the observed dominant morphologic pattern,
+  // not confidence in a specific etiologic diagnosis.
+  let reconciled = Math.max(score, 58);
+
+  if (safetyProfile?.hasRealVisualEvidence === true) {
+    reconciled = Math.max(reconciled, 62);
+  }
+
+  if (safetyProfile?.diagnosticReliability >= 55) {
+    reconciled = Math.max(reconciled, 64);
+  }
+
+  return {
+    score: normalize(reconciled),
+    marrowState,
+    applied: true,
+  };
+}
+
+// ============================================================================
 // GLOBAL SCORE
 // ============================================================================
 
@@ -1235,6 +1399,7 @@ function calculateGlobalScore({
   dysplasiaConfidence,
   diagnosticCoherenceConfidence,
   safetyProfile,
+  analysis = {},
 }) {
   let score =
     blastConfidence * 0.10 +
@@ -1295,7 +1460,10 @@ function calculateGlobalScore({
     score = Math.max(score, 55);
   }
 
-  return normalize(score);
+  const marrowReconciliation =
+    applyMarrowConfidenceReconciliation(score, analysis, safetyProfile);
+
+  return normalize(marrowReconciliation.score);
 }
 
 // ============================================================================
@@ -1309,6 +1477,7 @@ function calculateRiskCategory({
   inflammatoryPatternConfidence,
   diagnosticCorrelation,
   safetyProfile,
+  analysis = {},
 }) {
   let riskScore =
     blastConfidence * 0.42 +
@@ -1335,6 +1504,17 @@ function calculateRiskCategory({
 
   if (safetyProfile?.falsePositiveRisk >= 60) {
     riskScore += 10;
+  }
+
+  const marrowState = readMarrowDominantPatternState(analysis);
+
+  if (
+    marrowState.protectedExpansion &&
+    !marrowState.trueBlastoidArchitecture
+  ) {
+    // Do not let a protected pathologic marrow expansion collapse to "low risk".
+    // This is a morphology-level escalation only; it does not diagnose CML/BCR::ABL1.
+    riskScore = Math.max(riskScore, 45);
   }
 
   if (riskScore >= 75) {

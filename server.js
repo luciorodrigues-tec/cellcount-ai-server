@@ -295,6 +295,7 @@ import {
 
 import {
   buildConfidenceAnalysis,
+  MARROW_FINAL_CONFIDENCE_RECONCILIATION_VERSION,
 } from "./ai/confidenceEngine.js";
 
 import {
@@ -309,8 +310,9 @@ import {
   classifyLymphoidPattern,
 } from './ai/lymphoidPatternEngine.js';
 
-import analyzeGlobalPattern
-from './ai/globalPatternEngine.js';
+import analyzeGlobalPattern, {
+  MARROW_GLOBAL_PATTERN_COHERENCE_RECONCILIATION_VERSION,
+} from './ai/globalPatternEngine.js';
 
 import {
   sanitizeHematologyLanguage,
@@ -6718,6 +6720,10 @@ app.get("/runtime-version", (_req, res) => {
       MARROW_PRECURSOR_BLAST_SEMANTIC_SEPARATION_VERSION,
     marrowGlobalPatternReconciliationVersion:
       MARROW_GLOBAL_PATTERN_RECONCILIATION_VERSION,
+    marrowFinalConfidenceReconciliationVersion:
+      MARROW_FINAL_CONFIDENCE_RECONCILIATION_VERSION,
+    marrowFinalGlobalPatternCoherenceVersion:
+      MARROW_GLOBAL_PATTERN_COHERENCE_RECONCILIATION_VERSION,
     marrowMaturationEvidenceProjectionVersion:
       MARROW_MATURATION_EVIDENCE_PROJECTION_VERSION,
     marrowScopePropagationRecoveryVersion:
