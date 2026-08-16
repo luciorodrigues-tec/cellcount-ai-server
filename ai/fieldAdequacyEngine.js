@@ -37,6 +37,8 @@ function hasStructuredPositiveMarrowBlastEvidence(analysis = {}) {
   const directBlast = asObject(analysis?.blastAssessment);
   const lmeBlast = asObject(analysis?.localMorphologyEvidence?.marrow?.blastPopulationEvidence);
   const projected = asObject(analysis?.marrowBlastPopulationEvidence);
+  const recoveredLock = asObject(analysis?.marrowPositiveBlastEvidenceLock);
+  const recovered = asObject(analysis?.marrowRecoveredCytologyProjection);
   const states = [
     rawBlast.evidenceState,
     directBlast.evidenceState,
@@ -53,7 +55,9 @@ function hasStructuredPositiveMarrowBlastEvidence(analysis = {}) {
     lmeBlast.positive === true ||
     projected.observedPopulation === true ||
     projected.suspiciousPopulation === true ||
-    projected.focalSuspicion === true
+    projected.focalSuspicion === true ||
+    recoveredLock.active === true ||
+    recovered.structuredPositive === true
   );
 }
 

@@ -14,6 +14,8 @@ function hasPositiveMarrowBlastEvidence(result = {}) {
   const directBlast = asObject(result?.blastAssessment);
   const lmeBlast = asObject(result?.localMorphologyEvidence?.marrow?.blastPopulationEvidence);
   const projected = asObject(result?.marrowBlastPopulationEvidence);
+  const recoveredLock = asObject(result?.marrowPositiveBlastEvidenceLock);
+  const recovered = asObject(result?.marrowRecoveredCytologyProjection);
   const states = [
     rawBlast.evidenceState,
     directBlast.evidenceState,
@@ -28,7 +30,9 @@ function hasPositiveMarrowBlastEvidence(result = {}) {
   ].includes(state)) || lmeBlast.positive === true ||
     projected.observedPopulation === true ||
     projected.suspiciousPopulation === true ||
-    projected.focalSuspicion === true;
+    projected.focalSuspicion === true ||
+    recoveredLock.active === true ||
+    recovered.structuredPositive === true;
 }
 
 function readPhysiologicPrecursorDiscrimination(result = {}) {
@@ -138,6 +142,7 @@ export function analyzeGlobalPattern(result = {}) {
     globalInterpretation: morphology.overview || morphology.summary || "",
     ruleVersion: "GLOBAL_PATTERN_ENGINE_V2_BE_FIX_005_16",
     compatibilityGovernanceVersion: "BE-FIX-005.30",
+    marrowPositiveBlastE2ELockVersion: "BE-FIX-005.34",
   };
 }
 export default analyzeGlobalPattern;

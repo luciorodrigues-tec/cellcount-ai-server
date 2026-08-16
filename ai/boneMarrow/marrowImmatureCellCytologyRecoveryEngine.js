@@ -13,17 +13,33 @@ export function evaluateMarrowImmatureCellCytologyGap(result = {}) {
     Object.keys(obj(result.marrowAdequacy)).length>0||Object.keys(obj(raw.marrowAdequacy)).length>0;
   const assessment={...obj(raw.blastAssessment),...obj(result.blastAssessment)};
   const support=obj(assessment.morphologySupport);
+  const cytology=obj(assessment.immatureCellCytology);
   const subpopulation=obj(assessment.blastoidSubpopulationContext);
-  const immatureCount=finite(assessment.approximateImmatureCellCount);
-  const blastLikeCount=finite(assessment.approximateBlastLikeCells);
+  const immatureCount=finite(
+    assessment.approximateImmatureCellCount ??
+    assessment.approximateImmatureCellCountInProvidedFields
+  );
+  const blastLikeCount=finite(
+    assessment.approximateBlastLikeCells ??
+    assessment.approximateBlastLikeCellCountInProvidedFields ??
+    assessment.approximateBlastLikeCellCount
+  );
   const burden=text(assessment.immatureCellBurden).toLowerCase();
   const distribution=text(assessment.spatialDistribution).toLowerCase();
   const multipleImmature=(immatureCount!==null&&immatureCount>=3)||["multiple","numerous","increased"].includes(burden);
   const repeatedImmature=distribution.includes("repeated")||distribution.includes("across_field")||
-    support.repeatedAcrossField===true||subpopulation.repeatedSubsetAcrossField===true;
-  const cytology=[support.highNCRatio,support.openFineChromatin,support.nucleoli,support.scantBasophilicCytoplasm];
-  const characterizedCytologyCount=cytology.filter(v=>typeof v==="boolean").length;
-  const positiveCytologyCount=cytology.filter(v=>v===true).length;
+    text(assessment.populationPattern).toLowerCase().includes("repeated")||
+    support.repeatedAcrossField===true||subpopulation.repeatedSubsetAcrossField===true||
+    subpopulation.repeatedCellsWithSimilarFeatures===true||
+    cytology.repeatedSubsetAcrossField===true;
+  const cytologySignals=[
+    cytology.highNCRatio ?? support.highNCRatio,
+    cytology.openFineChromatin ?? support.openFineChromatin,
+    cytology.nucleoli ?? support.nucleoli,
+    cytology.scantBasophilicCytoplasm ?? support.scantBasophilicCytoplasm
+  ];
+  const characterizedCytologyCount=cytologySignals.filter(v=>typeof v==="boolean").length;
+  const positiveCytologyCount=cytologySignals.filter(v=>v===true).length;
   const architecture=[
     subpopulation.distinctFromMaturationContinuum,
     subpopulation.morphologicallyCoherent,
@@ -31,7 +47,9 @@ export function evaluateMarrowImmatureCellCytologyGap(result = {}) {
     subpopulation.disproportionateImmatureSubset,
   ];
   const characterizedArchitectureCount=architecture.filter(v=>typeof v==="boolean").length;
-  const positiveEvidenceState=["OBSERVED_POPULATION","SUSPICIOUS_POPULATION","FOCAL_SUSPICION"].includes(upper(assessment.evidenceState));
+  const evidenceState=upper(assessment.evidenceState);
+  const positiveEvidenceState=["OBSERVED_POPULATION","SUSPICIOUS_POPULATION","FOCAL_SUSPICION"].includes(evidenceState)||
+    evidenceState.includes("POSITIVE")||evidenceState.includes("BLASTLIKECELLS");
   const directPositiveProtected=positiveEvidenceState||assessment.observed===true||
     (blastLikeCount!==null&&blastLikeCount>=1)||positiveCytologyCount>=2;
   const uncharacterizedCytology=multipleImmature&&characterizedCytologyCount<=1&&positiveCytologyCount===0;

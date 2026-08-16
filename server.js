@@ -59,6 +59,12 @@ import {
 } from "./ai/boneMarrow/marrowImmatureCellCytologyRecoveryEngine.js";
 
 import {
+  MARROW_RECOVERED_CYTOLOGY_PROJECTION_VERSION,
+  MARROW_POSITIVE_BLAST_E2E_LOCK_VERSION,
+  applyMarrowRecoveredCytologyProjection,
+} from "./ai/boneMarrow/marrowRecoveredCytologyProjectionEngine.js";
+
+import {
   applyClinicalSafetyGovernor,
 } from "./ai/clinicalSafety/index.js";
 
@@ -4499,6 +4505,23 @@ BE-FIX-005.31 — COERÊNCIA NARRATIVA-ESTRUTURA E RECUPERAÇÃO FISIOLÓGICA:
         "BE-FIX-005.33 — MARROW IMMATURE-CELL CYTOLOGY RECOVERY",
         JSON.stringify(parsed.marrowImmatureCellCytologyRecovery || {}, null, 2),
       );
+
+      // BE-FIX-005.34 — project the schema emitted by focused marrow repair
+      // into canonical positive blast evidence BEFORE LME, FA-4.0 and global
+      // pattern governance. Field limitation may gate negative exclusion but
+      // cannot erase directly observed structured positive evidence.
+      parsed = applyMarrowRecoveredCytologyProjection(parsed);
+      console.log(
+        "BE-FIX-005.34 — MARROW RECOVERED CYTOLOGY PROJECTION / POSITIVE E2E LOCK",
+        JSON.stringify(
+          {
+            projection: parsed.marrowRecoveredCytologyProjection || {},
+            lock: parsed.marrowPositiveBlastEvidenceLock || {},
+          },
+          null,
+          2,
+        ),
+      );
     }
 
     console.log("================================");
@@ -6518,6 +6541,10 @@ app.get("/runtime-version", (_req, res) => {
       MARROW_IMMATURE_CELL_CYTOLOGY_RECOVERY_VERSION,
     marrowBlastoidCandidatePreservationVersion:
       MARROW_BLASTOID_CANDIDATE_PRESERVATION_VERSION,
+    marrowRecoveredCytologyProjectionVersion:
+      MARROW_RECOVERED_CYTOLOGY_PROJECTION_VERSION,
+    marrowPositiveBlastE2ELockVersion:
+      MARROW_POSITIVE_BLAST_E2E_LOCK_VERSION,
     reactiveLymphoidEvidenceSentinelVersion:
       REACTIVE_LYMPHOID_EVIDENCE_SENTINEL_VERSION,
     canonicalClinicalResultArchitectureVersion:
