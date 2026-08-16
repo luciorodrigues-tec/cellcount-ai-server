@@ -4,6 +4,7 @@
 // ============================================================================
 export const MARROW_RECOVERED_CYTOLOGY_PROJECTION_VERSION = "BE-FIX-005.34";
 export const MARROW_POSITIVE_BLAST_E2E_LOCK_VERSION = "BE-FIX-005.34";
+export const MARROW_FOCAL_CYTOLOGY_CONTEXTUALIZATION_VERSION = "BE-FIX-005.40";
 
 function obj(v){return v&&typeof v==="object"&&!Array.isArray(v)?v:{};}
 function txt(v){return typeof v==="string"?v.trim():"";}
@@ -75,13 +76,63 @@ export function readRecoveredMarrowBlastEvidence(result={}){
     sub.coherentBlastoidSubsetObserved===true;
   const physiologicContinuumLock =
     obj(result.marrowPhysiologicMaturationContinuumLock).active===true;
+  const pathologicMyeloidExpansionLock =
+    obj(result.marrowPathologicMaturationContinuumLock).active===true;
+
+  // BE-FIX-005.40 — positive immature cytology is not, by itself, a
+  // structured blast population. Recovered cytology may enrich an already
+  // supported blastoid population, but escalation requires cardinality and/or
+  // population architecture. This is especially important in marrow with
+  // myeloid expansion and broad maturation, where immature precursors can
+  // legitimately show open chromatin, nucleoli and basophilic cytoplasm.
+  const architectureQualified =
+    repeatedPattern &&
+    coherentSubset &&
+    distinctFromMaturationContinuum===true;
+
+  const countedBlastoidQualified =
+    blastLikeCount!==null &&
+    blastLikeCount>=1 &&
+    positiveCytologyCount>=2 &&
+    (
+      coherentSubset ||
+      distinctFromMaturationContinuum===true ||
+      repeatedPattern
+    );
+
+  const recoveredCytologyQualified =
+    positiveCytologyCount>=3 &&
+    repeatedPattern &&
+    coherentSubset &&
+    distinctFromMaturationContinuum!==false;
+
+  const positiveStateQualified =
+    positiveState(b.evidenceState) &&
+    (
+      architectureQualified ||
+      countedBlastoidQualified ||
+      recoveredCytologyQualified
+    );
+
+  // A protected 005.38 pathologic maturation continuum can only be overridden
+  // by a truly separable, coherent and repeated blastoid subset. This prevents
+  // focal repair from relabeling myeloid precursors as a blast population.
+  const pathologicExpansionOverrideQualified =
+    !pathologicMyeloidExpansionLock ||
+    (
+      architectureQualified &&
+      blastLikeCount!==null &&
+      blastLikeCount>=1 &&
+      positiveCytologyCount>=2
+    );
+
   const structuredPositive =
     !physiologicContinuumLock &&
+    pathologicExpansionOverrideQualified &&
     (
-      positiveState(b.evidenceState) ||
-      (blastLikeCount!==null&&blastLikeCount>=1&&positiveCytologyCount>=2) ||
-      (blastLikeCount!==null&&blastLikeCount>=1&&featureCount!==null&&featureCount>=2&&repeatedPattern) ||
-      (positiveCytologyCount>=3&&repeatedPattern&&coherentSubset)
+      positiveStateQualified ||
+      countedBlastoidQualified ||
+      recoveredCytologyQualified
     );
 
   return {
@@ -92,7 +143,10 @@ export function readRecoveredMarrowBlastEvidence(result={}){
     highNCRatio,openFineChromatin,nucleoli,scantBasophilicCytoplasm,
     morphologicallyCoherent,repeatedSubsetAcrossField,distinctFromMaturationContinuum,
     positiveCytologyCount,characterizedCytologyCount,repeatedPattern,coherentSubset,
-    physiologicContinuumLock,structuredPositive,
+    physiologicContinuumLock,pathologicMyeloidExpansionLock,
+    focalCytologyContextualizationVersion:MARROW_FOCAL_CYTOLOGY_CONTEXTUALIZATION_VERSION,
+    architectureQualified,countedBlastoidQualified,recoveredCytologyQualified,
+    positiveStateQualified,pathologicExpansionOverrideQualified,structuredPositive,
   };
 }
 

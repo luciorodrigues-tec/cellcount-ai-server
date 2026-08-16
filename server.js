@@ -21,6 +21,7 @@ import {
   MARROW_PRECURSOR_DISCRIMINATION_VERSION,
   MARROW_PRECURSOR_REBALANCING_VERSION,
   MARROW_DUAL_AXIS_SCORING_VERSION,
+  MARROW_ARCHITECTURE_GATED_BLAST_ESCALATION_VERSION,
   applyMarrowPrecursorDiscrimination,
 } from "./ai/boneMarrow/marrowPrecursorDiscriminationEngine.js";
 
@@ -61,6 +62,7 @@ import {
 import {
   MARROW_RECOVERED_CYTOLOGY_PROJECTION_VERSION,
   MARROW_POSITIVE_BLAST_E2E_LOCK_VERSION,
+  MARROW_FOCAL_CYTOLOGY_CONTEXTUALIZATION_VERSION,
   applyMarrowRecoveredCytologyProjection,
 } from "./ai/boneMarrow/marrowRecoveredCytologyProjectionEngine.js";
 
@@ -4648,6 +4650,26 @@ BE-FIX-005.31 — COERÊNCIA NARRATIVA-ESTRUTURA E RECUPERAÇÃO FISIOLÓGICA:
           2,
         ),
       );
+
+      console.log(
+        "BE-FIX-005.40 — MARROW FOCAL CYTOLOGY CONTEXTUALIZATION / ARCHITECTURE-GATED BLAST ESCALATION",
+        JSON.stringify(
+          {
+            focalCytologyContextualizationVersion:
+              MARROW_FOCAL_CYTOLOGY_CONTEXTUALIZATION_VERSION,
+            architectureGatedBlastEscalationVersion:
+              MARROW_ARCHITECTURE_GATED_BLAST_ESCALATION_VERSION,
+            pathologicMyeloidExpansionLockActive:
+              parsed?.marrowPathologicMaturationContinuumLock?.active === true,
+            structuredPositive:
+              parsed?.marrowRecoveredCytologyProjection?.structuredPositive === true,
+            architectureQualified:
+              parsed?.marrowRecoveredCytologyProjection?.architectureQualified === true,
+          },
+          null,
+          2,
+        ),
+      );
     }
 
     console.log("================================");
@@ -6653,6 +6675,8 @@ app.get("/runtime-version", (_req, res) => {
       MARROW_PRECURSOR_REBALANCING_VERSION,
     marrowDualAxisBlastScoringVersion:
       MARROW_DUAL_AXIS_SCORING_VERSION,
+    marrowArchitectureGatedBlastEscalationVersion:
+      MARROW_ARCHITECTURE_GATED_BLAST_ESCALATION_VERSION,
     marrowBlastEvidenceReconciliationVersion:
       MARROW_BLAST_EVIDENCE_RECONCILIATION_VERSION,
     marrowNarrativeStructureContradictionVersion:
@@ -6677,6 +6701,8 @@ app.get("/runtime-version", (_req, res) => {
       MARROW_RECOVERED_CYTOLOGY_PROJECTION_VERSION,
     marrowPositiveBlastE2ELockVersion:
       MARROW_POSITIVE_BLAST_E2E_LOCK_VERSION,
+    marrowFocalCytologyContextualizationVersion:
+      MARROW_FOCAL_CYTOLOGY_CONTEXTUALIZATION_VERSION,
     marrowPositiveCytologyConsistencyVersion:
       MARROW_POSITIVE_CYTOLOGY_CONSISTENCY_VERSION,
     marrowAcquisitionDiscordanceRecoveryVersion:

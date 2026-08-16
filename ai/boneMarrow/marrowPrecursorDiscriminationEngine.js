@@ -20,6 +20,7 @@ import {
 export const MARROW_PRECURSOR_DISCRIMINATION_VERSION = "BE-FIX-005.27";
 export const MARROW_PRECURSOR_REBALANCING_VERSION = "BE-FIX-005.27.1";
 export const MARROW_DUAL_AXIS_SCORING_VERSION = MARROW_DUAL_AXIS_BLAST_SCORING_VERSION;
+export const MARROW_ARCHITECTURE_GATED_BLAST_ESCALATION_VERSION = "BE-FIX-005.40";
 
 const MARROW_TYPES = new Set([
   "BONE_MARROW_ASPIRATE",
@@ -217,10 +218,21 @@ export function evaluateMarrowPrecursorDiscrimination(result = {}) {
     subpopulation.distinctFromMaturationContinuum === false;
 
   const protectedObservedBlastoid = marrow && dualAxis.observedEscalation;
+
+  // BE-FIX-005.40 — when 005.38 has already established a pathologic myeloid
+  // expansion with maturation, cytology-only escalation is forbidden. A
+  // suspicious blast path must carry a real subpopulation core rather than
+  // repeated precursor immaturity alone. OBSERVED_POPULATION remains protected.
+  const cytologyOnlyEscalationBlockedByMyeloidExpansion =
+    marrow &&
+    pathologicMyeloidExpansionProtected &&
+    dualAxis.subpopulationCore!==true;
+
   const protectedSuspiciousBlastoid =
     marrow &&
     dualAxis.suspiciousEscalation &&
-    !explicitlyNotDistinctFromContinuum;
+    !explicitlyNotDistinctFromContinuum &&
+    !cytologyOnlyEscalationBlockedByMyeloidExpansion;
 
   const strongPhysiologicPattern =
     marrow &&
@@ -280,6 +292,9 @@ export function evaluateMarrowPrecursorDiscrimination(result = {}) {
     coherentBlastoidSubpopulation,
     legacyStructuredSuspiciousSubset,
     protectedSuspiciousBlastoid,
+    architectureGatedBlastEscalationVersion:
+      MARROW_ARCHITECTURE_GATED_BLAST_ESCALATION_VERSION,
+    cytologyOnlyEscalationBlockedByMyeloidExpansion,
     physiologicScore: dualAxis.physiologicScore,
     blastArchitectureScore,
     blastFeatureScore,
@@ -329,6 +344,13 @@ export function applyMarrowPrecursorDiscrimination(result = {}) {
       "Expansão mieloide/granulocítica relevante com maturação preservada";
     output.normalityBlocked = true;
     output.requiresHumanReview = true;
+
+    // BE-FIX-005.40 — the protected 005.38 third-state is terminal for this
+    // discriminator unless an observed/structured blastoid population already
+    // outranked it during evaluation. Do not let unresolved cytology fall
+    // through into the generic indeterminate branch and erase the expansion
+    // classification.
+    return output;
   }
 
   else if (discrimination.strongPhysiologicPattern) {
