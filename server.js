@@ -3536,6 +3536,9 @@ const VME_REASONING_COMPATIBILITY_VERSION = "BE-FIX-005.21.1";
 const VME_EFFECTIVE_REASONING_ENFORCEMENT_VERSION =
   VME_EFFECTIVE_REASONING_ZERO_EVIDENCE_VERSION;
 
+const FINAL_RESULT_INITIALIZATION_ORDER_HOTFIX_VERSION =
+  "BE-FIX-005.47.1";
+
 // ============================================================================
 // OPENAI ANALYSIS
 // ============================================================================
@@ -6872,6 +6875,8 @@ app.get("/runtime-version", (_req, res) => {
       MARROW_LIMITED_FIELD_AXIS_NON_OVERRIDE_VERSION,
     confidenceMarrowTerminalMorphologyAdequacyProjectionLockVersion:
       CONFIDENCE_MARROW_TERMINAL_MORPHOLOGY_ADEQUACY_PROJECTION_LOCK_VERSION,
+    finalResultInitializationOrderHotfixVersion:
+      FINAL_RESULT_INITIALIZATION_ORDER_HOTFIX_VERSION,
     marrowMaturationEvidenceProjectionVersion:
       MARROW_MATURATION_EVIDENCE_PROJECTION_VERSION,
     marrowScopePropagationRecoveryVersion:
@@ -7849,10 +7854,12 @@ if (isAtypicalPopulation) {
 
       console.log("================================");
      
-      if (specimenGate.analysisType === "bone_marrow") {
-        finalResult =
-          applyMarrowMorphologyAdequacyProjectionLock(finalResult);
-      }
+      // BE-FIX-005.47.1 — FINAL RESULT INITIALIZATION ORDER HOTFIX
+      // Do not access finalResult here. At this stage only validation.result
+      // exists; finalResult is initialized immediately after FINAL VALIDATED
+      // RESULT by applyFinalClinicalGovernor(validation.result).
+      // The 005.47 morphology/adequacy projection lock remains applied later,
+      // after finalResult has been initialized.
 
       console.log("FINAL VALIDATED RESULT");
       console.log(
