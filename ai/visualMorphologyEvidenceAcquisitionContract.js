@@ -336,6 +336,27 @@ export function assessBoneMarrowVisualEvidenceAcquisition({
 
   const immatureCellCytologyRecovery =
     marrowImmatureCellCytologyRecoveryNeed(raw);
+
+  // BE-FIX-005.35 — a repeated immature population with at least one acquired
+  // blast-associated cytologic feature and narrative/structured discordance is
+  // not "complete" simply because the blast container exists. It requires one
+  // focal discrimination pass, while remaining non-positive until architecture
+  // is established.
+  const positiveCytologyDiscordanceRecoveryRequired =
+    immatureCellCytologyRecovery.multipleImmatureCells === true &&
+    immatureCellCytologyRecovery.repeatedImmatureCells === true &&
+    immatureCellCytologyRecovery.positiveBlastCytologyCount >= 1 &&
+    narrativeStructuredDiscordance === true &&
+    !["OBSERVED_POPULATION","SUSPICIOUS_POPULATION","FOCAL_SUSPICION"].includes(
+      asText(blastAssessment.evidenceState).toUpperCase(),
+    );
+
+  immatureCellCytologyRecovery.positiveCytologyDiscordanceRecoveryRequired =
+    positiveCytologyDiscordanceRecoveryRequired;
+  immatureCellCytologyRecovery.required =
+    immatureCellCytologyRecovery.required === true ||
+    positiveCytologyDiscordanceRecoveryRequired;
+
   if (
     immatureCellCytologyRecovery.required &&
     !missingRequirements.includes("blastAssessment.immatureCellCytology")
@@ -355,6 +376,8 @@ export function assessBoneMarrowVisualEvidenceAcquisition({
     retryRecommended: !effectiveComplete,
     immatureCellCytologyRecoveryRequired:
       immatureCellCytologyRecovery.required === true,
+    positiveCytologyConsistencyVersion: "BE-FIX-005.35",
+    acquisitionDiscordanceRecoveryVersion: "BE-FIX-005.35",
     immatureCellCytologyRecovery,
     zeroEvidence,
     missingRequirements,

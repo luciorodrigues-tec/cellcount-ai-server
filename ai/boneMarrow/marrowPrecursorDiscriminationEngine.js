@@ -102,8 +102,16 @@ export function evaluateMarrowPrecursorDiscrimination(result = {}) {
     assessment.evidenceState ||
     rawAssessment.evidenceState
   ).toUpperCase();
+  const positiveCytologyConsistency = obj(result.marrowPositiveCytologyConsistency);
+  const unresolvedPositiveCytology =
+    positiveCytologyConsistency.unresolvedPositiveCytology === true ||
+    positiveCytologyConsistency.active === true ||
+    immatureCandidateState === "UNRESOLVED_BLASTOID_CYTOLOGY" ||
+    assessment.cytologyResolutionRequired === true ||
+    rawAssessment.cytologyResolutionRequired === true;
   const unresolvedImmatureCandidate =
     immatureCandidateState === "IMMATURE_POPULATION_REQUIRES_DISCRIMINATION" ||
+    unresolvedPositiveCytology ||
     assessment.cytologyRecoveryRequired === true ||
     rawAssessment.cytologyRecoveryRequired === true;
 
@@ -238,9 +246,13 @@ export function evaluateMarrowPrecursorDiscrimination(result = {}) {
     approximateBlastLikeCells: count,
     unresolvedImmatureCandidate,
     immatureCandidateState: unresolvedImmatureCandidate
-      ? "IMMATURE_POPULATION_REQUIRES_DISCRIMINATION"
+      ? (unresolvedPositiveCytology
+          ? "UNRESOLVED_BLASTOID_CYTOLOGY"
+          : "IMMATURE_POPULATION_REQUIRES_DISCRIMINATION")
       : null,
     immatureCellCytologyRecoveryVersion: "BE-FIX-005.33",
+    positiveCytologyConsistencyVersion: "BE-FIX-005.35",
+    unresolvedPositiveCytology,
     physiologicSignals,
     blastSpecificSignals,
     blastoidSubpopulationSignals,
