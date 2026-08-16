@@ -513,6 +513,54 @@ function dedupe(values = []) {
   return [...new Set(asArray(values).map((value) => String(value).trim()).filter(Boolean))];
 }
 
+function positivePolychromasiaEvidence(result = {}, lme = {}) {
+  const erythrocytes = asObject(lme.erythrocytes);
+  const structured = asObject(result.erythrocyteFindings);
+
+  const corpus = evidenceStrings(
+    erythrocytes.description,
+    erythrocytes.chromia,
+    erythrocytes.observations,
+    erythrocytes.positiveFindings,
+    structured.summary,
+    structured.findings,
+    result.morphologyAnalysis?.erythrocyteReview,
+  ).join(" ");
+
+  const positive =
+    /\bpolychromasia\b|\bpolicromasia\b|policromatofilia|hem[aá]cias?\s+(?:mais\s+)?(?:azuladas|acinzentadas)|bluish erythrocytes/i.test(corpus) &&
+    !/(?:sem|aus[eê]ncia de|n[aã]o observad[ao]s?|not observed|absent)\s+(?:de\s+)?(?:polychromasia|policromasia)/i.test(corpus);
+
+  return {
+    positive,
+    evidence: positive
+      ? dedupe([
+          ...evidenceStrings(
+            erythrocytes.chromia,
+            erythrocytes.positiveFindings,
+            erythrocytes.description,
+            structured.summary,
+            result.morphologyAnalysis?.erythrocyteReview,
+          ),
+          "Policromasia presente no campo analisado.",
+        ])
+      : [],
+  };
+}
+
+function canonicalClinicalCriticality(result = {}) {
+  const criticality = asObject(result.clinicalCriticality);
+  const level = text(
+    criticality.level ||
+    result.marrowSeverityCriticality?.level ||
+    result.confidenceAnalysis?.hematologicRisk?.level,
+  ).toUpperCase();
+
+  if (level === "CRITICAL") return ClinicalSeverity.CRITICAL;
+  if (level === "HIGH") return ClinicalSeverity.HIGH;
+  return null;
+}
+
 export function buildCanonicalClinicalTruth(result = {}, {
   specimenType = null,
   analysisSource = null,
@@ -539,6 +587,8 @@ export function buildCanonicalClinicalTruth(result = {}, {
     observed.erythrocytes?.description,
     result.morphologyAnalysis?.erythrocyteReview,
   );
+  const polychromasia =
+    positivePolychromasiaEvidence(result, lme);
   const wbcDescription = firstText(
     lme.leukocytes?.description,
     observed.leukocytes?.description,
@@ -554,11 +604,15 @@ export function buildCanonicalClinicalTruth(result = {}, {
     description: rbcDescription,
     assessable: Boolean(rbcDescription),
     positive:
+      polychromasia.positive ||
       asArray(lme.erythrocytes?.specificForms).length > 0 ||
       Boolean(lme.erythrocytes?.anisocytosis && !/absent|ausent|not observed/i.test(String(lme.erythrocytes.anisocytosis))) ||
       Boolean(lme.erythrocytes?.poikilocytosis && !/absent|ausent|not observed/i.test(String(lme.erythrocytes.poikilocytosis))),
     confidence,
-    evidence: evidenceStrings(rbcDescription, lme.erythrocytes?.specificForms),
+    evidence: dedupe([
+      ...evidenceStrings(rbcDescription, lme.erythrocytes?.specificForms),
+      ...polychromasia.evidence,
+    ]),
   });
 
   const leukocytes = buildLineage({
@@ -609,20 +663,27 @@ export function buildCanonicalClinicalTruth(result = {}, {
       result.findings?.monomorphicPopulation === true,
   };
 
+  const explicitClinicalCriticality =
+    canonicalClinicalCriticality(result);
+
   const severity =
     blastLike.state === ClinicalEvidenceState.OBSERVED
       ? ClinicalSeverity.CRITICAL
-      : blastLike.state === ClinicalEvidenceState.SUSPICIOUS_INDETERMINATE
-        ? ClinicalSeverity.HIGH
-      : parasiteArtifact.parasite.state === ClinicalEvidenceState.OBSERVED
-        ? ClinicalSeverity.HIGH
-        : result.morphologicRiskClass === "CLASS_5_HIGH_NEOPLASTIC_SUSPICION"
+      : explicitClinicalCriticality === ClinicalSeverity.CRITICAL
+        ? ClinicalSeverity.CRITICAL
+        : blastLike.state === ClinicalEvidenceState.SUSPICIOUS_INDETERMINATE
           ? ClinicalSeverity.HIGH
-          : result.morphologicRiskClass === "CLASS_3_SUSPICIOUS_ATYPICAL_POPULATION"
-            ? ClinicalSeverity.INTERMEDIATE
-            : requiresReview
-              ? ClinicalSeverity.REVIEW
-              : ClinicalSeverity.NONE;
+          : explicitClinicalCriticality === ClinicalSeverity.HIGH
+            ? ClinicalSeverity.HIGH
+            : parasiteArtifact.parasite.state === ClinicalEvidenceState.OBSERVED
+              ? ClinicalSeverity.HIGH
+              : result.morphologicRiskClass === "CLASS_5_HIGH_NEOPLASTIC_SUSPICION"
+                ? ClinicalSeverity.HIGH
+                : result.morphologicRiskClass === "CLASS_3_SUSPICIOUS_ATYPICAL_POPULATION"
+                  ? ClinicalSeverity.INTERMEDIATE
+                  : requiresReview
+                    ? ClinicalSeverity.REVIEW
+                    : ClinicalSeverity.NONE;
 
   return {
     contract: CLINICAL_RESULT_V2_CONTRACT,
@@ -678,7 +739,15 @@ export function buildCanonicalClinicalTruth(result = {}, {
       parasites: parasiteArtifact.parasite,
     },
     lineages: {
-      erythrocytes,
+      erythrocytes: {
+        ...erythrocytes,
+        positiveMorphology: {
+          polychromasia: polychromasia.positive,
+          evidence: polychromasia.evidence,
+          fieldScoped: true,
+          globalExclusionAllowed: false,
+        },
+      },
       leukocytes,
       platelets,
     },

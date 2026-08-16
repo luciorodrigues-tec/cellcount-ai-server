@@ -27,6 +27,12 @@ export const MARROW_CONFIDENCE_CRITICALITY_AXIS_SEPARATION_VERSION =
 export const MARROW_BCR_ABL1_RECOMMENDATION_GATE_VERSION =
   "BE-FIX-005.49";
 
+export const MARROW_HIGH_SALIENCE_CRITICALITY_LOCK_VERSION =
+  "BE-FIX-005.50.1";
+
+export const MARROW_TERMINAL_CRITICALITY_CORE_SIGNATURE_VERSION =
+  "BE-FIX-005.50.2";
+
 function obj(value) {
   return value && typeof value === "object" && !Array.isArray(value)
     ? value
@@ -162,7 +168,7 @@ export function evaluateMarrowMyeloproliferativePatternCriticality(
   score += bool(signals.basophilEosinophilEnrichment) ? 4 : 0;
   score = clamp(score);
 
-  const level = protectedExpansion ? severityClass(score) : "LOW";
+  let level = protectedExpansion ? severityClass(score) : "LOW";
 
   const myeloproliferativeSignalCount = [
     signals.relativeMyeloidPredominance,
@@ -180,6 +186,39 @@ export function evaluateMarrowMyeloproliferativePatternCriticality(
     expansion.maturationAxis === true &&
     myeloproliferativeSignalCount >= 4 &&
     score >= 70;
+
+  // BE-FIX-005.50.1 — high-salience morphology lock. This is deliberately
+  // NOT a generic numeric threshold. A HIGH score is promoted to CRITICAL
+  // only when a dense, disproportionate, left-shifted expansion with a broad
+  // maturation spectrum has independently survived the marrow authority and
+  // blast-architecture gates. Limited field and low diagnostic confidence do
+  // not downgrade a directly observed positive morphology.
+  // BE-FIX-005.50.2 — high-salience CORE morphology is decisive.
+  // Erythroid reduction / basophil-eosinophil enrichment remain supportive,
+  // not mandatory. This is NOT a generic score-only promotion.
+  const highSalienceCriticalSignature =
+    protectedExpansion &&
+    !blast.suspicious &&
+    expansionScore >= 8 &&
+    expansion.disproportionateAxis === true &&
+    expansion.expansionBurdenAxis === true &&
+    expansion.maturationAxis === true &&
+    bool(signals.relativeMyeloidPredominance) &&
+    bool(signals.disproportionateMyeloidRepresentation) &&
+    bool(signals.numerousGranulocyticPrecursors) &&
+    bool(signals.broadMaturationSpectrum) &&
+    bool(signals.matureFormsPresent) &&
+    bool(signals.leftShiftedMaturationSpectrum) &&
+    bool(signals.denseMyeloidField);
+
+  const highSalienceSupportiveModifiers = [
+    signals.erythroidRelativeReduction,
+    signals.basophilEosinophilEnrichment,
+  ].filter((value) => value === true).length;
+
+  if (level === "HIGH" && highSalienceCriticalSignature) {
+    level = "CRITICAL";
+  }
 
   // Do not order a molecular test from morphology alone. Instead expose a
   // conditional gate that becomes actionable when CBC/differential and the
@@ -216,6 +255,12 @@ export function evaluateMarrowMyeloproliferativePatternCriticality(
     confidenceCriticalityAxisSeparated: true,
     myeloproliferativeSignalCount,
     myeloproliferativePatternSupported,
+    highSalienceCriticalSignature,
+    highSalienceSupportiveModifiers,
+    criticalityCalibrationVersion:
+      MARROW_TERMINAL_CRITICALITY_CORE_SIGNATURE_VERSION,
+    previousCriticalityCalibrationVersion:
+      MARROW_HIGH_SALIENCE_CRITICALITY_LOCK_VERSION,
     bcrAbl1RecommendationGate: bcrAbl1ContextGate
       ? "CONSIDER_IF_CLINICOLABORATORY_CONTEXT_CORROBORATES"
       : "NOT_TRIGGERED",
@@ -296,6 +341,21 @@ export function applyMarrowMyeloproliferativePatternCriticality(
           : "HEMATOLOGY_REVIEW",
     diagnosticConfidenceIndependent: true,
     adequacyIndependent: true,
+    axes: {
+      morphologicCriticality: {
+        level: decision.severityLevel,
+        score: decision.severityScore,
+        source: "DIRECT_VISUAL_MORPHOLOGY",
+      },
+      clinicalContextSeverity: {
+        level: "NOT_INFERRED_FROM_IMAGE",
+        source: "SEPARATE_CLINICAL_CONTEXT_AXIS",
+      },
+      diagnosticConcordance: {
+        level: "NOT_ESTABLISHED_BY_IMAGE_ALONE",
+        source: "REQUIRES_CLINICAL_LABORATORY_CORRELATION",
+      },
+    },
   };
 
   // Keep morphology classification unchanged; calibrate clinical urgency.

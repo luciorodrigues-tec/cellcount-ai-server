@@ -114,6 +114,7 @@ import {
   MARROW_SEVERITY_CRITICALITY_CALIBRATION_VERSION,
   MARROW_CONFIDENCE_CRITICALITY_AXIS_SEPARATION_VERSION,
   MARROW_BCR_ABL1_RECOMMENDATION_GATE_VERSION,
+  MARROW_HIGH_SALIENCE_CRITICALITY_LOCK_VERSION,
 } from "./ai/boneMarrow/marrowMyeloproliferativePatternCriticalityEngine.js";
 
 import {
@@ -4261,6 +4262,20 @@ BE-FIX-005.49 — CRITICIDADE DO PADRÃO MIELOIDE / CORRELAÇÃO MIELOPROLIFERAT
 - NÃO diagnosticar LMC ou outra neoplasia pela imagem.
 - O backend decidirá de forma determinística quando recomendar correlação com hemograma/diferencial e considerar BCR::ABL1 no contexto apropriado.
 
+BE-FIX-005.50.1 — PRESERVAÇÃO DE MORFOLOGIA ERITROCITÁRIA POSITIVA EM CAMPO LIMITADO:
+BE-FIX-005.50.2 — AUTORIDADE CLÍNICA TERMINAL E NARRATIVA CANÔNICA:
+- Criticidade morfológica, gravidade do contexto clínico conhecido e concordância diagnóstica são eixos independentes.
+- Um diagnóstico clínico informado (ex.: LMA/LMC) NÃO transforma sozinho uma imagem em CRITICAL e NÃO autoriza fabricar blastos/Auer.
+- Um padrão visual de expansão mieloide de alta saliência pode ser CRITICAL mesmo com confiança diagnóstica baixa ou campo limitado.
+- Cada conceito clínico terá um único proprietário narrativo: ACHADO, CRITICIDADE, INTERPRETAÇÃO, CONDUTA ou LIMITAÇÃO.
+- Não repetir a mesma conclusão em executiveSummary, clinicalMeaning, interpretiveSynthesis, hematologicReasoning e structuredReport.
+- Campo limitado reduz inferência populacional, mas NÃO apaga achado eritrocitário positivo diretamente visível.
+- Avaliar policromasia explicitamente como PRESENTE, NÃO OBSERVADA NO CAMPO ou NÃO AVALIÁVEL; nunca omitir silenciosamente o eixo quando hemácias forem avaliáveis.
+- Quando houver hemácias azuladas/acinzentadas com policromatofilia sustentada, registrar policromasia em erythrocyteFindings e morphologyAnalysis.erythrocyteReview.
+- Esquizócitos e bastonetes de Auer não visualizados em campo limitado devem ser descritos somente como “não observados no campo analisado”, nunca como exclusão global.
+- Contexto clínico conhecido (inclusive LMA) NÃO autoriza fabricar blastos, bastonetes de Auer ou qualquer morfologia ausente da evidência visual.
+- Evitar repetir a mesma conclusão em interpretiveSynthesis, clinicalMeaning, hematologicReasoning e structuredReport; cada camada deve acrescentar informação nova.
+
 BE-FIX-005.31 — COERÊNCIA NARRATIVA-ESTRUTURA E RECUPERAÇÃO FISIOLÓGICA:
 - Se a narrativa disser que NÃO há população/subpopulação blastoide monomórfica, distinta ou separada do continuum maturativo, os campos blastoidSubpopulationContext NÃO podem marcar simultaneamente distinctFromMaturationContinuum=true, morphologicallyCoherent=true e repeatedSubsetAcrossField=true sem suporte citomorfológico independente convincente.
 - A expressão "múltiplas células imaturas/precursoras" não significa "subpopulação blastoide repetida". Diferenciar repetição de precursores fisiológicos de repetição de um subconjunto blastoide.
@@ -6902,6 +6917,14 @@ app.get("/runtime-version", (_req, res) => {
       MARROW_CONFIDENCE_CRITICALITY_AXIS_SEPARATION_VERSION,
     marrowBcrAbl1RecommendationGateVersion:
       MARROW_BCR_ABL1_RECOMMENDATION_GATE_VERSION,
+    marrowHighSalienceCriticalityLockVersion:
+      MARROW_HIGH_SALIENCE_CRITICALITY_LOCK_VERSION,
+    terminalClinicalCriticalityAuthorityVersion:
+      "BE-FIX-005.50.2",
+    canonicalNarrativeAuthorityVersion:
+      "BE-FIX-005.50.2",
+    positiveRbcMorphologyPreservationVersion:
+      "BE-FIX-005.50.2",
     marrowMaturationEvidenceProjectionVersion:
       MARROW_MATURATION_EVIDENCE_PROJECTION_VERSION,
     marrowScopePropagationRecoveryVersion:
@@ -8814,6 +8837,89 @@ try {
     clinicalResultV2Validation:
       craError?.validation || null,
   });
+}
+
+// ============================================================================
+// BE-FIX-005.50.2 — TERMINAL CLINICAL CRITICALITY / CANONICAL PRESENTATION LOCK
+// Runs after CRA projection so no late presentation writer can downgrade the
+// calibrated clinical criticality.
+// ============================================================================
+if (specimenGate.analysisType === "bone_marrow") {
+  const clinicalCriticality =
+    finalResult.clinicalCriticality &&
+    typeof finalResult.clinicalCriticality === "object"
+      ? finalResult.clinicalCriticality
+      : {};
+
+  const level =
+    String(
+      clinicalCriticality.level ||
+      finalResult.marrowSeverityCriticality?.level ||
+      "",
+    ).trim().toUpperCase();
+
+  const v2 =
+    finalResult.clinicalResultV2 &&
+    typeof finalResult.clinicalResultV2 === "object"
+      ? finalResult.clinicalResultV2
+      : null;
+
+  if (v2 && (level === "CRITICAL" || level === "HIGH")) {
+    v2.risk = {
+      ...(v2.risk || {}),
+      severity: level,
+      clinicalCriticalityLevel: level,
+      clinicalCriticalityScore:
+        Number.isFinite(Number(clinicalCriticality.score))
+          ? Number(clinicalCriticality.score)
+          : null,
+      terminalClinicalCriticalityAuthorityVersion: "BE-FIX-005.50.2",
+    };
+
+    v2.presentation = {
+      ...(v2.presentation || {}),
+      clinicalCriticality: {
+        ...(v2.presentation?.clinicalCriticality || {}),
+        level,
+        score:
+          Number.isFinite(Number(clinicalCriticality.score))
+            ? Number(clinicalCriticality.score)
+            : null,
+        label:
+          clinicalCriticality.label ||
+          finalResult.marrowSeverityCriticality?.label ||
+          null,
+        colorToken: level === "CRITICAL" ? "RED" : "ORANGE",
+        urgency:
+          clinicalCriticality.urgency ||
+          (level === "CRITICAL"
+            ? "PRIORITY_HEMATOLOGY_REVIEW"
+            : "EXPEDITED_HEMATOLOGY_REVIEW"),
+        terminalClinicalCriticalityAuthorityVersion: "BE-FIX-005.50.2",
+      },
+      terminalClinicalCriticalityAuthorityVersion: "BE-FIX-005.50.2",
+    };
+  }
+
+  console.log(
+    "BE-FIX-005.50.2 — TERMINAL CLINICAL CRITICALITY AUTHORITY",
+    JSON.stringify(
+      {
+        level,
+        score: clinicalCriticality.score ?? null,
+        v2Severity: v2?.risk?.severity ?? null,
+        v2PresentationLevel:
+          v2?.presentation?.clinicalCriticality?.level ?? null,
+        colorToken:
+          v2?.presentation?.clinicalCriticality?.colorToken ?? null,
+        positivePolychromasia:
+          v2?.lineages?.erythrocytes?.positiveMorphology?.polychromasia ??
+          false,
+      },
+      null,
+      2,
+    ),
+  );
 }
 
 finalResult.academicMorphologyReasoningContract =
