@@ -293,6 +293,14 @@ import {
 } from "./ai/parasiteEvidenceSentinel.js";
 
 import {
+  applyPeripheralPositiveMorphologyArbitration,
+  PERIPHERAL_BLOOD_POSITIVE_MORPHOLOGY_ARBITRATION_VERSION,
+  PERIPHERAL_POLYCHROMASIA_PRESERVATION_VERSION,
+  PERIPHERAL_HEMATOPOIETIC_PARASITE_ARBITRATION_VERSION,
+  PERIPHERAL_LIMITED_FIELD_NON_SUPPRESSION_VERSION,
+} from "./ai/peripheralBloodPositiveMorphologyArbitrationEngine.js";
+
+import {
   REACTIVE_LYMPHOID_EVIDENCE_SENTINEL_VERSION,
   applyReactiveLymphoidEvidenceSentinel,
   evaluateReactiveLymphoidEvidence,
@@ -4950,6 +4958,13 @@ BE-FIX-005.31 — COERÊNCIA NARRATIVA-ESTRUTURA E RECUPERAÇÃO FISIOLÓGICA:
     // Field adequacy qualifies representativity; restore observed morphology.
     mergedAnalysis = applyMorphologyEvidencePreservation(mergedAnalysis);
 
+    // BE-FIX-005.50.4 — acquire/preserve positive peripheral morphology before
+    // lexical legacy layers can convert an unusual nucleated object into a
+    // parasite class or let limited-field adequacy erase focal evidence.
+    if (analysisType === "peripheral_blood") {
+      mergedAnalysis = applyPeripheralPositiveMorphologyArbitration(mergedAnalysis);
+    }
+
     // BE-FIX-005.29 — field adequacy is a negative-only gate. Reapply the
     // positive lock immediately afterwards so NOT_ASSESSABLE can never erase
     // a previously acquired SUSPICIOUS/OBSERVED marrow population.
@@ -7005,6 +7020,14 @@ app.get("/runtime-version", (_req, res) => {
       BONE_MARROW_COMPLETE_LENGTH_RECOVERY_VERSION,
     reactiveLymphoidEvidenceSentinelVersion:
       REACTIVE_LYMPHOID_EVIDENCE_SENTINEL_VERSION,
+    peripheralBloodPositiveMorphologyArbitrationVersion:
+      PERIPHERAL_BLOOD_POSITIVE_MORPHOLOGY_ARBITRATION_VERSION,
+    peripheralPolychromasiaPreservationVersion:
+      PERIPHERAL_POLYCHROMASIA_PRESERVATION_VERSION,
+    peripheralHematopoieticParasiteArbitrationVersion:
+      PERIPHERAL_HEMATOPOIETIC_PARASITE_ARBITRATION_VERSION,
+    peripheralLimitedFieldNonSuppressionVersion:
+      PERIPHERAL_LIMITED_FIELD_NON_SUPPRESSION_VERSION,
     canonicalClinicalResultArchitectureVersion:
       CRA_001_1_VERSION,
     clinicalResultCoherenceEngineVersion:
@@ -8661,6 +8684,14 @@ finalResult =
     finalResult,
   );
 
+if (specimenGate.analysisType === "peripheral_blood") {
+  finalResult = applyPeripheralPositiveMorphologyArbitration(finalResult);
+  console.log(
+    "BE-FIX-005.50.4 — PERIPHERAL POSITIVE MORPHOLOGY / PRE-SENTINEL ARBITRATION",
+    JSON.stringify(finalResult.peripheralPositiveMorphologyArbitration || {}, null, 2),
+  );
+}
+
 // ============================================================================
 // BE-FIX-005.13 — SINGLE BLAST SENTINEL
 // One positive blast/blast-like signal is sufficient to activate the critical
@@ -8686,6 +8717,14 @@ finalResult =
   applyParasiteEvidenceSentinel(
     finalResult,
   );
+
+if (specimenGate.analysisType === "peripheral_blood") {
+  finalResult = applyPeripheralPositiveMorphologyArbitration(finalResult);
+  console.log(
+    "BE-FIX-005.50.4 — COMPETING HEMATOPOIETIC / PARASITE SENTINEL ARBITRATION",
+    JSON.stringify(finalResult.peripheralPositiveMorphologyArbitration || {}, null, 2),
+  );
+}
 
 // ============================================================================
 // BE-FIX-005.15 — EVIDENCE-GROUNDED REACTIVE LYMPHOID SENTINEL

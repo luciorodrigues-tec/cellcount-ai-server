@@ -27,6 +27,7 @@ export const MARROW_REPAIR_ARCHITECTURE_PROVENANCE_VERSION = "BE-FIX-005.45";
 export const MARROW_CYTOLOGY_TO_ARCHITECTURE_ANTIFABRICATION_VERSION = "BE-FIX-005.45";
 export const BONE_MARROW_COMPACT_ACQUISITION_VERSION = "BE-FIX-005.39";
 export const BONE_MARROW_COMPLETE_LENGTH_RECOVERY_VERSION = "BE-FIX-005.39";
+export const PERIPHERAL_POSITIVE_MORPHOLOGY_ACQUISITION_VERSION = "BE-FIX-005.50.4";
 
 const STATUS = Object.freeze({
   COMPLETE: "COMPLETE",
@@ -908,6 +909,16 @@ REGRAS OBRIGATÓRIAS:
   para significar desconhecido.
 - Campo limitado restringe inferência populacional, mas NÃO apaga morfologia
   local diretamente observada.
+- BE-FIX-005.50.4: avalie POLICROMASIA explicitamente. Hemácias azuladas/acinzentadas
+  com policromatofilia diretamente visível devem gerar polychromasiaState=OBSERVED;
+  não atribua policromasia a variação de iluminação, balanço de branco, precipitado ou sobreposição.
+- BE-FIX-005.50.4: toda célula nucleada focal deve ser primeiro arbitrada como elemento
+  hematopoiético versus estrutura não celular. Se núcleo/cromatina/citoplasma forem reconhecíveis,
+  preserve hematopoieticCellCandidate=true. Se houver traços de imaturidade mas insuficientes
+  para blasto inequívoco, use focalImmatureCellState=SUSPICIOUS_INDETERMINATE.
+- BE-FIX-005.50.4: não promova hemoparasita apenas por uma estrutura púrpura/alongada ou pela
+  expressão “estrutura incomum”. Parasita OBSERVED exige morfologia parasitária estruturada
+  independente da célula hematopoiética concorrente.
 - Separe representatividade de morfologia.
 - Para núcleo/cromatina/nucléolos/citoplasma/maturação, descreva o observável;
 - Para blastos/blastoides, diferencie obrigatoriamente: OBSERVED (célula realmente observada), SUSPICIOUS_INDETERMINATE (suspeita sem confirmação), NOT_OBSERVED_IN_EVALUABLE_FIELD (somente se o campo for avaliável) e NOT_ASSESSABLE.
@@ -964,12 +975,14 @@ export function buildVisualMorphologyAcquisitionResponseFormat() {
                   description: { type: "string" },
                   size: { type: "string" },
                   chromia: { type: "string" },
+                  polychromasiaState: { type: "string", enum: ["OBSERVED", "NOT_OBSERVED_IN_EVALUABLE_FIELD", "NOT_ASSESSABLE"] },
+                  polychromasiaEvidence: { type: "string" },
                   anisocytosis: { type: "string" },
                   poikilocytosis: { type: "string" },
                   specificForms: stringArraySchema(),
                   artifactConsiderations: { type: "string" },
                 },
-                required: ["description", "size", "chromia", "anisocytosis", "poikilocytosis", "specificForms", "artifactConsiderations"],
+                required: ["description", "size", "chromia", "polychromasiaState", "polychromasiaEvidence", "anisocytosis", "poikilocytosis", "specificForms", "artifactConsiderations"],
               },
               leukocytes: {
                 type: "object",
@@ -986,8 +999,11 @@ export function buildVisualMorphologyAcquisitionResponseFormat() {
                   maturation: { type: "string" },
                   atypia: { type: "string" },
                   blastLikeFeatures: { type: "string" },
+                  hematopoieticCellCandidate: { type: "boolean" },
+                  focalImmatureCellState: { type: "string", enum: ["OBSERVED", "SUSPICIOUS_INDETERMINATE", "NOT_OBSERVED_IN_EVALUABLE_FIELD", "NOT_ASSESSABLE"] },
+                  focalImmatureCellEvidence: { type: "string" },
                 },
-                required: ["description", "approximateVisibleCells", "countStatus", "heterogeneity", "nuclearMorphology", "chromatin", "nucleoli", "cytoplasm", "maturation", "atypia", "blastLikeFeatures"],
+                required: ["description", "approximateVisibleCells", "countStatus", "heterogeneity", "nuclearMorphology", "chromatin", "nucleoli", "cytoplasm", "maturation", "atypia", "blastLikeFeatures", "hematopoieticCellCandidate", "focalImmatureCellState", "focalImmatureCellEvidence"],
               },
               platelets: {
                 type: "object",

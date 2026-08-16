@@ -520,16 +520,26 @@ function positivePolychromasiaEvidence(result = {}, lme = {}) {
   const corpus = evidenceStrings(
     erythrocytes.description,
     erythrocytes.chromia,
+    erythrocytes.polychromasiaEvidence,
     erythrocytes.observations,
     erythrocytes.positiveFindings,
+    structured.polychromasiaEvidence,
     structured.summary,
     structured.findings,
+    result.positiveMorphology?.erythrocytes?.polychromasia?.evidence,
     result.morphologyAnalysis?.erythrocyteReview,
   ).join(" ");
 
-  const positive =
+  const explicitObserved =
+    String(erythrocytes.polychromasiaState || "").toUpperCase() === "OBSERVED" ||
+    structured.polychromasia === true ||
+    String(structured.polychromasiaState || "").toUpperCase() === "OBSERVED" ||
+    result.positiveMorphology?.erythrocytes?.polychromasia?.observed === true;
+
+  const positive = explicitObserved || (
     /\bpolychromasia\b|\bpolicromasia\b|policromatofilia|hem[aá]cias?\s+(?:mais\s+)?(?:azuladas|acinzentadas)|bluish erythrocytes/i.test(corpus) &&
-    !/(?:sem|aus[eê]ncia de|n[aã]o observad[ao]s?|not observed|absent)\s+(?:de\s+)?(?:polychromasia|policromasia)/i.test(corpus);
+    !/(?:sem|aus[eê]ncia de|n[aã]o observad[ao]s?|not observed|absent)\s+(?:de\s+)?(?:polychromasia|policromasia)/i.test(corpus)
+  );
 
   return {
     positive,
@@ -537,6 +547,7 @@ function positivePolychromasiaEvidence(result = {}, lme = {}) {
       ? dedupe([
           ...evidenceStrings(
             erythrocytes.chromia,
+            erythrocytes.polychromasiaEvidence,
             erythrocytes.positiveFindings,
             erythrocytes.description,
             structured.summary,

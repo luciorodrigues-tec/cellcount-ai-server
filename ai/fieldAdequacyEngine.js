@@ -13,6 +13,7 @@
 export const FIELD_ADEQUACY_CONTRACT_VERSION = "FA-4.0";
 export const BLAST_ASSESSABILITY_GATE_VERSION = "BE-FIX-005.16";
 export const POSITIVE_BLAST_OVERRIDE_VERSION = "BE-FIX-005.29";
+export const PERIPHERAL_SENTINEL_ARBITRATION_FIELD_VERSION = "BE-FIX-005.50.4";
 
 function normalizeText(value = "") {
   return String(value || "")
@@ -259,6 +260,21 @@ function buildAdequacyContract({
   };
 }
 
+function structuredPeripheralParasiteEvidence(analysis = {}) {
+  const lme = asObject(analysis?.localMorphologyEvidence);
+  const critical = asObject(lme.criticalMorphology);
+  const profile = asObject(critical.parasiteEvidence);
+  const rawParasite = asObject(analysis?.rawResponse?.observedMorphology?.parasites);
+  const state = String(profile.evidenceState || rawParasite.evidenceState || "").trim().toUpperCase();
+
+  return {
+    version: PERIPHERAL_SENTINEL_ARBITRATION_FIELD_VERSION,
+    observed: state === "OBSERVED",
+    suspicious: state === "SUSPICIOUS_INDETERMINATE",
+    state: state || "NOT_ASSESSABLE",
+  };
+}
+
 export function evaluateFieldAdequacy(analysis = {}) {
   const raw = normalizeText(JSON.stringify(analysis || ""));
 
@@ -307,37 +323,13 @@ export function evaluateFieldAdequacy(analysis = {}) {
     "estrutura curvilínea",
     "estrutura filamentosa",
     "estrutura serpiginosa",
-    "estrutura flagelada",
-    "forma extracelular",
-    "forma alongada",
-    "forma flagelada",
-    "organismo extracelular",
-    "filamento extracelular",
-    "elemento extracelular",
   ]);
 
-  const parasiteSignal =
-    includesAny(raw, [
-      "parasita",
-      "hemoparasita",
-      "protozoario",
-      "protozoário",
-      "plasmodium",
-      "babesia",
-      "trypanosoma",
-      "tripanossoma",
-      "tripomastigota",
-      "microfilaria",
-      "microfilária",
-      "filaria",
-      "filária",
-      "flagelo",
-      "flagelado",
-      "membrana ondulante",
-      "cinetoplasto",
-      "intraeritrocitario",
-      "intraeritrocitário",
-    ]) || unusualStructureSignal;
+  // BE-FIX-005.50.4 — free text may flag an unusual object for review, but it
+  // is never sufficient to promote a hemoparasite class. Only structured
+  // acquired parasite evidence may set parasiteSignal.
+  const structuredParasite = structuredPeripheralParasiteEvidence(analysis);
+  const parasiteSignal = structuredParasite.observed === true;
 
   const singleCellConcern =
     includesAny(raw, [
@@ -404,10 +396,7 @@ export function applyFieldAdequacyRules(analysis = {}) {
     analysis.localMorphologyEvidence = preservedLocalMorphologyEvidence;
   }
 
-  if (
-    fieldAdequacy.parasiteSignal ||
-    fieldAdequacy.unusualStructureSignal
-  ) {
+  if (fieldAdequacy.parasiteSignal) {
     analysis.normalityBlocked = true;
     analysis.requiresHumanReview = true;
 
@@ -442,6 +431,17 @@ export function applyFieldAdequacyRules(analysis = {}) {
     analysis.structuredReport.recommendation =
       analysis.structuredReport.recommendation ||
       "Confirmar por revisão microscópica profissional, múltiplos campos, gota espessa/esfregaço seriado e métodos complementares conforme protocolo.";
+  }
+
+  // BE-FIX-005.50.4 — unusual structure without structured parasite evidence
+  // remains an artifact/uncertainty qualifier and cannot seize morphologic class.
+  if (
+    fieldAdequacy.unusualStructureSignal &&
+    !fieldAdequacy.parasiteSignal
+  ) {
+    analysis.requiresHumanReview = true;
+    analysis.fieldAdequacy.unusualStructureRequiresReview = true;
+    analysis.fieldAdequacy.unusualStructureDoesNotImplyParasite = true;
   }
 
   const atypicalPopulation =
