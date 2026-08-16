@@ -267,9 +267,13 @@ import {
   visualMorphologyEvidenceAcquisitionContractStatus,
   assessBoneMarrowVisualEvidenceAcquisition,
   buildBoneMarrowVisualRepairPrompt,
+  buildBoneMarrowCompactAcquisitionPrompt,
+  buildBoneMarrowLengthRecoveryPrompt,
   VME_EFFECTIVE_REASONING_ZERO_EVIDENCE_VERSION,
   MARROW_REPAIR_EVIDENCE_MERGE_VERSION,
   MARROW_POSITIVE_CYTOLOGY_CARDINALITY_PRESERVATION_VERSION,
+  BONE_MARROW_COMPACT_ACQUISITION_VERSION,
+  BONE_MARROW_COMPLETE_LENGTH_RECOVERY_VERSION,
 } from "./ai/visualMorphologyEvidenceAcquisitionContract.js";
 
 import {
@@ -4171,7 +4175,7 @@ BE-FIX-005.31 — COERÊNCIA NARRATIVA-ESTRUTURA E RECUPERAÇÃO FISIOLÓGICA:
 
     const selectedPrompt = isPeripheralVisualAcquisition
       ? buildPrimaryVisualMorphologyAcquisitionPrompt()
-      : boneMarrowPrompt;
+      : buildBoneMarrowCompactAcquisitionPrompt();
 
     const acquisitionContext = isPeripheralVisualAcquisition
       ? `ANALYSIS SOURCE: ${analysisSource}\nSPECIMEN: ${specimenType || "peripheral_blood"}\nAvalie diretamente as imagens anexadas. Não use ausência de descrição como ausência celular.`
@@ -4210,6 +4214,10 @@ BE-FIX-005.31 — COERÊNCIA NARRATIVA-ESTRUTURA E RECUPERAÇÃO FISIOLÓGICA:
         maxCompletionTokens: effectivePrimaryMaxCompletionTokens,
         lengthExhaustionRecoveryVersion:
           VME_LENGTH_EXHAUSTION_RECOVERY_VERSION,
+        boneMarrowCompactAcquisitionVersion:
+          analysisType === "bone_marrow"
+            ? BONE_MARROW_COMPACT_ACQUISITION_VERSION
+            : null,
         imageDetail:
           process.env.VME_IMAGE_DETAIL || "high",
         centerCrop:
@@ -4345,24 +4353,55 @@ BE-FIX-005.31 — COERÊNCIA NARRATIVA-ESTRUTURA E RECUPERAÇÃO FISIOLÓGICA:
       visualMorphologyRepairAttempted = true;
 
       const repairStart = performance.now();
+      const marrowLengthRecovery =
+        analysisType === "bone_marrow" && lengthExhausted === true;
+
       const repairPrompt = analysisType === "bone_marrow"
-        ? buildBoneMarrowVisualRepairPrompt({
-            missingRequirements:
-              visualMorphologyEvidenceAcquisition.missingRequirements,
-          })
+        ? (
+            marrowLengthRecovery
+              ? buildBoneMarrowLengthRecoveryPrompt({
+                  missingRequirements:
+                    visualMorphologyEvidenceAcquisition.missingRequirements,
+                })
+              : buildBoneMarrowVisualRepairPrompt({
+                  missingRequirements:
+                    visualMorphologyEvidenceAcquisition.missingRequirements,
+                })
+          )
         : buildVisualMorphologyRepairPrompt({
             missingRequirements:
               visualMorphologyEvidenceAcquisition.missingRequirements,
           });
+
+      if (analysisType === "bone_marrow") {
+        console.log(
+          "BE-FIX-005.39 — MARROW REPAIR ROUTING",
+          JSON.stringify({
+            version: BONE_MARROW_COMPLETE_LENGTH_RECOVERY_VERSION,
+            mode: marrowLengthRecovery
+              ? "COMPLETE_LENGTH_RECOVERY"
+              : "FOCAL_MORPHOLOGY_REPAIR",
+            primaryFinishReason,
+            missingRequirements:
+              visualMorphologyEvidenceAcquisition.missingRequirements,
+          }),
+        );
+      }
 
       try {
         const repairCompletion = await openai.chat.completions.create({
           model: OPENAI_MODEL,
           reasoning_effort:
             process.env.OPENAI_VISION_REPAIR_REASONING_EFFORT || "none",
-          max_completion_tokens: Number(
-            process.env.OPENAI_VISION_REPAIR_MAX_COMPLETION_TOKENS || 3600,
-          ),
+          max_completion_tokens:
+            analysisType === "bone_marrow" && marrowLengthRecovery
+              ? Number(
+                  process.env.OPENAI_MARROW_LENGTH_RECOVERY_MAX_COMPLETION_TOKENS ||
+                    2600,
+                )
+              : Number(
+                  process.env.OPENAI_VISION_REPAIR_MAX_COMPLETION_TOKENS || 3600,
+                ),
           response_format: analysisType === "bone_marrow"
             ? { type: "json_object" }
             : buildVisualMorphologyAcquisitionResponseFormat(),
@@ -4377,7 +4416,11 @@ BE-FIX-005.31 — COERÊNCIA NARRATIVA-ESTRUTURA E RECUPERAÇÃO FISIOLÓGICA:
                 {
                   type: "text",
                   text: analysisType === "bone_marrow"
-                    ? "Reanalise as mesmas imagens somente para preencher a aquisição medular obrigatória. Priorize os campos ausentes, especialmente blastAssessment e séries medulares. Use notAssessable quando necessário e não produza relatório clínico longo."
+                    ? (
+                        marrowLengthRecovery
+                          ? "Recupere os seis domínios medulares obrigatórios em JSON compacto e completo. Não produza relatório, diferencial ou interpretação longa. Termine o JSON dentro do orçamento."
+                          : "Faça somente a reparação morfológica focal solicitada. Preserve os domínios já adquiridos e não produza relatório clínico longo."
+                      )
                     : "Reanalise as mesmas imagens somente para preencher o schema VME obrigatório. Priorize primeiro os campos ausentes, use descrições morfológicas objetivas e concisas, use null/NOT_ASSESSABLE quando não avaliável e não produza relatório clínico final.",
                 },
                 ...imagesPayload,
@@ -6650,6 +6693,10 @@ app.get("/runtime-version", (_req, res) => {
       MARROW_MYELOID_EXPANSION_DISCRIMINATION_VERSION,
     marrowPathologicMaturationContinuumVersion:
       MARROW_PATHOLOGIC_MATURATION_CONTINUUM_VERSION,
+    boneMarrowCompactAcquisitionVersion:
+      BONE_MARROW_COMPACT_ACQUISITION_VERSION,
+    boneMarrowCompleteLengthRecoveryVersion:
+      BONE_MARROW_COMPLETE_LENGTH_RECOVERY_VERSION,
     reactiveLymphoidEvidenceSentinelVersion:
       REACTIVE_LYMPHOID_EVIDENCE_SENTINEL_VERSION,
     canonicalClinicalResultArchitectureVersion:
@@ -6671,6 +6718,10 @@ app.get("/runtime-version", (_req, res) => {
         process.env.OPENAI_VISION_REPAIR_REASONING_EFFORT || "none",
       repairMaxCompletionTokens:
         Number(process.env.OPENAI_VISION_REPAIR_MAX_COMPLETION_TOKENS || 3600),
+      boneMarrowLengthRecoveryMaxCompletionTokens:
+        Number(
+          process.env.OPENAI_MARROW_LENGTH_RECOVERY_MAX_COMPLETION_TOKENS || 2600,
+        ),
       lengthRecoveryPrimaryBudgetMs:
         Number(process.env.VME_LENGTH_RECOVERY_PRIMARY_BUDGET_MS || 65000),
       primaryTiles:

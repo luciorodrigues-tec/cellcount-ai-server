@@ -23,6 +23,8 @@ export const HEMOPARASITE_HIGH_SALIENCE_ACQUISITION_VERSION = "BE-FIX-005.23";
 export const VME_EFFECTIVE_REASONING_ZERO_EVIDENCE_VERSION = "BE-FIX-005.25";
 export const MARROW_REPAIR_EVIDENCE_MERGE_VERSION = "BE-FIX-005.36";
 export const MARROW_POSITIVE_CYTOLOGY_CARDINALITY_PRESERVATION_VERSION = "BE-FIX-005.36";
+export const BONE_MARROW_COMPACT_ACQUISITION_VERSION = "BE-FIX-005.39";
+export const BONE_MARROW_COMPLETE_LENGTH_RECOVERY_VERSION = "BE-FIX-005.39";
 
 const STATUS = Object.freeze({
   COMPLETE: "COMPLETE",
@@ -401,6 +403,92 @@ export function assessBoneMarrowVisualEvidenceAcquisition({
   };
 }
 
+export function buildBoneMarrowCompactAcquisitionPrompt() {
+  return `CELLCOUNT BE-FIX-005.39 — COMPACT BONE MARROW ACQUISITION
+
+Você é um observador citomorfológico de aspirado de medula óssea.
+Sua tarefa é ADQUIRIR EVIDÊNCIA ESTRUTURADA, não escrever relatório clínico.
+Responda SOMENTE JSON válido, curto e objetivo.
+
+REGRAS ABSOLUTAS:
+- Nunca diagnosticar LMA, LLA, LMC, MPN, SMD, mieloma, linfoma ou BCR::ABL1.
+- Nunca usar ausência de avaliação como ausência morfológica.
+- Campo único limita inferência global, mas não apaga achado positivo local.
+- Use null ou status="notAssessable" quando não avaliável.
+- Não produzir interpretação educacional longa, diferenciais, recomendações ou narrativa clínica extensa.
+- Preencha primeiro os 6 DOMÍNIOS OBRIGATÓRIOS abaixo. Os demais são opcionais.
+
+JSON OBRIGATÓRIO:
+{
+  "specimenAssessment":{"status":"present|notObserved|notAssessable|indeterminate","summary":"","specimenType":"BONE_MARROW_ASPIRATE|HEMODILUTED_BONE_MARROW|BONE_MARROW_BIOPSY|indeterminate"},
+  "marrowAdequacy":{"status":"present|notObserved|notAssessable|indeterminate","technicalQuality":"","representativity":"","summary":""},
+  "myeloidSeries":{"status":"present|notObserved|notAssessable|indeterminate","maturation":"","dysplasia":"","summary":"","expansionContext":{"relativeMyeloidPredominance":null,"broadMaturationSpectrum":null,"numerousGranulocyticPrecursors":null,"matureNeutrophilicFormsPresent":null,"leftShiftedMaturationSpectrum":null,"basophilEosinophilEnrichment":null,"erythroidRelativeReduction":null,"disproportionateMyeloidRepresentation":null,"denseMyeloidField":null}},
+  "erythroidSeries":{"status":"present|notObserved|notAssessable|indeterminate","maturation":"","dysplasia":"","summary":""},
+  "megakaryocyticSeries":{"status":"present|notObserved|notAssessable|indeterminate","maturation":"","dysplasia":"","summary":""},
+  "blastAssessment":{"status":"present|notObserved|notAssessable|indeterminate","observed":null,"estimatedPercentage":null,"globalAbsenceAllowed":false,"evidenceState":"OBSERVED_POPULATION|SUSPICIOUS_POPULATION|FOCAL_SUSPICION|NOT_OBSERVED_IN_EVALUABLE_FIELD|NOT_ASSESSABLE","approximateBlastLikeCells":null,"approximateImmatureCellCount":null,"immatureCellBurden":"none|few|multiple|numerous|dominant|indeterminate","spatialDistribution":"isolated|focal|repeated_across_field|diffuse|indeterminate","morphologicFeatureCount":null,"populationPattern":"dominant|repeated|focal|heterogeneous|indeterminate","morphologySupport":{"highNCRatio":null,"openFineChromatin":null,"nucleoli":null,"scantBasophilicCytoplasm":null,"monomorphism":null,"repeatedAcrossField":null},"immatureCellCytology":{"highNCRatio":null,"openFineChromatin":null,"nucleoli":null,"scantBasophilicCytoplasm":null,"morphologicallyCoherent":null,"repeatedSubsetAcrossField":null,"distinctFromMaturationContinuum":null},"precursorContext":{"maturationHeterogeneity":null,"maturationContinuum":null,"matureFormsPresent":null,"lineageDiversity":null,"orderlyGranulocyticMaturation":null,"nonMonomorphicBackground":null},"blastoidSubpopulationContext":{"distinctFromMaturationContinuum":null,"morphologicallyCoherent":null,"repeatedSubsetAcrossField":null,"disproportionateImmatureSubset":null,"matureFormsCoexist":null},"lineageAssignable":false,"lineage":"indeterminate","summary":""},
+  "spiculeAssessment":{"status":"present|notObserved|notAssessable|indeterminate","observed":null,"summary":""},
+  "hemodilutionAssessment":{"status":"present|notObserved|notAssessable|indeterminate","suspected":null,"summary":""},
+  "cellularityAssessment":{"status":"present|notObserved|notAssessable|indeterminate","scope":"field_limited","globalEstimateAllowed":false,"estimate":null,"summary":""},
+  "plasmaCellAssessment":{"status":"present|notObserved|notAssessable|indeterminate","estimatedPercentage":null,"summary":""},
+  "dysplasiaAssessment":{"status":"present|notObserved|notAssessable|indeterminate","globalExclusionAllowed":false,"summary":""},
+  "infiltrationAssessment":{"status":"present|notObserved|notAssessable|indeterminate","globalExclusionAllowed":false,"summary":""},
+  "marrowLimitations":[]
+}
+
+DISCRIMINAÇÃO BLASTO/PRECURSOR:
+- Imaturidade medular não é sinônimo de blasto.
+- Preserve continuum maturativo, heterogeneidade e formas maduras quando observados.
+- SUSPICIOUS/OBSERVED exige subpopulação distinta/coerente/repetida + citologia sustentada.
+- N:C, cromatina, nucléolo ou citoplasma isolados não bastam.
+
+EXPANSÃO MIELOIDE COM MATURAÇÃO — BE-FIX-005.38:
+- Preencha expansionContext separadamente da pesquisa de blastos.
+- Continuidade maturativa não significa automaticamente fisiológico.
+- Registre predomínio/expansão mieloide somente quando visualmente sustentado.
+
+Mantenha cada summary em no máximo 240 caracteres. Não acrescente campos narrativos longos.`;
+}
+
+export function buildBoneMarrowLengthRecoveryPrompt({
+  missingRequirements = [],
+} = {}) {
+  const missing = Array.isArray(missingRequirements) && missingRequirements.length
+    ? missingRequirements.join(", ")
+    : "all required marrow acquisition domains";
+
+  return `CELLCOUNT BE-FIX-005.39 — COMPLETE LENGTH-RECOVERY REPAIR
+
+A resposta anterior foi truncada por limite de saída. Isto é falha de transporte,
+não ausência de morfologia. Reanalise as MESMAS imagens e devolva SOMENTE JSON
+válido e COMPACTO. Não escreva relatório clínico.
+
+RECUPERE OBRIGATORIAMENTE ESTES 6 DOMÍNIOS:
+1. specimenAssessment
+2. marrowAdequacy
+3. myeloidSeries
+4. erythroidSeries
+5. megakaryocyticSeries
+6. blastAssessment
+
+Itens que estavam ausentes: ${missing}.
+
+Use a MESMA estrutura dos 6 domínios do contrato compacto 005.39.
+Para myeloidSeries, inclua expansionContext.
+Para blastAssessment, inclua evidenceState, cardinalidade aproximada, carga,
+distribuição, morphologySupport, immatureCellCytology, precursorContext e
+blastoidSubpopulationContext.
+
+REGRAS:
+- status="notAssessable" e null quando realmente não avaliável.
+- Nunca use false/0 como sinônimo de desconhecido.
+- Preserve achado positivo local mesmo em campo limitado.
+- Não diagnostique doença ou linhagem.
+- Não inclua differentialDiagnosis, clinicalMeaning, interpretiveSynthesis,
+  hematologicReasoning, educationalImpact ou structuredReport.
+- Cada summary deve ter no máximo 180 caracteres.
+- O JSON deve terminar completo dentro do orçamento.`;
+}
+
 export function buildBoneMarrowVisualRepairPrompt({
   missingRequirements = [],
 } = {}) {
@@ -524,6 +612,17 @@ export function mergeVisualMorphologyRepair(
   for (const key of objectKeys) {
     merged[key] = mergeNestedObject(original[key], repair[key]);
   }
+
+  // BE-FIX-005.39 — nested marrow acquisition domains are monotonic too.
+  // A compact length-recovery pass may provide only part of expansionContext;
+  // never let that shallow replacement erase valid first-pass signals.
+  merged.myeloidSeries = {
+    ...asObject(merged.myeloidSeries),
+    expansionContext: mergeNestedObject(
+      asObject(asObject(original.myeloidSeries).expansionContext),
+      asObject(asObject(repair.myeloidSeries).expansionContext),
+    ),
+  };
 
   // BE-FIX-005.36 — marrow blast evidence is additive across acquisition
   // passes. The repair may enrich cytology/architecture, but it must not erase
@@ -686,6 +785,8 @@ export function mergeVisualMorphologyRepair(
     originalEvidenceState: originalEvidenceState || null,
     repairEvidenceState: repairEvidenceState || null,
     finalEvidenceState: blast.evidenceState || null,
+    compactAcquisitionVersion: BONE_MARROW_COMPACT_ACQUISITION_VERSION,
+    completeLengthRecoveryVersion: BONE_MARROW_COMPLETE_LENGTH_RECOVERY_VERSION,
   };
 
   return merged;
