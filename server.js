@@ -109,6 +109,14 @@ import {
 } from "./ai/boneMarrow/marrowMorphologyAdequacyProjectionLockEngine.js";
 
 import {
+  applyMarrowMyeloproliferativePatternCriticality,
+  MARROW_MYELOPROLIFERATIVE_PATTERN_CORRELATION_VERSION,
+  MARROW_SEVERITY_CRITICALITY_CALIBRATION_VERSION,
+  MARROW_CONFIDENCE_CRITICALITY_AXIS_SEPARATION_VERSION,
+  MARROW_BCR_ABL1_RECOMMENDATION_GATE_VERSION,
+} from "./ai/boneMarrow/marrowMyeloproliferativePatternCriticalityEngine.js";
+
+import {
   MARROW_POSITIVE_CYTOLOGY_CONSISTENCY_VERSION,
   MARROW_ACQUISITION_DISCORDANCE_RECOVERY_VERSION,
   applyMarrowPositiveCytologyConsistency,
@@ -4244,6 +4252,15 @@ BE-FIX-005.38 — EXPANSÃO MIELOIDE COM MATURAÇÃO:
 - Um padrão com expansão mieloide + amplo espectro maturativo + formas maduras, SEM subpopulação blastoide distinta/coerente/repetida, deve ser descrito como expansão mieloide com maturação, não como padrão fisiológico automático e não como blastose.
 - NÃO diagnosticar LMC, neoplasia mieloproliferativa ou BCR::ABL1 pela imagem. O backend fará a discriminação morfológica determinística.
 
+BE-FIX-005.49 — CRITICIDADE DO PADRÃO MIELOIDE / CORRELAÇÃO MIELOPROLIFERATIVA:
+- Gravidade morfológica, confiança diagnóstica e adequação do campo são eixos distintos.
+- Campo limitado pode reduzir confiança e representatividade, mas NÃO deve reduzir automaticamente a criticidade de uma expansão mieloide/granulocítica intensa observada.
+- Descrever intensidade/desproporção do padrão mieloide quando sustentada: predomínio mieloide, carga de precursores, desvio à esquerda, densidade mieloide, redução eritroide relativa e enriquecimento basofílico/eosinofílico.
+- "Maturação preservada" ou "amplo espectro maturativo" NÃO significa baixo risco quando coexistir expansão mieloide acentuada/desproporcional.
+- Um padrão de expansão mieloide acentuada com maturação pode justificar correlação educacional com processo mieloproliferativo.
+- NÃO diagnosticar LMC ou outra neoplasia pela imagem.
+- O backend decidirá de forma determinística quando recomendar correlação com hemograma/diferencial e considerar BCR::ABL1 no contexto apropriado.
+
 BE-FIX-005.31 — COERÊNCIA NARRATIVA-ESTRUTURA E RECUPERAÇÃO FISIOLÓGICA:
 - Se a narrativa disser que NÃO há população/subpopulação blastoide monomórfica, distinta ou separada do continuum maturativo, os campos blastoidSubpopulationContext NÃO podem marcar simultaneamente distinctFromMaturationContinuum=true, morphologicallyCoherent=true e repeatedSubsetAcrossField=true sem suporte citomorfológico independente convincente.
 - A expressão "múltiplas células imaturas/precursoras" não significa "subpopulação blastoide repetida". Diferenciar repetição de precursores fisiológicos de repetição de um subconjunto blastoide.
@@ -6877,6 +6894,14 @@ app.get("/runtime-version", (_req, res) => {
       CONFIDENCE_MARROW_TERMINAL_MORPHOLOGY_ADEQUACY_PROJECTION_LOCK_VERSION,
     finalResultInitializationOrderHotfixVersion:
       FINAL_RESULT_INITIALIZATION_ORDER_HOTFIX_VERSION,
+    marrowMyeloproliferativePatternCorrelationVersion:
+      MARROW_MYELOPROLIFERATIVE_PATTERN_CORRELATION_VERSION,
+    marrowSeverityCriticalityCalibrationVersion:
+      MARROW_SEVERITY_CRITICALITY_CALIBRATION_VERSION,
+    marrowConfidenceCriticalityAxisSeparationVersion:
+      MARROW_CONFIDENCE_CRITICALITY_AXIS_SEPARATION_VERSION,
+    marrowBcrAbl1RecommendationGateVersion:
+      MARROW_BCR_ABL1_RECOMMENDATION_GATE_VERSION,
     marrowMaturationEvidenceProjectionVersion:
       MARROW_MATURATION_EVIDENCE_PROJECTION_VERSION,
     marrowScopePropagationRecoveryVersion:
@@ -8712,6 +8737,46 @@ if (specimenGate.analysisType === "bone_marrow") {
         morphologicRiskClass: finalResult.morphologicRiskClass,
         blastSuspicion: finalResult.findings?.blastSuspicion,
         dominantPattern: finalResult.globalPattern?.dominantPattern,
+      },
+      null,
+      2,
+    ),
+  );
+}
+
+// ============================================================================
+// BE-FIX-005.49 — MARROW MYELOPROLIFERATIVE PATTERN CORRELATION
+//                 & SEVERITY-CRITICALITY CALIBRATION
+// Runs after terminal marrow authority and before CRA so the canonical result
+// receives morphology severity/criticality independently from field adequacy
+// and diagnostic confidence.
+// ============================================================================
+if (specimenGate.analysisType === "bone_marrow") {
+  finalResult =
+    applyMarrowMyeloproliferativePatternCriticality(finalResult);
+
+  console.log(
+    "BE-FIX-005.49 — MARROW MYELOPROLIFERATIVE PATTERN / SEVERITY-CRITICALITY",
+    JSON.stringify(
+      {
+        correlation:
+          finalResult.marrowMyeloproliferativePatternCorrelation || {},
+        severity:
+          finalResult.marrowSeverityCriticality || {},
+        clinicalCriticality:
+          finalResult.clinicalCriticality || {},
+        finalClassification:
+          finalResult.finalClassification,
+        morphologicRiskClass:
+          finalResult.morphologicRiskClass,
+        riskLevel:
+          finalResult.riskLevel,
+        diagnosticConfidence:
+          finalResult.confidenceAnalysis?.confidenceHierarchy?.diagnosticLevel ??
+          null,
+        adequacy:
+          finalResult.marrowAdequacyMorphologyAxis?.adequacyClassification ??
+          null,
       },
       null,
       2,
