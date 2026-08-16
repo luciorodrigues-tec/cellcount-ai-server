@@ -96,6 +96,13 @@ import {
 } from "./ai/boneMarrow/marrowPositiveBlastEvidenceSemanticSupersessionEngine.js";
 
 import {
+  applyFinalMarrowAuthority,
+  MARROW_FINAL_CLINICAL_AUTHORITY_VERSION,
+  MARROW_POST_LEGACY_RECONCILIATION_VERSION,
+  MARROW_ADEQUACY_MORPHOLOGY_AXIS_SEPARATION_VERSION,
+} from "./ai/boneMarrow/marrowFinalClinicalAuthorityEngine.js";
+
+import {
   MARROW_POSITIVE_CYTOLOGY_CONSISTENCY_VERSION,
   MARROW_ACQUISITION_DISCORDANCE_RECOVERY_VERSION,
   applyMarrowPositiveCytologyConsistency,
@@ -174,8 +181,9 @@ import {
   createFinalDifferentialDiagnosisEngine,
 } from "./ai/differentialDiagnosis/finalDiagnosisEngine/index.js";
 
-import applyFinalClinicalGovernor
-  from "./ai/finalClinicalGovernor.js";
+import applyFinalClinicalGovernor, {
+  MARROW_FINAL_GOVERNOR_AXIS_SEPARATION_VERSION,
+} from "./ai/finalClinicalGovernor.js";
 
 import validateConsistency
   from "./utils/validateConsistency.js";
@@ -6781,6 +6789,14 @@ app.get("/runtime-version", (_req, res) => {
       MARROW_POSITIVE_BLAST_EVIDENCE_SEMANTIC_SUPERSESSION_VERSION,
     marrowFinalBlastProjectionLockVersion:
       MARROW_FINAL_BLAST_PROJECTION_LOCK_VERSION,
+    marrowFinalClinicalAuthorityVersion:
+      MARROW_FINAL_CLINICAL_AUTHORITY_VERSION,
+    marrowPostLegacyReconciliationVersion:
+      MARROW_POST_LEGACY_RECONCILIATION_VERSION,
+    marrowAdequacyMorphologyAxisSeparationVersion:
+      MARROW_ADEQUACY_MORPHOLOGY_AXIS_SEPARATION_VERSION,
+    marrowFinalGovernorAxisSeparationVersion:
+      MARROW_FINAL_GOVERNOR_AXIS_SEPARATION_VERSION,
     marrowMaturationEvidenceProjectionVersion:
       MARROW_MATURATION_EVIDENCE_PROJECTION_VERSION,
     marrowScopePropagationRecoveryVersion:
@@ -8540,6 +8556,33 @@ if (specimenGate.analysisType === "bone_marrow") {
           finalResult.marrowPositiveBlastEvidenceSemanticSupersession || {},
         finalProjectionLock:
           finalResult.marrowFinalBlastProjectionLock || {},
+      },
+      null,
+      2,
+    ),
+  );
+}
+
+// ============================================================================
+// BE-FIX-005.46 — FINAL MARROW AUTHORITY / POST-LEGACY RECONCILIATION
+// This is the terminal marrow writer after every legacy raw restore, generic
+// safety lock, sentinel and 005.42/005.44 reconciliation. CRA consumes this
+// reconciled state. Limited-field adequacy remains a separate axis.
+// ============================================================================
+if (specimenGate.analysisType === "bone_marrow") {
+  finalResult = applyFinalMarrowAuthority(finalResult);
+
+  console.log(
+    "BE-FIX-005.46 — FINAL MARROW AUTHORITY / POST-LEGACY RECONCILIATION",
+    JSON.stringify(
+      {
+        authority: finalResult.finalMarrowAuthority || {},
+        adequacyMorphologyAxis:
+          finalResult.marrowAdequacyMorphologyAxis || {},
+        finalClassification: finalResult.finalClassification,
+        morphologicRiskClass: finalResult.morphologicRiskClass,
+        blastSuspicion: finalResult.findings?.blastSuspicion,
+        dominantPattern: finalResult.globalPattern?.dominantPattern,
       },
       null,
       2,

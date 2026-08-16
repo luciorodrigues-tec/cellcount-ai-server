@@ -1,3 +1,5 @@
+export const MARROW_FINAL_GOVERNOR_AXIS_SEPARATION_VERSION = "BE-FIX-005.46";
+
 // ============================================================================
 // CELLCOUNT ENTERPRISE
 // BE-FIX-005.17 — EVIDENCE PRESERVATION + SINGLE BLAST PRIORITY GOVERNOR
@@ -256,9 +258,32 @@ export function applyFinalClinicalGovernor(result = {}) {
     blastSentinel.active === true ||
     safeBool(f.blastSuspicion);
 
-  // BE-FIX-005.17: reactive morphology can coexist with blast evidence, but it
-  // can never suppress or downgrade it.
-  const strongBlastEvidence = suspiciousBlastEvidence;
+  // BE-FIX-005.46 — marrow morphology and representativity are separate axes.
+  // A stale generic blast flag cannot outrank the canonical final blast lock
+  // when 005.38/005.44 have established protected myeloid expansion without a
+  // structured blastoid population.
+  const marrowExpansion = asObject(final.marrowMyeloidExpansionDiscrimination);
+  const marrowExpansionLock = asObject(final.marrowPathologicMaturationContinuumLock);
+  const marrowFinalBlastLock = asObject(final.marrowFinalBlastProjectionLock);
+  const protectedMarrowExpansion =
+    (
+      marrowExpansion.classification ===
+        "PATHOLOGIC_MYELOID_EXPANSION_WITH_MATURATION" ||
+      final.finalClassification ===
+        "MARROW_MYELOID_EXPANSION_WITH_MATURATION_PATTERN"
+    ) &&
+    (
+      marrowExpansion.pathologicMyeloidExpansionSupported === true ||
+      marrowExpansionLock.active === true
+    ) &&
+    marrowFinalBlastLock.active === true &&
+    marrowFinalBlastLock.populationBlastSuspicion === false;
+
+  // BE-FIX-005.17: reactive morphology can coexist with true blast evidence,
+  // but it can never suppress or downgrade it. 005.46 only blocks stale
+  // generic flags after a canonical negative population-level blast lock.
+  const strongBlastEvidence =
+    suspiciousBlastEvidence && !protectedMarrowExpansion;
 
   const highNeoplasticEvidence =
     safeBool(f.plasmablasts) &&
@@ -350,6 +375,14 @@ export function applyFinalClinicalGovernor(result = {}) {
     mainFinding =
       "População mononuclear atípica sustentada no campo analisado, sem critérios definitivos de blasto.";
     requiresHumanReview = true;
+  } else if (protectedMarrowExpansion) {
+    finalClass = "MARROW_MYELOID_EXPANSION_WITH_MATURATION_PATTERN";
+    riskLevel =
+      "Expansão mieloide/granulocítica relevante com maturação preservada";
+    mainFinding =
+      final.mainFinding ||
+      "Expansão mieloide/granulocítica com amplo espectro maturativo, sem subpopulação blastoide distinta/coerente/repetida sustentada no campo.";
+    requiresHumanReview = true;
   } else if (limitedField) {
     finalClass = "CLASS_1_LIMITED_FIELD";
     riskLevel = "Campo limitado";
@@ -434,6 +467,12 @@ export function applyFinalClinicalGovernor(result = {}) {
     morphologyDescriptionAllowed:
       localEvidenceAvailable || field.morphologyDescriptionAllowed === true,
     evidenceScope: limitedField ? "FIELD_SCOPED" : "POPULATION_ASSESSABLE",
+    marrowFinalGovernorAxisSeparationVersion:
+      MARROW_FINAL_GOVERNOR_AXIS_SEPARATION_VERSION,
+    morphologyClassification: finalClass,
+    adequacyClassification: limitedField
+      ? "CLASS_1_LIMITED_FIELD"
+      : "POPULATION_ASSESSABLE",
   };
 
   // Hard invariant: restore protected evidence byte-for-byte equivalent to the
