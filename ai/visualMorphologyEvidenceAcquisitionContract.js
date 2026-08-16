@@ -21,6 +21,8 @@ export const LOCAL_MORPHOLOGY_ACQUISITION_RECOVERY_VERSION = "BE-FIX-005.9";
 export const SINGLE_BLAST_CONFIRMATION_ACQUISITION_VERSION = "BE-FIX-005.17";
 export const HEMOPARASITE_HIGH_SALIENCE_ACQUISITION_VERSION = "BE-FIX-005.23";
 export const VME_EFFECTIVE_REASONING_ZERO_EVIDENCE_VERSION = "BE-FIX-005.25";
+export const MARROW_REPAIR_EVIDENCE_MERGE_VERSION = "BE-FIX-005.36";
+export const MARROW_POSITIVE_CYTOLOGY_CARDINALITY_PRESERVATION_VERSION = "BE-FIX-005.36";
 
 const STATUS = Object.freeze({
   COMPLETE: "COMPLETE",
@@ -446,9 +448,54 @@ export function mergeVisualMorphologyRepair(
   const original = asObject(originalResponse);
   const repair = asObject(repairResponse);
 
+  const meaningful = (value) => {
+    if (value === null || value === undefined) return false;
+    if (typeof value === "string") return value.trim().length > 0;
+    if (Array.isArray(value)) return value.length > 0;
+    if (typeof value === "object") return Object.keys(value).length > 0;
+    return true;
+  };
+
+  const choose = (repairValue, originalValue) =>
+    meaningful(repairValue) ? repairValue : originalValue;
+
+  const positiveBoolean = (repairValue, originalValue) =>
+    repairValue === true || originalValue === true
+      ? true
+      : (
+          typeof repairValue === "boolean"
+            ? repairValue
+            : originalValue
+        );
+
+  const preserveCount = (repairValue, originalValue, { preferMax = false } = {}) => {
+    const r = Number(repairValue);
+    const o = Number(originalValue);
+    const rValid = Number.isFinite(r);
+    const oValid = Number.isFinite(o);
+
+    if (preferMax && rValid && oValid) return Math.max(r, o);
+    if (rValid && r > 0) return r;
+    if (oValid && o > 0) return o;
+    if (rValid) return r;
+    if (oValid) return o;
+    return null;
+  };
+
+  const mergeNestedObject = (originalValue, repairValue) => ({
+    ...asObject(originalValue),
+    ...Object.fromEntries(
+      Object.entries(asObject(repairValue))
+        .filter(([, value]) => meaningful(value)),
+    ),
+  });
+
   const merged = {
     ...original,
-    ...repair,
+    ...Object.fromEntries(
+      Object.entries(repair)
+        .filter(([, value]) => meaningful(value)),
+    ),
   };
 
   // Do not let a repair response erase useful first-pass structures.
@@ -461,14 +508,152 @@ export function mergeVisualMorphologyRepair(
     "academicInterpretation",
     "morphologyAnalysis",
     "visualEvidence",
+    "specimenAssessment",
+    "marrowAdequacy",
+    "spiculeAssessment",
+    "hemodilutionAssessment",
+    "cellularityAssessment",
+    "myeloidSeries",
+    "erythroidSeries",
+    "megakaryocyticSeries",
+    "plasmaCellAssessment",
+    "dysplasiaAssessment",
+    "infiltrationAssessment",
   ];
 
   for (const key of objectKeys) {
-    merged[key] = {
-      ...asObject(original[key]),
-      ...asObject(repair[key]),
-    };
+    merged[key] = mergeNestedObject(original[key], repair[key]);
   }
+
+  // BE-FIX-005.36 — marrow blast evidence is additive across acquisition
+  // passes. The repair may enrich cytology/architecture, but it must not erase
+  // first-pass cardinality, repetition or specimen context with null/false.
+  const originalBlast = asObject(original.blastAssessment);
+  const repairBlast = asObject(repair.blastAssessment);
+  const blast = mergeNestedObject(originalBlast, repairBlast);
+
+  blast.approximateImmatureCellCount = preserveCount(
+    repairBlast.approximateImmatureCellCount ??
+      repairBlast.approximateImmatureCellCountInProvidedFields,
+    originalBlast.approximateImmatureCellCount ??
+      originalBlast.approximateImmatureCellCountInProvidedFields,
+    { preferMax: true },
+  );
+
+  blast.approximateBlastLikeCells = preserveCount(
+    repairBlast.approximateBlastLikeCells ??
+      repairBlast.approximateBlastLikeCellCountInProvidedFields,
+    originalBlast.approximateBlastLikeCells ??
+      originalBlast.approximateBlastLikeCellCountInProvidedFields,
+    { preferMax: true },
+  );
+
+  blast.morphologicFeatureCount = preserveCount(
+    repairBlast.morphologicFeatureCount,
+    originalBlast.morphologicFeatureCount,
+    { preferMax: true },
+  );
+
+  const originalSupport = asObject(originalBlast.morphologySupport);
+  const repairSupport = asObject(repairBlast.morphologySupport);
+  blast.morphologySupport = mergeNestedObject(originalSupport, repairSupport);
+
+  for (const key of [
+    "highNCRatio",
+    "openFineChromatin",
+    "nucleoli",
+    "scantBasophilicCytoplasm",
+    "repeatedAcrossField",
+  ]) {
+    blast.morphologySupport[key] = positiveBoolean(
+      repairSupport[key],
+      originalSupport[key],
+    );
+  }
+
+  const originalCytology = asObject(originalBlast.immatureCellCytology);
+  const repairCytology = asObject(repairBlast.immatureCellCytology);
+  blast.immatureCellCytology = mergeNestedObject(
+    originalCytology,
+    repairCytology,
+  );
+
+  for (const key of [
+    "highNCRatio",
+    "openFineChromatin",
+    "nucleoli",
+    "scantBasophilicCytoplasm",
+    "morphologicallyCoherent",
+    "repeatedSubsetAcrossField",
+    "distinctFromMaturationContinuum",
+  ]) {
+    blast.immatureCellCytology[key] = positiveBoolean(
+      repairCytology[key],
+      originalCytology[key],
+    );
+  }
+
+  const originalSub = asObject(originalBlast.blastoidSubpopulationContext);
+  const repairSub = asObject(repairBlast.blastoidSubpopulationContext);
+  blast.blastoidSubpopulationContext = mergeNestedObject(
+    originalSub,
+    repairSub,
+  );
+
+  for (const key of [
+    "morphologicallyCoherent",
+    "repeatedSubsetAcrossField",
+    "repeatedCellsWithSimilarFeatures",
+    "coherentBlastoidSubsetObserved",
+    "distinctFromMaturationContinuum",
+  ]) {
+    blast.blastoidSubpopulationContext[key] = positiveBoolean(
+      repairSub[key],
+      originalSub[key],
+    );
+  }
+
+  // Preserve repeated/multiple immature evidence even when the repair focuses
+  // on cytology and omits or nulls population cardinality.
+  const originalImmatureBurden = asText(originalBlast.immatureCellBurden).toLowerCase();
+  const repairImmatureBurden = asText(repairBlast.immatureCellBurden).toLowerCase();
+  const originalSpatial = asText(originalBlast.spatialDistribution).toLowerCase();
+  const repairSpatial = asText(repairBlast.spatialDistribution).toLowerCase();
+
+  const multipleImmaturePreserved =
+    blast.approximateImmatureCellCount >= 3 ||
+    originalImmatureBurden === "multiple" ||
+    repairImmatureBurden === "multiple";
+
+  const repeatedImmaturePreserved =
+    originalSpatial.includes("repeated") ||
+    repairSpatial.includes("repeated") ||
+    originalSupport.repeatedAcrossField === true ||
+    repairSupport.repeatedAcrossField === true ||
+    originalCytology.repeatedSubsetAcrossField === true ||
+    repairCytology.repeatedSubsetAcrossField === true ||
+    originalSub.repeatedSubsetAcrossField === true ||
+    repairSub.repeatedSubsetAcrossField === true ||
+    originalSub.repeatedCellsWithSimilarFeatures === true ||
+    repairSub.repeatedCellsWithSimilarFeatures === true;
+
+  if (multipleImmaturePreserved) {
+    blast.immatureCellBurden = "multiple";
+  }
+
+  if (repeatedImmaturePreserved) {
+    blast.spatialDistribution =
+      choose(repairBlast.spatialDistribution, originalBlast.spatialDistribution) ||
+      "repeated_across_field";
+  }
+
+  // A positive repair evidence state must outrank an indeterminate first pass.
+  const repairEvidenceState = asText(repairBlast.evidenceState);
+  const originalEvidenceState = asText(originalBlast.evidenceState);
+  blast.evidenceState =
+    repairEvidenceState || originalEvidenceState || null;
+
+  merged.blastAssessment = blast;
 
   const arrayKeys = [
     "positiveFindings",
@@ -477,9 +662,31 @@ export function mergeVisualMorphologyRepair(
   ];
 
   for (const key of arrayKeys) {
-    if (Array.isArray(repair[key])) merged[key] = repair[key];
-    else if (Array.isArray(original[key])) merged[key] = original[key];
+    if (Array.isArray(repair[key]) && repair[key].length > 0) {
+      merged[key] = repair[key];
+    } else if (Array.isArray(original[key])) {
+      merged[key] = original[key];
+    }
   }
+
+  merged.marrowRepairEvidenceMerge = {
+    version: MARROW_REPAIR_EVIDENCE_MERGE_VERSION,
+    positiveCytologyCardinalityPreservationVersion:
+      MARROW_POSITIVE_CYTOLOGY_CARDINALITY_PRESERVATION_VERSION,
+    originalImmatureCellCount:
+      preserveCount(originalBlast.approximateImmatureCellCount, null),
+    repairImmatureCellCount:
+      preserveCount(repairBlast.approximateImmatureCellCount, null),
+    finalImmatureCellCount:
+      preserveCount(blast.approximateImmatureCellCount, null),
+    multipleImmaturePreserved,
+    repeatedImmaturePreserved,
+    specimenAssessmentPreserved:
+      meaningful(merged.specimenAssessment),
+    originalEvidenceState: originalEvidenceState || null,
+    repairEvidenceState: repairEvidenceState || null,
+    finalEvidenceState: blast.evidenceState || null,
+  };
 
   return merged;
 }

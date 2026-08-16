@@ -256,6 +256,8 @@ import {
   assessBoneMarrowVisualEvidenceAcquisition,
   buildBoneMarrowVisualRepairPrompt,
   VME_EFFECTIVE_REASONING_ZERO_EVIDENCE_VERSION,
+  MARROW_REPAIR_EVIDENCE_MERGE_VERSION,
+  MARROW_POSITIVE_CYTOLOGY_CARDINALITY_PRESERVATION_VERSION,
 } from "./ai/visualMorphologyEvidenceAcquisitionContract.js";
 
 import {
@@ -4356,6 +4358,11 @@ BE-FIX-005.31 — COERÊNCIA NARRATIVA-ESTRUTURA E RECUPERAÇÃO FISIOLÓGICA:
 
         parsed = mergeVisualMorphologyRepair(parsed, repaired);
 
+        console.log(
+          "BE-FIX-005.36 — MARROW REPAIR EVIDENCE MERGE / POSITIVE CYTOLOGY CARDINALITY PRESERVATION",
+          JSON.stringify(parsed?.marrowRepairEvidenceMerge || {}, null, 2),
+        );
+
         visualMorphologyEvidenceAcquisition =
           analysisType === "bone_marrow"
             ? assessBoneMarrowVisualEvidenceAcquisition({
@@ -6563,6 +6570,10 @@ app.get("/runtime-version", (_req, res) => {
       MARROW_POSITIVE_CYTOLOGY_CONSISTENCY_VERSION,
     marrowAcquisitionDiscordanceRecoveryVersion:
       MARROW_ACQUISITION_DISCORDANCE_RECOVERY_VERSION,
+    marrowRepairEvidenceMergeVersion:
+      MARROW_REPAIR_EVIDENCE_MERGE_VERSION,
+    marrowPositiveCytologyCardinalityPreservationVersion:
+      MARROW_POSITIVE_CYTOLOGY_CARDINALITY_PRESERVATION_VERSION,
     reactiveLymphoidEvidenceSentinelVersion:
       REACTIVE_LYMPHOID_EVIDENCE_SENTINEL_VERSION,
     canonicalClinicalResultArchitectureVersion:
