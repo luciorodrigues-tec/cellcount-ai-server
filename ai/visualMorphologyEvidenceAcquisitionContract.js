@@ -916,6 +916,13 @@ REGRAS OBRIGATÓRIAS:
   hematopoiético versus estrutura não celular. Se núcleo/cromatina/citoplasma forem reconhecíveis,
   preserve hematopoieticCellCandidate=true. Se houver traços de imaturidade mas insuficientes
   para blasto inequívoco, use focalImmatureCellState=SUSPICIOUS_INDETERMINATE.
+- BE-FIX-005.50.5: quando houver célula hematopoiética focal potencialmente imatura/blastoide,
+  preencha focalBlastoidCytology célula-a-célula. Julgue separadamente relação N:C, cromatina
+  aberta/fina, nucléolo, citoplasma escasso/basofílico e aumento de tamanho. Nunca use tamanho
+  isolado. Se >=2 critérios independentes forem visíveis e a maturação permanecer duvidosa,
+  focalBlastoidCytology.state NÃO pode ser NOT_OBSERVED_IN_EVALUABLE_FIELD; use
+  SUSPICIOUS_INDETERMINATE. OBSERVED requer conjunto morfológico blastoide diretamente sustentado.
+  A presença de uma célula focal NÃO autoriza inferir população blástica nem LMA.
 - BE-FIX-005.50.4: não promova hemoparasita apenas por uma estrutura púrpura/alongada ou pela
   expressão “estrutura incomum”. Parasita OBSERVED exige morfologia parasitária estruturada
   independente da célula hematopoiética concorrente.
@@ -1002,8 +1009,25 @@ export function buildVisualMorphologyAcquisitionResponseFormat() {
                   hematopoieticCellCandidate: { type: "boolean" },
                   focalImmatureCellState: { type: "string", enum: ["OBSERVED", "SUSPICIOUS_INDETERMINATE", "NOT_OBSERVED_IN_EVALUABLE_FIELD", "NOT_ASSESSABLE"] },
                   focalImmatureCellEvidence: { type: "string" },
+                  focalBlastoidCytology: {
+                    type: "object",
+                    additionalProperties: false,
+                    properties: {
+                      state: { type: "string", enum: ["OBSERVED", "SUSPICIOUS_INDETERMINATE", "NOT_OBSERVED_IN_EVALUABLE_FIELD", "NOT_ASSESSABLE"] },
+                      cellCount: nullableIntegerSchema(),
+                      highNCRatio: { type: "string", enum: ["OBSERVED", "NOT_OBSERVED_IN_EVALUABLE_FIELD", "NOT_ASSESSABLE"] },
+                      openFineChromatin: { type: "string", enum: ["OBSERVED", "NOT_OBSERVED_IN_EVALUABLE_FIELD", "NOT_ASSESSABLE"] },
+                      nucleoli: { type: "string", enum: ["OBSERVED", "NOT_OBSERVED_IN_EVALUABLE_FIELD", "NOT_ASSESSABLE"] },
+                      scantBasophilicCytoplasm: { type: "string", enum: ["OBSERVED", "NOT_OBSERVED_IN_EVALUABLE_FIELD", "NOT_ASSESSABLE"] },
+                      largeCellSize: { type: "string", enum: ["OBSERVED", "NOT_OBSERVED_IN_EVALUABLE_FIELD", "NOT_ASSESSABLE"] },
+                      featureCount: nullableIntegerSchema(),
+                      evidence: { type: "string" },
+                      reactiveMimicFeatures: { type: "string" }
+                    },
+                    required: ["state", "cellCount", "highNCRatio", "openFineChromatin", "nucleoli", "scantBasophilicCytoplasm", "largeCellSize", "featureCount", "evidence", "reactiveMimicFeatures"]
+                  },
                 },
-                required: ["description", "approximateVisibleCells", "countStatus", "heterogeneity", "nuclearMorphology", "chromatin", "nucleoli", "cytoplasm", "maturation", "atypia", "blastLikeFeatures", "hematopoieticCellCandidate", "focalImmatureCellState", "focalImmatureCellEvidence"],
+                required: ["description", "approximateVisibleCells", "countStatus", "heterogeneity", "nuclearMorphology", "chromatin", "nucleoli", "cytoplasm", "maturation", "atypia", "blastLikeFeatures", "hematopoieticCellCandidate", "focalImmatureCellState", "focalImmatureCellEvidence", "focalBlastoidCytology"],
               },
               platelets: {
                 type: "object",

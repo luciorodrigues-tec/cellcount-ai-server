@@ -301,6 +301,14 @@ import {
 } from "./ai/peripheralBloodPositiveMorphologyArbitrationEngine.js";
 
 import {
+  applyPeripheralBlastoidCytologyAuthority,
+  applyPeripheralNegativeFindingAuthorityControl,
+  PERIPHERAL_BLASTOID_CYTOLOGY_AUTHORITY_VERSION,
+  PERIPHERAL_NEGATIVE_FINDING_AUTHORITY_CONTROL_VERSION,
+  PERIPHERAL_FOCAL_VS_POPULATION_SEPARATION_VERSION,
+} from "./ai/peripheralBlastoidCytologyAuthorityEngine.js";
+
+import {
   REACTIVE_LYMPHOID_EVIDENCE_SENTINEL_VERSION,
   applyReactiveLymphoidEvidenceSentinel,
   evaluateReactiveLymphoidEvidence,
@@ -7028,6 +7036,12 @@ app.get("/runtime-version", (_req, res) => {
       PERIPHERAL_HEMATOPOIETIC_PARASITE_ARBITRATION_VERSION,
     peripheralLimitedFieldNonSuppressionVersion:
       PERIPHERAL_LIMITED_FIELD_NON_SUPPRESSION_VERSION,
+    peripheralBlastoidCytologyAuthorityVersion:
+      PERIPHERAL_BLASTOID_CYTOLOGY_AUTHORITY_VERSION,
+    peripheralNegativeFindingAuthorityControlVersion:
+      PERIPHERAL_NEGATIVE_FINDING_AUTHORITY_CONTROL_VERSION,
+    peripheralFocalVsPopulationSeparationVersion:
+      PERIPHERAL_FOCAL_VS_POPULATION_SEPARATION_VERSION,
     canonicalClinicalResultArchitectureVersion:
       CRA_001_1_VERSION,
     clinicalResultCoherenceEngineVersion:
@@ -8692,6 +8706,14 @@ if (specimenGate.analysisType === "peripheral_blood") {
   );
 }
 
+if (specimenGate.analysisType === "peripheral_blood") {
+  finalResult = applyPeripheralBlastoidCytologyAuthority(finalResult);
+  console.log(
+    "BE-FIX-005.50.5 — PERIPHERAL BLASTOID CYTOLOGY AUTHORITY / PRE-SENTINEL",
+    JSON.stringify(finalResult.peripheralBlastoidCytologyAuthority || {}, null, 2),
+  );
+}
+
 // ============================================================================
 // BE-FIX-005.13 — SINGLE BLAST SENTINEL
 // One positive blast/blast-like signal is sufficient to activate the critical
@@ -8751,6 +8773,22 @@ finalResult =
   applyFieldScopedNegativeFindings(
     finalResult,
   );
+
+if (specimenGate.analysisType === "peripheral_blood") {
+  finalResult = applyPeripheralBlastoidCytologyAuthority(finalResult);
+  finalResult = applyPeripheralNegativeFindingAuthorityControl(finalResult);
+  console.log(
+    "BE-FIX-005.50.5 — PERIPHERAL BLASTOID / NEGATIVE-FINDING TERMINAL AUTHORITY",
+    JSON.stringify(
+      {
+        blastoid: finalResult.peripheralBlastoidCytologyAuthority || {},
+        negativeAuthority: finalResult.negativeFindingAuthority || {},
+      },
+      null,
+      2,
+    ),
+  );
+}
 
 // BE-FIX-005.32 — final marrow result coherence lock.
 if (specimenGate.analysisType === "bone_marrow") {

@@ -1,6 +1,8 @@
 // ============================================================================
 // CELLCOUNT ENTERPRISE
 // BE-FIX-005.4 — FIELD-SCOPED NEGATIVE FINDINGS
+// BE-FIX-005.50.5 — negative findings remain auditable but may be demoted from
+// the executive narrative when positive focal blastoid cytology is present.
 // NEGATIVE FINDINGS SCOPE ENGINE V1
 //
 // PRINCIPLE

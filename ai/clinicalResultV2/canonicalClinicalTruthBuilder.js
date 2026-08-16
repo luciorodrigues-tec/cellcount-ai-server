@@ -572,6 +572,44 @@ function canonicalClinicalCriticality(result = {}) {
   return null;
 }
 
+function applyNegativeFindingPresentationAuthority(result = {}, criticalFindings = {}) {
+  const authority = asObject(result.negativeFindingAuthority);
+  const secondary = new Set(
+    asArray(authority.secondaryItems)
+      .map((item) => text(item?.key))
+      .filter(Boolean),
+  );
+
+  const output = { ...criticalFindings };
+
+  const keyMap = {
+    auerRods: "auerRods",
+    schistocytes: "schistocytes",
+    parasites: "hemoparasites",
+  };
+
+  for (const [resultKey, authorityKey] of Object.entries(keyMap)) {
+    if (!secondary.has(authorityKey) || !output[resultKey]) continue;
+    output[resultKey] = {
+      ...output[resultKey],
+      presentationAuthority: "SECONDARY_DETAIL",
+      suppressFromExecutiveCriticalList: true,
+    };
+  }
+
+  if (output.blastLike) {
+    output.blastLike = {
+      ...output.blastLike,
+      presentationAuthority:
+        ["OBSERVED", "SUSPICIOUS_INDETERMINATE"].includes(output.blastLike.state)
+          ? "PRIMARY_POSITIVE"
+          : "PRIMARY_CONTEXT",
+    };
+  }
+
+  return output;
+}
+
 export function buildCanonicalClinicalTruth(result = {}, {
   specimenType = null,
   analysisSource = null,
@@ -733,22 +771,25 @@ export function buildCanonicalClinicalTruth(result = {}, {
         ...asArray(result.limitations),
       ]),
     },
-    criticalFindings: {
-      blastLike,
-      auerRods: buildStructuredCriticalTruth(result, {
-        keys: ["auerRods", "auerRod", "auerSticks"],
-        assessable: field.adequateForBlastScreening === true,
-        confidence,
-        label: "Bastonetes de Auer",
-      }),
-      schistocytes: buildStructuredCriticalTruth(result, {
-        keys: ["schistocytes", "schistocyte", "clinicallyRelevantSchistocytes"],
-        assessable: Boolean(erythrocytes.description),
-        confidence,
-        label: "Esquizócitos clinicamente relevantes",
-      }),
-      parasites: parasiteArtifact.parasite,
-    },
+    criticalFindings: applyNegativeFindingPresentationAuthority(
+      result,
+      {
+        blastLike,
+        auerRods: buildStructuredCriticalTruth(result, {
+          keys: ["auerRods", "auerRod", "auerSticks"],
+          assessable: field.adequateForBlastScreening === true,
+          confidence,
+          label: "Bastonetes de Auer",
+        }),
+        schistocytes: buildStructuredCriticalTruth(result, {
+          keys: ["schistocytes", "schistocyte", "clinicallyRelevantSchistocytes"],
+          assessable: Boolean(erythrocytes.description),
+          confidence,
+          label: "Esquizócitos clinicamente relevantes",
+        }),
+        parasites: parasiteArtifact.parasite,
+      },
+    ),
     lineages: {
       erythrocytes: {
         ...erythrocytes,
