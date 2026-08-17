@@ -1,12 +1,12 @@
 // ============================================================================
 // CELLCOUNT ENTERPRISE
-// BE-FIX-005.50.5 — PERIPHERAL BLASTOID CYTOLOGY ACQUISITION &
-//                   NEGATIVE-FINDING AUTHORITY CONTROL
+// BE-FIX-005.50.6 — FOCAL-CELL NEGATIVE BLAST AUTHORITY GATE &
+//                   PERIPHERAL BLASTOID CYTOLOGY PRESERVATION
 // ============================================================================
 
-export const PERIPHERAL_BLASTOID_CYTOLOGY_AUTHORITY_VERSION = "BE-FIX-005.50.5";
-export const PERIPHERAL_NEGATIVE_FINDING_AUTHORITY_CONTROL_VERSION = "BE-FIX-005.50.5";
-export const PERIPHERAL_FOCAL_VS_POPULATION_SEPARATION_VERSION = "BE-FIX-005.50.5";
+export const PERIPHERAL_BLASTOID_CYTOLOGY_AUTHORITY_VERSION = "BE-FIX-005.50.6";
+export const PERIPHERAL_NEGATIVE_FINDING_AUTHORITY_CONTROL_VERSION = "BE-FIX-005.50.6";
+export const PERIPHERAL_FOCAL_VS_POPULATION_SEPARATION_VERSION = "BE-FIX-005.50.6";
 
 function asObject(value) {
   return value && typeof value === "object" && !Array.isArray(value) ? value : {};
@@ -84,7 +84,7 @@ export function evaluatePeripheralBlastoidCytologyAuthority(result = {}) {
     finite(rawWbc.approximateVisibleCells);
 
   // A focal cell can be morphologically meaningful without establishing a
-  // population. 005.50.5 never converts one cell into blastosis/AML.
+  // population. 005.50.6 never converts one cell into blastosis/AML.
   const enoughForSuspicion =
     hematopoieticCandidate &&
     (cellCount === null || cellCount >= 1) &&
@@ -135,9 +135,32 @@ export function evaluatePeripheralBlastoidCytologyAuthority(result = {}) {
 
   const active = ["OBSERVED", "SUSPICIOUS_INDETERMINATE"].includes(effectiveState);
 
+  // BE-FIX-005.50.6 — a sparse field containing only one recognized
+  // hematopoietic cell cannot carry a hard field-level negative blast
+  // conclusion. The cell may be described as mature, but that is not the same
+  // as an adequate blast screen of the peripheral smear. This specifically
+  // separates CELL-LEVEL cytology from FIELD-LEVEL negative authority.
+  const focalOnlyField =
+    hematopoieticCandidate &&
+    cellCount !== null &&
+    cellCount <= 1;
+
+  const hardNegativeDeclared =
+    effectiveState === "NOT_OBSERVED_IN_EVALUABLE_FIELD";
+
+  const focalNegativeAuthorityBlocked =
+    focalOnlyField && hardNegativeDeclared && !active;
+
+  if (focalNegativeAuthorityBlocked) {
+    effectiveState = "NOT_ASSESSABLE";
+  }
+
+  const effectiveActive =
+    ["OBSERVED", "SUSPICIOUS_INDETERMINATE"].includes(effectiveState);
+
   return {
     version: PERIPHERAL_BLASTOID_CYTOLOGY_AUTHORITY_VERSION,
-    active,
+    active: effectiveActive,
     declaredState,
     effectiveState,
     hematopoieticCandidate,
@@ -158,7 +181,9 @@ export function evaluatePeripheralBlastoidCytologyAuthority(result = {}) {
     reactiveMimicFeatures: text(structured.reactiveMimicFeatures),
     populationInferenceAllowed: false,
     amlDiagnosisAllowed: false,
-    negativeBlastAuthorityAllowed: !active,
+    focalOnlyField,
+    focalNegativeAuthorityBlocked,
+    negativeBlastAuthorityAllowed: !effectiveActive && !focalNegativeAuthorityBlocked,
   };
 }
 
@@ -210,6 +235,21 @@ export function applyPeripheralBlastoidCytologyAuthority(result = {}) {
     populationInferenceAllowed: false,
     version: PERIPHERAL_BLASTOID_CYTOLOGY_AUTHORITY_VERSION,
   };
+
+  if (decision.focalNegativeAuthorityBlocked) {
+    // Do not fabricate suspicion. Only revoke an unsupported hard negative.
+    result.findings.focalHematopoieticCellObserved = true;
+    result.findings.focalImmatureCellState = "NOT_ASSESSABLE";
+    result.findings.blastEvidenceState = "NOT_ASSESSABLE";
+    result.findings.blastSuspicion = false;
+    result.normalityBlocked = true;
+    result.requiresHumanReview = true;
+
+    result.blockNormalReason = unique([
+      ...asArray(result.blockNormalReason),
+      "Campo com célula hematopoiética focal isolada: insuficiente para conclusão negativa de blastos.",
+    ]);
+  }
 
   if (decision.active) {
     result.findings.focalHematopoieticCellObserved = true;
@@ -263,6 +303,9 @@ export function applyPeripheralNegativeFindingAuthorityControl(result = {}) {
   const scope = asObject(result.negativeFindingScope);
   const items = asArray(scope.items);
 
+  const focalNegativeAuthorityBlocked =
+    authority.focalNegativeAuthorityBlocked === true;
+
   const secondaryKeys = new Set([
     "auerRods",
     "schistocytes",
@@ -293,6 +336,7 @@ export function applyPeripheralNegativeFindingAuthorityControl(result = {}) {
   result.negativeFindingAuthority = {
     version: PERIPHERAL_NEGATIVE_FINDING_AUTHORITY_CONTROL_VERSION,
     blastPositive,
+    focalNegativeAuthorityBlocked,
     principle: "POSITIVE_MORPHOLOGY_OUTRANKS_NEGATIVE_OR_INDETERMINATE_DETAIL",
     primaryItems,
     secondaryItems,
