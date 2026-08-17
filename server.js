@@ -328,6 +328,11 @@ import {
 } from "./ai/clinicalResultV2/index.js";
 
 import {
+  applyCanonicalClinicalPresentationAuthority,
+  CANONICAL_CLINICAL_PRESENTATION_AUTHORITY_VERSION,
+} from "./ai/clinicalResultV2/canonicalClinicalPresentationAuthority.js";
+
+import {
   PRODUCTION_VME_ENFORCEMENT_VERSION,
   LOCAL_MORPHOLOGY_ACQUISITION_RECOVERY_VERSION,
   assessVisualMorphologyEvidenceAcquisition,
@@ -6971,6 +6976,10 @@ app.get("/runtime-version", (_req, res) => {
       "BE-FIX-005.50.2",
     positiveRbcMorphologyPreservationVersion:
       "BE-FIX-005.50.2",
+    canonicalClinicalPresentationAuthorityVersion:
+      CANONICAL_CLINICAL_PRESENTATION_AUTHORITY_VERSION,
+    canonicalClinicalNarrativeDeduplicationVersion:
+      CANONICAL_CLINICAL_PRESENTATION_AUTHORITY_VERSION,
     marrowEvidenceWeightedCriticalityVersion:
       MARROW_EVIDENCE_WEIGHTED_CRITICALITY_VERSION,
     marrowCoreMyeloidSalienceCalibrationVersion:
@@ -9095,6 +9104,21 @@ if (specimenGate.analysisType === "bone_marrow") {
     ),
   );
 }
+
+// ============================================================================
+// BE/FE-FIX-005.50.8 — CANONICAL CLINICAL PRESENTATION AUTHORITY
+// Presentation-only projection. It must not rewrite morphology, evidence,
+// maturation state, negative-finding authority or clinical criticality.
+// ============================================================================
+finalResult =
+  applyCanonicalClinicalPresentationAuthority(
+    finalResult,
+  );
+
+console.log(
+  "BE-FIX-005.50.8 — CANONICAL CLINICAL PRESENTATION",
+  JSON.stringify(finalResult.clinicalPresentation || {}, null, 2),
+);
 
 finalResult.academicMorphologyReasoningContract =
   finalAcademicMorphologyReasoningContract;
