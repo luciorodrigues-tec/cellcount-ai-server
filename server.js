@@ -309,6 +309,13 @@ import {
 } from "./ai/peripheralBlastoidCytologyAuthorityEngine.js";
 
 import {
+  applyPeripheralFocalHematopoieticCytomorphologyResolution,
+  PERIPHERAL_FOCAL_CELL_CYTOMORPHOLOGY_VERSION,
+  PERIPHERAL_MATURATION_STATE_RESOLUTION_VERSION,
+  PERIPHERAL_CELL_FEATURE_PROVENANCE_VERSION,
+} from "./ai/peripheralFocalHematopoieticCytomorphologyEngine.js";
+
+import {
   REACTIVE_LYMPHOID_EVIDENCE_SENTINEL_VERSION,
   applyReactiveLymphoidEvidenceSentinel,
   evaluateReactiveLymphoidEvidence,
@@ -7042,6 +7049,12 @@ app.get("/runtime-version", (_req, res) => {
       PERIPHERAL_NEGATIVE_FINDING_AUTHORITY_CONTROL_VERSION,
     peripheralFocalVsPopulationSeparationVersion:
       PERIPHERAL_FOCAL_VS_POPULATION_SEPARATION_VERSION,
+    peripheralFocalCellCytomorphologyVersion:
+      PERIPHERAL_FOCAL_CELL_CYTOMORPHOLOGY_VERSION,
+    peripheralMaturationStateResolutionVersion:
+      PERIPHERAL_MATURATION_STATE_RESOLUTION_VERSION,
+    peripheralCellFeatureProvenanceVersion:
+      PERIPHERAL_CELL_FEATURE_PROVENANCE_VERSION,
     canonicalClinicalResultArchitectureVersion:
       CRA_001_1_VERSION,
     clinicalResultCoherenceEngineVersion:
@@ -8707,6 +8720,19 @@ if (specimenGate.analysisType === "peripheral_blood") {
 }
 
 if (specimenGate.analysisType === "peripheral_blood") {
+  finalResult =
+    applyPeripheralFocalHematopoieticCytomorphologyResolution(finalResult);
+  console.log(
+    "BE-FIX-005.50.7 — FOCAL HEMATOPOIETIC DEEP CYTOMORPHOLOGY / PRE-SENTINEL",
+    JSON.stringify(
+      finalResult.peripheralFocalHematopoieticCytomorphology || {},
+      null,
+      2,
+    ),
+  );
+}
+
+if (specimenGate.analysisType === "peripheral_blood") {
   finalResult = applyPeripheralBlastoidCytologyAuthority(finalResult);
   console.log(
     "BE-FIX-005.50.5 — PERIPHERAL BLASTOID CYTOLOGY AUTHORITY / PRE-SENTINEL",
@@ -8775,8 +8801,18 @@ finalResult =
   );
 
 if (specimenGate.analysisType === "peripheral_blood") {
+  finalResult =
+    applyPeripheralFocalHematopoieticCytomorphologyResolution(finalResult);
   finalResult = applyPeripheralBlastoidCytologyAuthority(finalResult);
   finalResult = applyPeripheralNegativeFindingAuthorityControl(finalResult);
+  console.log(
+    "BE-FIX-005.50.7 — FOCAL CELL MATURATION RESOLUTION / TERMINAL PROJECTION",
+    JSON.stringify(
+      finalResult.peripheralFocalHematopoieticCytomorphology || {},
+      null,
+      2,
+    ),
+  );
   console.log(
     "BE-FIX-005.50.5 — PERIPHERAL BLASTOID / NEGATIVE-FINDING TERMINAL AUTHORITY",
     JSON.stringify(

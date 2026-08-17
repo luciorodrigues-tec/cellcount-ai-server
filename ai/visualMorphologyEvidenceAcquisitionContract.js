@@ -923,6 +923,15 @@ REGRAS OBRIGATÓRIAS:
   focalBlastoidCytology.state NÃO pode ser NOT_OBSERVED_IN_EVALUABLE_FIELD; use
   SUSPICIOUS_INDETERMINATE. OBSERVED requer conjunto morfológico blastoide diretamente sustentado.
   A presença de uma célula focal NÃO autoriza inferir população blástica nem LMA.
+- BE-FIX-005.50.7: SEMPRE que hematopoieticCellCandidate=true e houver pelo menos uma célula
+  focal avaliável, preencha focalCellCytomorphology ANTES de decidir maturação. Caracterize
+  tamanho relativo, relação N:C, cromatina, nucléolos, contorno nuclear, quantidade/basofilia
+  citoplasmática, granulação e inclusões. Para cada feature use exatamente OBSERVED,
+  NOT_OBSERVED_IN_EVALUABLE_CELL ou NOT_ASSESSABLE. Falta de resolução NÃO é ausência.
+  Não classifique a célula como madura apenas por núcleo arredondado/oval ou por ausência de
+  um único critério blastoide. Maturação madura exige suporte citomorfológico positivo; se
+  cromatina, nucléolos ou limites citoplasmáticos essenciais não forem suficientemente avaliáveis,
+  use modelMaturationImpression=INDETERMINATE. Contexto clínico não pode preencher features.
 - BE-FIX-005.50.4: não promova hemoparasita apenas por uma estrutura púrpura/alongada ou pela
   expressão “estrutura incomum”. Parasita OBSERVED exige morfologia parasitária estruturada
   independente da célula hematopoiética concorrente.
@@ -1009,6 +1018,35 @@ export function buildVisualMorphologyAcquisitionResponseFormat() {
                   hematopoieticCellCandidate: { type: "boolean" },
                   focalImmatureCellState: { type: "string", enum: ["OBSERVED", "SUSPICIOUS_INDETERMINATE", "NOT_OBSERVED_IN_EVALUABLE_FIELD", "NOT_ASSESSABLE"] },
                   focalImmatureCellEvidence: { type: "string" },
+                  focalCellCytomorphology: {
+                    type: "object",
+                    additionalProperties: false,
+                    properties: {
+                      state: { type: "string", enum: ["OBSERVED", "NOT_ASSESSABLE"] },
+                      cellCount: nullableIntegerSchema(),
+                      relativeSizeDescription: { type: "string" },
+                      nuclearDescription: { type: "string" },
+                      chromatinDescription: { type: "string" },
+                      nucleoliDescription: { type: "string" },
+                      cytoplasmDescription: { type: "string" },
+                      granulationDescription: { type: "string" },
+                      inclusionDescription: { type: "string" },
+                      largeCellSize: { type: "string", enum: ["OBSERVED", "NOT_OBSERVED_IN_EVALUABLE_CELL", "NOT_ASSESSABLE"] },
+                      highNCRatio: { type: "string", enum: ["OBSERVED", "NOT_OBSERVED_IN_EVALUABLE_CELL", "NOT_ASSESSABLE"] },
+                      openFineChromatin: { type: "string", enum: ["OBSERVED", "NOT_OBSERVED_IN_EVALUABLE_CELL", "NOT_ASSESSABLE"] },
+                      visibleNucleoli: { type: "string", enum: ["OBSERVED", "NOT_OBSERVED_IN_EVALUABLE_CELL", "NOT_ASSESSABLE"] },
+                      irregularNuclearContour: { type: "string", enum: ["OBSERVED", "NOT_OBSERVED_IN_EVALUABLE_CELL", "NOT_ASSESSABLE"] },
+                      segmentedOrLobulatedNucleus: { type: "string", enum: ["OBSERVED", "NOT_OBSERVED_IN_EVALUABLE_CELL", "NOT_ASSESSABLE"] },
+                      condensedChromatin: { type: "string", enum: ["OBSERVED", "NOT_OBSERVED_IN_EVALUABLE_CELL", "NOT_ASSESSABLE"] },
+                      scantCytoplasm: { type: "string", enum: ["OBSERVED", "NOT_OBSERVED_IN_EVALUABLE_CELL", "NOT_ASSESSABLE"] },
+                      basophilicCytoplasm: { type: "string", enum: ["OBSERVED", "NOT_OBSERVED_IN_EVALUABLE_CELL", "NOT_ASSESSABLE"] },
+                      cytoplasmicGranules: { type: "string", enum: ["OBSERVED", "NOT_OBSERVED_IN_EVALUABLE_CELL", "NOT_ASSESSABLE"] },
+                      cytoplasmicInclusions: { type: "string", enum: ["OBSERVED", "NOT_OBSERVED_IN_EVALUABLE_CELL", "NOT_ASSESSABLE"] },
+                      modelMaturationImpression: { type: "string", enum: ["MATURE_LIKE", "IMMATURE_OR_BLASTOID_LIKE", "REACTIVE_OR_ATYPICAL_LIKE", "INDETERMINATE"] },
+                      evidenceSummary: { type: "string" }
+                    },
+                    required: ["state", "cellCount", "relativeSizeDescription", "nuclearDescription", "chromatinDescription", "nucleoliDescription", "cytoplasmDescription", "granulationDescription", "inclusionDescription", "largeCellSize", "highNCRatio", "openFineChromatin", "visibleNucleoli", "irregularNuclearContour", "segmentedOrLobulatedNucleus", "condensedChromatin", "scantCytoplasm", "basophilicCytoplasm", "cytoplasmicGranules", "cytoplasmicInclusions", "modelMaturationImpression", "evidenceSummary"]
+                  },
                   focalBlastoidCytology: {
                     type: "object",
                     additionalProperties: false,
@@ -1027,7 +1065,7 @@ export function buildVisualMorphologyAcquisitionResponseFormat() {
                     required: ["state", "cellCount", "highNCRatio", "openFineChromatin", "nucleoli", "scantBasophilicCytoplasm", "largeCellSize", "featureCount", "evidence", "reactiveMimicFeatures"]
                   },
                 },
-                required: ["description", "approximateVisibleCells", "countStatus", "heterogeneity", "nuclearMorphology", "chromatin", "nucleoli", "cytoplasm", "maturation", "atypia", "blastLikeFeatures", "hematopoieticCellCandidate", "focalImmatureCellState", "focalImmatureCellEvidence", "focalBlastoidCytology"],
+                required: ["description", "approximateVisibleCells", "countStatus", "heterogeneity", "nuclearMorphology", "chromatin", "nucleoli", "cytoplasm", "maturation", "atypia", "blastLikeFeatures", "hematopoieticCellCandidate", "focalImmatureCellState", "focalImmatureCellEvidence", "focalCellCytomorphology", "focalBlastoidCytology"],
               },
               platelets: {
                 type: "object",

@@ -20,6 +20,7 @@ export const MARROW_POSITIVE_EVIDENCE_PROJECTION_VERSION = "BE-FIX-005.26";
 export const MARROW_PRECURSOR_FALSE_POSITIVE_CONTAINMENT_LME_VERSION = MARROW_PRECURSOR_DISCRIMINATION_VERSION;
 export const PERIPHERAL_POSITIVE_MORPHOLOGY_LME_VERSION = "BE-FIX-005.50.4";
 export const PERIPHERAL_BLASTOID_CYTOLOGY_LME_VERSION = "BE-FIX-005.50.5";
+export const PERIPHERAL_FOCAL_CELL_CYTOMORPHOLOGY_LME_VERSION = "BE-FIX-005.50.7";
 
 const GENERIC_LIMITATION_PATTERNS = [
   /campo microsc[oó]pico limitado/i,
@@ -450,6 +451,11 @@ export function createLocalMorphologyEvidence({
       hematopoieticCellCandidate: explicitWbc.hematopoieticCellCandidate === true || legacyWbc.hematopoieticCellCandidate === true,
       focalImmatureCellState: firstText(explicitWbc.focalImmatureCellState, legacyWbc.focalImmatureCellState).toUpperCase() || "NOT_ASSESSABLE",
       focalImmatureCellEvidence: firstText(explicitWbc.focalImmatureCellEvidence, legacyWbc.focalImmatureCellEvidence),
+      focalCellCytomorphology: {
+        ...asObject(legacyWbc.focalCellCytomorphology),
+        ...asObject(explicitWbc.focalCellCytomorphology),
+        version: PERIPHERAL_FOCAL_CELL_CYTOMORPHOLOGY_LME_VERSION,
+      },
       focalBlastoidCytology: {
         ...asObject(legacyWbc.focalBlastoidCytology),
         ...asObject(explicitWbc.focalBlastoidCytology),
@@ -457,6 +463,7 @@ export function createLocalMorphologyEvidence({
       },
       positiveMorphologyVersion: PERIPHERAL_POSITIVE_MORPHOLOGY_LME_VERSION,
       blastoidCytologyVersion: PERIPHERAL_BLASTOID_CYTOLOGY_LME_VERSION,
+      focalCellCytomorphologyVersion: PERIPHERAL_FOCAL_CELL_CYTOMORPHOLOGY_LME_VERSION,
       positiveFindings: asArray(explicitWbc.positiveFindings),
       uncertainties: asArray(explicitWbc.uncertainties),
     },
