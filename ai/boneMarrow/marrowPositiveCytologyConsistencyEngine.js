@@ -16,6 +16,7 @@
 export const MARROW_POSITIVE_CYTOLOGY_CONSISTENCY_VERSION = "BE-FIX-005.35";
 export const MARROW_ACQUISITION_DISCORDANCE_RECOVERY_VERSION = "BE-FIX-005.35";
 export const MARROW_PRIMARY_OR_RECOVERED_POSITIVE_BLASTOID_CYTOLOGY_PRESERVATION_VERSION = "BE-FIX-005.50.15.4";
+export const MARROW_FOCAL_CYTOLOGY_POPULATION_SCOPE_LOCK_VERSION = "BE-FIX-005.50.15.5";
 
 function obj(v){return v&&typeof v==="object"&&!Array.isArray(v)?v:{};}
 function txt(v){return typeof v==="string"?v.trim():"";}
@@ -88,9 +89,14 @@ export function evaluateMarrowPositiveCytologyDiscordance(result={}){
   const distinctSubset =
     cyt.distinctFromMaturationContinuum===true ||
     sub.distinctFromMaturationContinuum===true;
-  const positiveState=[
-    "OBSERVED_POPULATION","SUSPICIOUS_POPULATION","FOCAL_SUSPICION"
-  ].includes(upper(assessment.evidenceState));
+  const evidenceState=upper(assessment.evidenceState);
+  // BE-FIX-005.50.15.5 — FOCAL_SUSPICION is positive local cytology, not
+  // population architecture. Only explicit population states may participate
+  // in structured-positive authority through this branch.
+  const positivePopulationState=[
+    "OBSERVED_POPULATION","SUSPICIOUS_POPULATION"
+  ].includes(evidenceState);
+  const focalSuspicionState=evidenceState==="FOCAL_SUSPICION";
   const physiologicContinuumLock =
     obj(result.marrowPhysiologicMaturationContinuumLock).active===true;
   const repairArchitectureProvenance = obj(result.marrowRepairEvidenceMerge);
@@ -105,7 +111,7 @@ export function evaluateMarrowPositiveCytologyDiscordance(result={}){
     !physiologicContinuumLock &&
     architectureQualifiedForStructuredPositive &&
     (
-      positiveState ||
+      positivePopulationState ||
       obj(result.marrowPositiveBlastEvidenceLock).active===true ||
       obj(result.marrowRecoveredCytologyProjection).structuredPositive===true
     );
@@ -143,6 +149,9 @@ export function evaluateMarrowPositiveCytologyDiscordance(result={}){
     characterizedCytologyCount,positiveCytologyCount,
     narrativeStructuredDiscordance,structuredRepeat,
     coherentSubset,distinctSubset,physiologicContinuumLock,structuredPositive,
+    focalCytologyPopulationScopeLockVersion:
+      MARROW_FOCAL_CYTOLOGY_POPULATION_SCOPE_LOCK_VERSION,
+    positivePopulationState,focalSuspicionState,
     repairArchitectureProvenanceVersion:
       repairArchitectureProvenance.repairArchitectureProvenanceVersion || null,
     repairAttempted,singlePassArchitectureCore,

@@ -16,10 +16,10 @@
 // ============================================================================
 
 export const MARROW_POSITIVE_BLAST_EVIDENCE_SEMANTIC_SUPERSESSION_VERSION =
-  "BE-FIX-005.50.13";
+  "BE-FIX-005.50.15.5";
 
 export const MARROW_FINAL_BLAST_PROJECTION_LOCK_VERSION =
-  "BE-FIX-005.50.13";
+  "BE-FIX-005.50.15.5";
 
 function obj(value) {
   return value && typeof value === "object" && !Array.isArray(value)
@@ -152,6 +152,15 @@ export function evaluateMarrowPositiveBlastEvidenceSemanticSupersession(
       (num(lmeBlast.approximateBlastLikeCells) ?? 0) <= 2
     );
 
+  const populationInferenceAllowed =
+    result?.fieldAdequacy?.populationInferenceAllowed !== false;
+  const focalPopulationScopeBlocked =
+    focalOnly &&
+    !populationInferenceAllowed &&
+    !observedQualified &&
+    !suspiciousArchitectureQualified &&
+    !structuredArchitecture;
+
   const approximateBlastLikeCells =
     num(directBlast.approximateBlastLikeCells) ??
     num(rawBlast.approximateBlastLikeCells) ??
@@ -216,7 +225,18 @@ export function evaluateMarrowPositiveBlastEvidenceSemanticSupersession(
     unresolvedImmatureCandidateAfterAcquisition,
     physiologicMaturationContradiction,
     supersessionMode,
-    populationPositiveAllowed: !active,
+    populationInferenceAllowed,
+    focalPopulationScopeBlocked,
+    populationPositiveAllowed:
+      !active &&
+      !focalPopulationScopeBlocked &&
+      (
+        observedQualified ||
+        suspiciousArchitectureQualified ||
+        structuredArchitecture ||
+        (!focalOnly && populationInferenceAllowed)
+      ),
+    focalCytologyPopulationScopeLockVersion: "BE-FIX-005.50.15.5",
     negativeBlastExclusionAllowed: false,
     reason: physiologicMaturationContradiction
       ? "Suspicious architecture is not sufficient to establish a structured blastoid population when morphology is explicitly within a physiologic maturation continuum, no blast-like cells are counted, no observed blast population exists, and no independent structured architecture is present."

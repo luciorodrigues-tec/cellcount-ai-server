@@ -17,9 +17,9 @@
 // - never diagnose CML/LMC/MPN/BCR::ABL1 from morphology alone.
 // ============================================================================
 
-export const MARROW_FINAL_CLINICAL_AUTHORITY_VERSION = "BE-FIX-005.50.13";
-export const MARROW_POST_LEGACY_RECONCILIATION_VERSION = "BE-FIX-005.50.13";
-export const MARROW_ADEQUACY_MORPHOLOGY_AXIS_SEPARATION_VERSION = "BE-FIX-005.50.13";
+export const MARROW_FINAL_CLINICAL_AUTHORITY_VERSION = "BE-FIX-005.50.15.5";
+export const MARROW_POST_LEGACY_RECONCILIATION_VERSION = "BE-FIX-005.50.15.5";
+export const MARROW_ADEQUACY_MORPHOLOGY_AXIS_SEPARATION_VERSION = "BE-FIX-005.50.15.5";
 export const MARROW_TERMINAL_MORPHOLOGY_ADEQUACY_PROJECTION_LOCK_VERSION = "BE-FIX-005.47";
 
 function obj(value) {
@@ -65,6 +65,14 @@ function evaluateStructuredBlastAuthority(result = {}) {
     result.rawResponse?.blastAssessment?.evidenceState,
   );
 
+  // BE-FIX-005.50.15.5 — local focal cytology and population inference are
+  // orthogonal. A FOCAL_SUSPICION may survive as positive local evidence, but
+  // it cannot become structured/population-positive merely because a legacy
+  // recovery container marked it positive.
+  const populationInferenceAllowed =
+    result.fieldAdequacy?.populationInferenceAllowed !== false;
+  const focalOnly = evidenceState === "FOCAL_SUSPICION";
+
   const observed =
     marrowEvidence.observedPopulation === true ||
     precursor.protectedObservedBlastoid === true ||
@@ -99,10 +107,13 @@ function evaluateStructuredBlastAuthority(result = {}) {
 
   const independentStructuredArchitecture =
     precursor.coherentBlastoidSubpopulation === true ||
-    recovered.structuredPositive === true ||
     recovered.architectureQualified === true ||
     expansion.structuredPathologicSubset === true ||
-    expansionLock.blastoidPopulationSupported === true;
+    expansionLock.blastoidPopulationSupported === true ||
+    (
+      recovered.structuredPositive === true &&
+      !(focalOnly && !populationInferenceAllowed)
+    );
 
   const physiologicMaturationContradiction =
     observed === false &&
@@ -120,7 +131,7 @@ function evaluateStructuredBlastAuthority(result = {}) {
   const effectiveSuspicious =
     suspicious && !physiologicMaturationContradiction;
 
-  const structured =
+  const structuredCandidate =
     observed ||
     effectiveSuspicious ||
     independentStructuredArchitecture ||
@@ -128,6 +139,15 @@ function evaluateStructuredBlastAuthority(result = {}) {
       finalLock.populationBlastSuspicion === true &&
       !physiologicMaturationContradiction
     );
+
+  const focalPopulationScopeBlocked =
+    focalOnly &&
+    !populationInferenceAllowed &&
+    !observed &&
+    !effectiveSuspicious &&
+    !independentStructuredArchitecture;
+
+  const structured = structuredCandidate && !focalPopulationScopeBlocked;
 
   return {
     observed,
@@ -137,6 +157,13 @@ function evaluateStructuredBlastAuthority(result = {}) {
     approximateBlastLikeCells,
     explicitlyWithinContinuum,
     physiologicMaturationContradiction,
+    populationInferenceAllowed,
+    focalOnly,
+    focalPopulationScopeBlocked,
+    populationPositiveAllowed:
+      observed || effectiveSuspicious ||
+      (populationInferenceAllowed && structured),
+    focalCytologyPopulationScopeLockVersion: "BE-FIX-005.50.15.5",
   };
 }
 

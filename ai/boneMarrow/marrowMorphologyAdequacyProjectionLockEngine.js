@@ -16,10 +16,10 @@
 // ============================================================================
 
 export const MARROW_TERMINAL_MORPHOLOGY_ADEQUACY_PROJECTION_LOCK_VERSION =
-  "BE-FIX-005.50.13";
+  "BE-FIX-005.50.15.5";
 
 export const MARROW_LIMITED_FIELD_AXIS_NON_OVERRIDE_VERSION =
-  "BE-FIX-005.50.13";
+  "BE-FIX-005.50.15.5";
 
 function obj(value) {
   return value && typeof value === "object" && !Array.isArray(value)
@@ -106,6 +106,13 @@ export function evaluateMarrowMorphologyAdequacyProjectionLock(result = {}) {
       ? "CLASS_1_LIMITED_FIELD"
       : "POPULATION_ASSESSABLE",
     populationInferenceAllowed: field.populationInferenceAllowed !== false,
+    populationPositiveAllowed:
+      trueBlastoid ||
+      (field.populationInferenceAllowed !== false && positiveMarrowMorphology),
+    focalCytologyPopulationScopeLocked:
+      field.populationInferenceAllowed === false &&
+      authority.structuredBlast?.focalOnly === true &&
+      trueBlastoid === false,
     globalNegativeExclusionAllowed:
       field.globalNegativeExclusionAllowed === true,
     blastSuspicion:
