@@ -16,10 +16,10 @@
 // ============================================================================
 
 export const MARROW_TERMINAL_MORPHOLOGY_ADEQUACY_PROJECTION_LOCK_VERSION =
-  "BE-FIX-005.47";
+  "BE-FIX-005.50.13";
 
 export const MARROW_LIMITED_FIELD_AXIS_NON_OVERRIDE_VERSION =
-  "BE-FIX-005.47";
+  "BE-FIX-005.50.13";
 
 function obj(value) {
   return value && typeof value === "object" && !Array.isArray(value)
@@ -62,13 +62,27 @@ export function evaluateMarrowMorphologyAdequacyProjectionLock(result = {}) {
       result.marrowPathologicMaturationContinuumLock?.active === true
     );
 
+  const physiologicMaturationContradiction =
+    authority.structuredBlast?.physiologicMaturationContradiction === true ||
+    result.marrowPositiveBlastEvidenceSemanticSupersession?.physiologicMaturationContradiction === true;
+
   const trueBlastoid =
     authority.structuredBlast?.observed === true ||
-    authority.structuredBlast?.suspicious === true ||
+    (
+      authority.structuredBlast?.suspicious === true &&
+      authority.structuredBlast?.structured === true &&
+      !physiologicMaturationContradiction
+    ) ||
     result.marrowBlastPopulationEvidence?.observedPopulation === true ||
-    result.marrowBlastPopulationEvidence?.suspiciousPopulation === true ||
+    (
+      result.marrowBlastPopulationEvidence?.suspiciousPopulation === true &&
+      !physiologicMaturationContradiction
+    ) ||
     result.marrowPrecursorDiscrimination?.protectedObservedBlastoid === true ||
-    result.marrowPrecursorDiscrimination?.protectedSuspiciousBlastoid === true;
+    (
+      result.marrowPrecursorDiscrimination?.protectedSuspiciousBlastoid === true &&
+      !physiologicMaturationContradiction
+    );
 
   const positiveMarrowMorphology =
     trueBlastoid ||
@@ -86,6 +100,7 @@ export function evaluateMarrowMorphologyAdequacyProjectionLock(result = {}) {
     positiveMarrowMorphology,
     protectedExpansion,
     trueBlastoid,
+    physiologicMaturationContradiction,
     morphologyClassification,
     adequacyClassification: limitedField
       ? "CLASS_1_LIMITED_FIELD"

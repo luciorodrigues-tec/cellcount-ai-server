@@ -17,9 +17,9 @@
 // - never diagnose CML/LMC/MPN/BCR::ABL1 from morphology alone.
 // ============================================================================
 
-export const MARROW_FINAL_CLINICAL_AUTHORITY_VERSION = "BE-FIX-005.46";
-export const MARROW_POST_LEGACY_RECONCILIATION_VERSION = "BE-FIX-005.46";
-export const MARROW_ADEQUACY_MORPHOLOGY_AXIS_SEPARATION_VERSION = "BE-FIX-005.46";
+export const MARROW_FINAL_CLINICAL_AUTHORITY_VERSION = "BE-FIX-005.50.13";
+export const MARROW_POST_LEGACY_RECONCILIATION_VERSION = "BE-FIX-005.50.13";
+export const MARROW_ADEQUACY_MORPHOLOGY_AXIS_SEPARATION_VERSION = "BE-FIX-005.50.13";
 export const MARROW_TERMINAL_MORPHOLOGY_ADEQUACY_PROJECTION_LOCK_VERSION = "BE-FIX-005.47";
 
 function obj(value) {
@@ -87,21 +87,56 @@ function evaluateStructuredBlastAuthority(result = {}) {
       )
     );
 
-  const structured =
-    observed ||
-    suspicious ||
+  const approximateBlastLikeCells =
+    num(result.blastAssessment?.approximateBlastLikeCells) ??
+    num(result.rawResponse?.blastAssessment?.approximateBlastLikeCells) ??
+    num(result.localMorphologyEvidence?.marrow?.blastPopulationEvidence?.approximateBlastLikeCells);
+
+  const explicitlyWithinContinuum =
+    precursor.explicitlyNotDistinctFromContinuum === true ||
+    sub.distinctFromMaturationContinuum === false ||
+    recovered.distinctFromMaturationContinuum === false;
+
+  const independentStructuredArchitecture =
     precursor.coherentBlastoidSubpopulation === true ||
     recovered.structuredPositive === true ||
     recovered.architectureQualified === true ||
     expansion.structuredPathologicSubset === true ||
-    expansionLock.blastoidPopulationSupported === true ||
-    finalLock.populationBlastSuspicion === true;
+    expansionLock.blastoidPopulationSupported === true;
+
+  const physiologicMaturationContradiction =
+    observed === false &&
+    explicitlyWithinContinuum === true &&
+    independentStructuredArchitecture === false &&
+    (approximateBlastLikeCells ?? 0) === 0 &&
+    (
+      evidenceState === "PHYSIOLOGIC_PRECURSOR_PATTERN" ||
+      precursor.strongPhysiologicPattern === true ||
+      precursor.maturationContinuumSupported === true ||
+      result.marrowPositiveBlastEvidenceSemanticSupersession?.physiologicMaturationContradiction === true ||
+      result.marrowResidualBlastSemanticCleanup?.maturationContinuumSupported === true
+    );
+
+  const effectiveSuspicious =
+    suspicious && !physiologicMaturationContradiction;
+
+  const structured =
+    observed ||
+    effectiveSuspicious ||
+    independentStructuredArchitecture ||
+    (
+      finalLock.populationBlastSuspicion === true &&
+      !physiologicMaturationContradiction
+    );
 
   return {
     observed,
-    suspicious,
+    suspicious: effectiveSuspicious,
     structured,
     evidenceState: evidenceState || null,
+    approximateBlastLikeCells,
+    explicitlyWithinContinuum,
+    physiologicMaturationContradiction,
   };
 }
 

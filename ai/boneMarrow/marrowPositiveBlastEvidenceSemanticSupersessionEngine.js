@@ -16,10 +16,10 @@
 // ============================================================================
 
 export const MARROW_POSITIVE_BLAST_EVIDENCE_SEMANTIC_SUPERSESSION_VERSION =
-  "BE-FIX-005.44";
+  "BE-FIX-005.50.13";
 
 export const MARROW_FINAL_BLAST_PROJECTION_LOCK_VERSION =
-  "BE-FIX-005.44";
+  "BE-FIX-005.50.13";
 
 function obj(value) {
   return value && typeof value === "object" && !Array.isArray(value)
@@ -152,16 +152,44 @@ export function evaluateMarrowPositiveBlastEvidenceSemanticSupersession(
       (num(lmeBlast.approximateBlastLikeCells) ?? 0) <= 2
     );
 
-  const active =
-    protectedExpansion &&
-    focalOnly &&
-    architectureAbsent &&
-    explicitlyWithinContinuum;
-
   const approximateBlastLikeCells =
     num(directBlast.approximateBlastLikeCells) ??
     num(rawBlast.approximateBlastLikeCells) ??
     num(lmeBlast.approximateBlastLikeCells);
+
+  // BE-FIX-005.50.13 — physiologic maturation vs blastoid architecture
+  // contradiction lock. Suspicious architecture alone must not manufacture a
+  // structured blastoid population when the evidence explicitly places the
+  // cells inside a maturation continuum, no blast-like cells are counted, no
+  // observed blast population exists, and no independent structured
+  // architecture is present.
+  const physiologicMaturationContradiction =
+    explicitlyWithinContinuum === true &&
+    observedQualified === false &&
+    structuredArchitecture === false &&
+    (approximateBlastLikeCells ?? 0) === 0 &&
+    (
+      state === "PHYSIOLOGIC_PRECURSOR_PATTERN" ||
+      precursor.strongPhysiologicPattern === true ||
+      precursor.maturationContinuumSupported === true ||
+      result?.marrowResidualBlastSemanticCleanup?.maturationContinuumSupported === true ||
+      result?.marrowMyeloidExpansionDiscrimination?.maturationContinuumSupported === true
+    );
+
+  const active =
+    (
+      protectedExpansion &&
+      focalOnly &&
+      architectureAbsent &&
+      explicitlyWithinContinuum
+    ) ||
+    physiologicMaturationContradiction;
+
+  const supersessionMode = physiologicMaturationContradiction
+    ? "PHYSIOLOGIC_MATURATION_CONTRADICTION_LOCK"
+    : active
+      ? "EXPANSION_WITH_MATURATION_SUPERSESSION"
+      : "NONE";
 
   return {
     version: MARROW_POSITIVE_BLAST_EVIDENCE_SEMANTIC_SUPERSESSION_VERSION,
@@ -180,11 +208,15 @@ export function evaluateMarrowPositiveBlastEvidenceSemanticSupersession(
     approximateBlastLikeCells,
     focalCytologyPreserved:
       active && approximateBlastLikeCells !== null && approximateBlastLikeCells > 0,
+    physiologicMaturationContradiction,
+    supersessionMode,
     populationPositiveAllowed: !active,
     negativeBlastExclusionAllowed: false,
-    reason: active
-      ? "Legacy focal blast-like cytology is preserved as focal morphology but is semantically superseded as population-level blast evidence by protected pathologic myeloid expansion with maturation and absent blastoid architecture."
-      : "No semantic supersession applied.",
+    reason: physiologicMaturationContradiction
+      ? "Suspicious architecture is not sufficient to establish a structured blastoid population when morphology is explicitly within a physiologic maturation continuum, no blast-like cells are counted, no observed blast population exists, and no independent structured architecture is present."
+      : active
+        ? "Legacy focal blast-like cytology is preserved as focal morphology but is semantically superseded as population-level blast evidence by protected pathologic myeloid expansion with maturation and absent blastoid architecture."
+        : "No semantic supersession applied.",
   };
 }
 
@@ -202,6 +234,71 @@ export function applyMarrowPositiveBlastEvidenceSemanticSupersession(
   };
 
   if (!decision.active) {
+    return out;
+  }
+
+  if (decision.physiologicMaturationContradiction === true) {
+    out.findings = {
+      ...obj(out.findings),
+      blastSuspicion: false,
+      blastEvidenceState: "PHYSIOLOGIC_PRECURSOR_PATTERN",
+    };
+
+    if (out.marrowBlastPopulationEvidence) {
+      out.marrowBlastPopulationEvidence = {
+        ...obj(out.marrowBlastPopulationEvidence),
+        priorEvidenceState:
+          out.marrowBlastPopulationEvidence.priorEvidenceState ||
+          out.marrowBlastPopulationEvidence.evidenceState ||
+          decision.priorEvidenceState,
+        evidenceState: "PHYSIOLOGIC_PRECURSOR_PATTERN",
+        positivePopulationFinding: false,
+        observedPopulation: false,
+        suspiciousPopulation: false,
+        focalSuspicion: false,
+        semanticSupersessionVersion:
+          MARROW_POSITIVE_BLAST_EVIDENCE_SEMANTIC_SUPERSESSION_VERSION,
+      };
+    }
+
+    const lme = obj(out.localMorphologyEvidence);
+    const marrow = obj(lme.marrow);
+    const lmeBlast = obj(marrow.blastPopulationEvidence);
+    out.localMorphologyEvidence = {
+      ...lme,
+      marrow: {
+        ...marrow,
+        blastPopulationEvidence: {
+          ...lmeBlast,
+          priorEvidenceState:
+            lmeBlast.priorEvidenceState ||
+            lmeBlast.evidenceState ||
+            decision.priorEvidenceState,
+          evidenceState: "PHYSIOLOGIC_PRECURSOR_PATTERN",
+          positive: false,
+          positivePopulationFinding: false,
+          observedPopulation: false,
+          suspiciousPopulation: false,
+          focalSuspicion: false,
+          semanticSupersessionVersion:
+            MARROW_POSITIVE_BLAST_EVIDENCE_SEMANTIC_SUPERSESSION_VERSION,
+        },
+      },
+    };
+
+    out.marrowFinalBlastProjectionLock = {
+      ...obj(out.marrowFinalBlastProjectionLock),
+      version: MARROW_FINAL_BLAST_PROJECTION_LOCK_VERSION,
+      active: true,
+      populationBlastSuspicion: false,
+      focalCytologyPreserved: false,
+      globalBlastExclusionAllowed: false,
+      physiologicMaturationContradictionLocked: true,
+      dominantPattern:
+        out.globalPattern?.dominantPattern ||
+        "MARROW_PHYSIOLOGIC_MATURATION_LIMITED_PATTERN",
+    };
+
     return out;
   }
 
