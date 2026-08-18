@@ -7,6 +7,7 @@
 export const MARROW_MATURATION_CONTINUUM_DISCRIMINATION_VERSION = "BE-FIX-005.37";
 export const MARROW_PHYSIOLOGIC_IMMATURITY_CONTAINMENT_VERSION = "BE-FIX-005.37";
 export const MARROW_MATURATION_EVIDENCE_PROJECTION_VERSION = "BE-FIX-005.41";
+export const MARROW_UNRESOLVED_IMMATURE_CANDIDATE_CONTINUUM_SAFETY_GATE_VERSION = "BE-FIX-005.50.14";
 
 function obj(v){return v&&typeof v==="object"&&!Array.isArray(v)?v:{};}
 function txt(v){return typeof v==="string"?v.trim():"";}
@@ -130,12 +131,63 @@ export function evaluateMarrowMaturationContinuum(result={}){
     obj(result.marrowPathologicMaturationContinuumLock).active===true ||
     obj(obj(result.rawResponse).marrowPathologicMaturationContinuumLock).active===true;
 
+  // BE-FIX-005.50.14 — unresolved immature-candidate continuum safety gate.
+  // A repeated immature population whose discriminative cytology remains
+  // uncharacterized after acquisition/repair must not be resolved as
+  // physiologic solely because mature forms and a maturation continuum coexist.
+  // This gate is deliberately non-promotional: it only preserves indeterminacy.
+  const vme=obj(result.visualMorphologyEvidenceAcquisition);
+  const vmeRecovery=obj(vme.immatureCellCytologyRecovery);
+  const recovery=obj(result.marrowImmatureCellCytologyRecovery);
+  const consistency=obj(result.marrowPositiveCytologyConsistency);
+  const candidateState=txt(
+    assessment.candidateEvidenceState ||
+    recovery.candidateState ||
+    recovery.finalEvidenceState ||
+    consistency.state
+  ).toUpperCase();
+  const acquisitionRepeatedImmature =
+    vmeRecovery.repeatedImmatureCells===true ||
+    recovery.repeatedImmature===true;
+  const acquisitionMultipleImmature =
+    vmeRecovery.multipleImmatureCells===true ||
+    recovery.multipleImmature===true;
+  const acquiredCharacterizedCytology = Number(
+    vmeRecovery.characterizedBlastCytologyCount ??
+    recovery.characterizedCytologyCount
+  );
+  const acquiredPositiveCytology = Number(
+    vmeRecovery.positiveBlastCytologyCount ??
+    recovery.positiveCytologyCount
+  );
+  const repairAttemptedForCandidate =
+    vme.repairAttempted===true || repairAttempted===true;
+  const unresolvedByState =
+    candidateState==="IMMATURE_POPULATION_REQUIRES_DISCRIMINATION" ||
+    candidateState==="UNRESOLVED_BLASTOID_CYTOLOGY" ||
+    assessment.cytologyRecoveryRequired===true ||
+    assessment.cytologyResolutionRequired===true ||
+    recovery.unresolvedCandidate===true ||
+    consistency.unresolvedPositiveCytology===true;
+  const unresolvedByAcquisition =
+    acquisitionMultipleImmature &&
+    acquisitionRepeatedImmature &&
+    Number.isFinite(acquiredCharacterizedCytology) &&
+    acquiredCharacterizedCytology<=1 &&
+    (!Number.isFinite(acquiredPositiveCytology) || acquiredPositiveCytology===0);
+  const unresolvedImmatureCandidateAfterAcquisition =
+    marrowScope(result) &&
+    !observed &&
+    !structuredPathologicSubset &&
+    (unresolvedByState || unresolvedByAcquisition);
+
   const strongPhysiologicContinuum =
     marrowScope(result) &&
     physiologicScore>=3 &&
     maturationContinuum &&
     !pathologicMaturationContinuumLock &&
-    !structuredPathologicSubset;
+    !structuredPathologicSubset &&
+    !unresolvedImmatureCandidateAfterAcquisition;
 
   const isolatedImmaturityTraits =
     cytologyScore>0 &&
@@ -167,6 +219,19 @@ export function evaluateMarrowMaturationContinuum(result={}){
     repairAttempted,singlePassArchitectureCore,architectureProvenanceQualified,
     structuredPathologicSubset,
     pathologicMaturationContinuumLock,
+    unresolvedImmatureCandidateContinuumSafetyGateVersion:
+      MARROW_UNRESOLVED_IMMATURE_CANDIDATE_CONTINUUM_SAFETY_GATE_VERSION,
+    unresolvedImmatureCandidateAfterAcquisition,
+    unresolvedCandidateSignals:{
+      candidateState:candidateState||null,
+      acquisitionMultipleImmature,
+      acquisitionRepeatedImmature,
+      acquiredCharacterizedCytology:Number.isFinite(acquiredCharacterizedCytology)?acquiredCharacterizedCytology:null,
+      acquiredPositiveCytology:Number.isFinite(acquiredPositiveCytology)?acquiredPositiveCytology:null,
+      repairAttempted:repairAttemptedForCandidate,
+      unresolvedByState,
+      unresolvedByAcquisition,
+    },
     strongPhysiologicContinuum,
     isolatedImmaturityTraits,
     falseBlastPromotionRisk,
