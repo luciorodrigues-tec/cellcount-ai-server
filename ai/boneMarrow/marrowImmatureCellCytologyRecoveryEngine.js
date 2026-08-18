@@ -3,6 +3,7 @@ export const MARROW_BLASTOID_CANDIDATE_PRESERVATION_VERSION = "BE-FIX-005.33";
 export const MARROW_CROSS_PASS_IMMATURE_CYTOMORPHOLOGY_RECOVERY_VERSION = "BE-FIX-005.50.15";
 export const MARROW_UNRESOLVED_IMMATURITY_SEMANTIC_RECOVERY_VERSION = "BE-FIX-005.50.15.1";
 export const MARROW_RECOVERED_IMMATURE_CARDINALITY_UNRESOLVED_LOCK_VERSION = "BE-FIX-005.50.15.1";
+export const MARROW_SEMANTIC_UNRESOLVED_IMMATURITY_PROPAGATION_VERSION = "BE-FIX-005.50.15.3";
 
 function obj(v){return v&&typeof v==="object"&&!Array.isArray(v)?v:{};}
 function text(v){return typeof v==="string"?v.trim():"";}
@@ -73,9 +74,11 @@ export function evaluateMarrowImmatureCellCytologyGap(result = {}) {
     assessment.observed===true ||
     (blastLikeCount!==null&&blastLikeCount>=1) ||
     positiveCytologyCount>=2;
-  const crossPassUnresolvedSemantic =
+  const semanticUnresolvedImmaturity =
+    crossPass.semanticUnresolvedImmaturity===true ||
     crossPass.unresolvedEvidenceStatePreserved===true ||
     crossPass.recoveredMultipleUncharacterizedImmaturity===true;
+  const crossPassUnresolvedSemantic = semanticUnresolvedImmaturity;
 
   const uncharacterizedCytology=
     multipleImmature &&
@@ -109,6 +112,9 @@ export function evaluateMarrowImmatureCellCytologyGap(result = {}) {
     crossPassEvidenceAvailable:Object.keys(crossPass).length>0,
     crossPassMaximumImmatureCount,
     crossPassUnresolvedSemantic,
+    semanticUnresolvedImmaturity,
+    semanticUnresolvedImmaturityPropagationVersion:
+      MARROW_SEMANTIC_UNRESOLVED_IMMATURITY_PROPAGATION_VERSION,
     candidateState:unresolvedCandidate?"IMMATURE_POPULATION_REQUIRES_DISCRIMINATION":null
   };
 }

@@ -75,6 +75,7 @@ import {
   MARROW_PHYSIOLOGIC_IMMATURITY_CONTAINMENT_VERSION,
   MARROW_MATURATION_EVIDENCE_PROJECTION_VERSION,
   MARROW_POST_RECOVERY_MATURATION_CONTINUUM_REEVALUATION_VERSION,
+  MARROW_POSITIVE_RECOVERED_BLASTOID_CYTOLOGY_CONTINUUM_LOCK_VERSION,
   applyMarrowMaturationContinuumDiscrimination,
 } from "./ai/boneMarrow/marrowMaturationContinuumDiscriminationEngine.js";
 
@@ -7054,6 +7055,8 @@ app.get("/runtime-version", (_req, res) => {
       MARROW_MATURATION_EVIDENCE_PROJECTION_VERSION,
     marrowPostRecoveryMaturationContinuumReevaluationVersion:
       MARROW_POST_RECOVERY_MATURATION_CONTINUUM_REEVALUATION_VERSION,
+    marrowPositiveRecoveredBlastoidCytologyContinuumLockVersion:
+      MARROW_POSITIVE_RECOVERED_BLASTOID_CYTOLOGY_CONTINUUM_LOCK_VERSION,
     marrowScopePropagationRecoveryVersion:
       MARROW_SCOPE_PROPAGATION_RECOVERY_VERSION,
     marrowBlastEvidenceReconciliationVersion:

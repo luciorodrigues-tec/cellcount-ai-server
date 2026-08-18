@@ -2,6 +2,8 @@
 // CELLCOUNT ENTERPRISE
 // BE-FIX-005.37 — PHYSIOLOGIC MARROW MATURATION CONTINUUM VS PATHOLOGIC
 // BLAST POPULATION DISCRIMINATION
+// BE-FIX-005.50.15.3 — POSITIVE RECOVERED BLASTOID CYTOLOGY /
+// PHYSIOLOGIC CONTINUUM DISCRIMINATION LOCK
 // ============================================================================
 
 export const MARROW_MATURATION_CONTINUUM_DISCRIMINATION_VERSION = "BE-FIX-005.37";
@@ -9,6 +11,8 @@ export const MARROW_PHYSIOLOGIC_IMMATURITY_CONTAINMENT_VERSION = "BE-FIX-005.37"
 export const MARROW_MATURATION_EVIDENCE_PROJECTION_VERSION = "BE-FIX-005.41";
 export const MARROW_UNRESOLVED_IMMATURE_CANDIDATE_CONTINUUM_SAFETY_GATE_VERSION = "BE-FIX-005.50.14";
 export const MARROW_POST_RECOVERY_MATURATION_CONTINUUM_REEVALUATION_VERSION = "BE-FIX-005.50.14.1";
+export const MARROW_SEMANTIC_UNRESOLVED_IMMATURITY_CONTINUUM_GATE_VERSION = "BE-FIX-005.50.15.3";
+export const MARROW_POSITIVE_RECOVERED_BLASTOID_CYTOLOGY_CONTINUUM_LOCK_VERSION = "BE-FIX-005.50.15.3";
 
 function obj(v){return v&&typeof v==="object"&&!Array.isArray(v)?v:{};}
 function txt(v){return typeof v==="string"?v.trim():"";}
@@ -132,41 +136,42 @@ export function evaluateMarrowMaturationContinuum(result={}){
     obj(result.marrowPathologicMaturationContinuumLock).active===true ||
     obj(obj(result.rawResponse).marrowPathologicMaturationContinuumLock).active===true;
 
-  // BE-FIX-005.50.14 — unresolved immature-candidate continuum safety gate.
-  // A repeated immature population whose discriminative cytology remains
-  // uncharacterized after acquisition/repair must not be resolved as
-  // physiologic solely because mature forms and a maturation continuum coexist.
-  // This gate is deliberately non-promotional: it only preserves indeterminacy.
   const vme=obj(result.visualMorphologyEvidenceAcquisition);
   const vmeRecovery=obj(vme.immatureCellCytologyRecovery);
   const recovery=obj(result.marrowImmatureCellCytologyRecovery);
   const consistency=obj(result.marrowPositiveCytologyConsistency);
-  // BE-FIX-005.50.14.1 — post-recovery state has precedence over a stale
-  // candidateEvidenceState written by the initial physiologic pass.
-  // Otherwise PHYSIOLOGIC_MATURATION_CONTINUUM can mask the later
-  // IMMATURE_POPULATION_REQUIRES_DISCRIMINATION state created by 005.33/35.
+
   const candidateState=txt(
     recovery.candidateState ||
     recovery.finalEvidenceState ||
     consistency.state ||
     assessment.candidateEvidenceState
   ).toUpperCase();
+
   const acquisitionRepeatedImmature =
     vmeRecovery.repeatedImmatureCells===true ||
     recovery.repeatedImmature===true;
   const acquisitionMultipleImmature =
     vmeRecovery.multipleImmatureCells===true ||
     recovery.multipleImmature===true;
-  const acquiredCharacterizedCytology = Number(
+
+  const characterizedRaw =
     vmeRecovery.characterizedBlastCytologyCount ??
-    recovery.characterizedCytologyCount
-  );
-  const acquiredPositiveCytology = Number(
+    recovery.characterizedCytologyCount;
+  const positiveRaw =
     vmeRecovery.positiveBlastCytologyCount ??
-    recovery.positiveCytologyCount
-  );
+    recovery.positiveCytologyCount;
+
+  const acquiredCharacterizedCytology =
+    characterizedRaw === null || characterizedRaw === undefined
+      ? NaN : Number(characterizedRaw);
+  const acquiredPositiveCytology =
+    positiveRaw === null || positiveRaw === undefined
+      ? NaN : Number(positiveRaw);
+
   const repairAttemptedForCandidate =
     vme.repairAttempted===true || repairAttempted===true;
+
   const unresolvedByState =
     candidateState==="IMMATURE_POPULATION_REQUIRES_DISCRIMINATION" ||
     candidateState==="UNRESOLVED_BLASTOID_CYTOLOGY" ||
@@ -174,17 +179,65 @@ export function evaluateMarrowMaturationContinuum(result={}){
     assessment.cytologyResolutionRequired===true ||
     recovery.unresolvedCandidate===true ||
     consistency.unresolvedPositiveCytology===true;
+
+  const semanticUnresolvedImmaturity =
+    vme.semanticUnresolvedImmaturity===true ||
+    vmeRecovery.semanticUnresolvedImmaturity===true ||
+    recovery.semanticUnresolvedImmaturity===true ||
+    obj(result.marrowCrossPassImmatureCytomorphologyEvidence).semanticUnresolvedImmaturity===true ||
+    obj(obj(result.rawResponse).marrowCrossPassImmatureCytomorphologyEvidence).semanticUnresolvedImmaturity===true;
+
   const unresolvedByAcquisition =
     acquisitionMultipleImmature &&
     acquisitionRepeatedImmature &&
     Number.isFinite(acquiredCharacterizedCytology) &&
     acquiredCharacterizedCytology<=1 &&
     (!Number.isFinite(acquiredPositiveCytology) || acquiredPositiveCytology===0);
+
   const unresolvedImmatureCandidateAfterAcquisition =
     marrowScope(result) &&
     !observed &&
     !structuredPathologicSubset &&
-    (unresolvedByState || unresolvedByAcquisition);
+    (unresolvedByState || unresolvedByAcquisition || semanticUnresolvedImmaturity);
+
+  // BE-FIX-005.50.15.3
+  // Recovered/merged focal blastoid cytology that has been positively
+  // characterized must not be semantically collapsed into a physiologic
+  // precursor pattern merely because mature forms coexist.
+  //
+  // This is intentionally non-promotional:
+  // - it blocks PHYSIOLOGIC_PRECURSOR_PATTERN auto-resolution;
+  // - it does NOT create OBSERVED_POPULATION;
+  // - it does NOT synthesize cross-pass architecture;
+  // - structured population authority remains architecture-gated.
+  const canonicalEvidenceState = txt(
+    recovery.finalEvidenceState ||
+    recovery.candidateState ||
+    consistency.state ||
+    assessment.evidenceState
+  ).toUpperCase();
+
+  const focalPositiveState =
+    canonicalEvidenceState==="FOCAL_SUSPICION" ||
+    canonicalEvidenceState==="POSITIVE_MORPHOLOGIC_SUSPICION_IN_LIMITED_FIELD" ||
+    canonicalEvidenceState==="POSITIVEMORPHOLOGICSUSPICIONINLIMITEDFIELD";
+
+  const positiveRecoveredBlastoidCytology =
+    marrowScope(result) &&
+    !observed &&
+    !structuredPathologicSubset &&
+    (
+      (
+        Number.isFinite(acquiredCharacterizedCytology) &&
+        acquiredCharacterizedCytology>=2 &&
+        Number.isFinite(acquiredPositiveCytology) &&
+        acquiredPositiveCytology>=2
+      ) ||
+      (
+        focalPositiveState &&
+        cytologyScore>=2
+      )
+    );
 
   const strongPhysiologicContinuum =
     marrowScope(result) &&
@@ -192,7 +245,8 @@ export function evaluateMarrowMaturationContinuum(result={}){
     maturationContinuum &&
     !pathologicMaturationContinuumLock &&
     !structuredPathologicSubset &&
-    !unresolvedImmatureCandidateAfterAcquisition;
+    !unresolvedImmatureCandidateAfterAcquisition &&
+    !positiveRecoveredBlastoidCytology;
 
   const isolatedImmaturityTraits =
     cytologyScore>0 &&
@@ -228,7 +282,12 @@ export function evaluateMarrowMaturationContinuum(result={}){
       MARROW_UNRESOLVED_IMMATURE_CANDIDATE_CONTINUUM_SAFETY_GATE_VERSION,
     postRecoveryMaturationContinuumReevaluationVersion:
       MARROW_POST_RECOVERY_MATURATION_CONTINUUM_REEVALUATION_VERSION,
+    semanticUnresolvedImmaturityContinuumGateVersion:
+      MARROW_SEMANTIC_UNRESOLVED_IMMATURITY_CONTINUUM_GATE_VERSION,
+    positiveRecoveredBlastoidCytologyContinuumLockVersion:
+      MARROW_POSITIVE_RECOVERED_BLASTOID_CYTOLOGY_CONTINUUM_LOCK_VERSION,
     unresolvedImmatureCandidateAfterAcquisition,
+    positiveRecoveredBlastoidCytology,
     unresolvedCandidateSignals:{
       candidateState:candidateState||null,
       acquisitionMultipleImmature,
@@ -238,6 +297,8 @@ export function evaluateMarrowMaturationContinuum(result={}){
       repairAttempted:repairAttemptedForCandidate,
       unresolvedByState,
       unresolvedByAcquisition,
+      semanticUnresolvedImmaturity,
+      focalPositiveState,
     },
     strongPhysiologicContinuum,
     isolatedImmaturityTraits,
@@ -257,12 +318,52 @@ export function applyMarrowMaturationContinuumDiscrimination(result={}){
 
   result.marrowMaturationContinuumDiscrimination=e;
 
-  // BE-FIX-005.50.14.1 — post-recovery re-evaluation.
-  // The first 005.50.14 pass can run before 005.33/005.35/005.34 have created
-  // the unresolved-candidate state. If that later evidence appears, revoke any
-  // stale physiologic continuum lock rather than allowing it to survive by
-  // execution order. This is non-promotional: it restores indeterminacy and
-  // does NOT create SUSPICIOUS/OBSERVED blast evidence.
+  // BE-FIX-005.50.15.3 — preserve focal positive blastoid cytology without
+  // manufacturing population-level blast positivity.
+  if(e.positiveRecoveredBlastoidCytology===true){
+    const a=obj(result.blastAssessment);
+    const priorLock=obj(result.marrowPhysiologicMaturationContinuumLock);
+    const priorState=txt(a.evidenceState).toUpperCase();
+
+    if(
+      priorLock.active===true ||
+      priorState==="PHYSIOLOGIC_PRECURSOR_PATTERN" ||
+      a.candidateEvidenceState==="PHYSIOLOGIC_MATURATION_CONTINUUM"
+    ){
+      a.evidenceState="FOCAL_SUSPICION";
+      a.candidateEvidenceState="FOCAL_BLASTOID_CYTOLOGY_REQUIRES_POPULATION_DISCRIMINATION";
+      a.observed=false;
+      a.globalAbsenceAllowed=false;
+      a.cytologyResolutionRequired=false;
+      a.cytologyRecoveryRequired=false;
+      a.positiveEvidenceLock={
+        ...obj(a.positiveEvidenceLock),
+        active:true,
+        focalOnly:true,
+        populationPositiveAllowed:false,
+        preservedBy:MARROW_POSITIVE_RECOVERED_BLASTOID_CYTOLOGY_CONTINUUM_LOCK_VERSION,
+      };
+
+      result.blastAssessment=a;
+      result.marrowPhysiologicMaturationContinuumLock={
+        ...priorLock,
+        version:MARROW_PHYSIOLOGIC_IMMATURITY_CONTAINMENT_VERSION,
+        active:false,
+        revoked:true,
+        revokedBy:MARROW_POSITIVE_RECOVERED_BLASTOID_CYTOLOGY_CONTINUUM_LOCK_VERSION,
+        priorEvidenceState:priorState||priorLock.priorEvidenceState||null,
+        finalEvidenceState:"FOCAL_SUSPICION",
+        reason:"Recovered focal blastoid cytology is positively characterized and cannot be collapsed to a physiologic precursor pattern; population-level blast inference remains architecture-gated.",
+        positiveBlastPopulationSuppressed:false,
+        negativeBlastExclusionAllowed:false,
+      };
+    }
+
+    return result;
+  }
+
+  // BE-FIX-005.50.14.1 — unresolved post-recovery candidate stays
+  // indeterminate and never manufactures blast positivity.
   if(e.unresolvedImmatureCandidateAfterAcquisition===true){
     const a=obj(result.blastAssessment);
     const priorLock=obj(result.marrowPhysiologicMaturationContinuumLock);
