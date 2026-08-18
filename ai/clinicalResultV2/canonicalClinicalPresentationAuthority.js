@@ -1,5 +1,6 @@
-// BE/FE-FIX-005.50.8 — Canonical Clinical Narrative Deduplication & Information Hierarchy
-export const CANONICAL_CLINICAL_PRESENTATION_AUTHORITY_VERSION = "BE-FIX-005.50.8";
+// BE/FE-FIX-005.50.9 — Focal Blastoid Clinical Presentation Consolidation
+export const CANONICAL_CLINICAL_PRESENTATION_BASE_VERSION = "BE/FE-FIX-005.50.8";
+export const CANONICAL_CLINICAL_PRESENTATION_AUTHORITY_VERSION = "BE/FE-FIX-005.50.9";
 
 const text = (v) => (typeof v === "string" ? v.trim() : "");
 const arr = (v) => (Array.isArray(v) ? v : []);
@@ -37,16 +38,27 @@ export function buildCanonicalClinicalPresentation(result = {}) {
   const severity = text(criticality.level || v2.risk?.severity || result.clinicalCriticality?.level).toUpperCase();
   const blast = blastState(v2);
   const blastPositive = blast === "OBSERVED" || blast === "SUSPICIOUS_INDETERMINATE";
+  const focalCardinality = obj(result.peripheralFocalBlastoidCardinalityAuthority);
+  const focalBlastoidOnly =
+    focalCardinality.active === true &&
+    focalCardinality.focalOnly === true &&
+    focalCardinality.populationEvidenceEstablished !== true;
   const polychromasia = v2.lineages?.erythrocytes?.positiveMorphology?.polychromasia === true;
   const limited = v2.scope?.limitedField === true || result.fieldAdequacy?.limitedField === true;
 
   let title = "Análise hematológica";
   let subtitle = "Resultado morfológico disponível para revisão.";
   if (blastPositive) {
-    title = "Suspeita blástica / blastoide";
-    subtitle = blast === "OBSERVED"
-      ? "Achado morfológico prioritário — revisão hematológica urgente."
-      : "Achado morfológico prioritário — revisão hematológica recomendada.";
+    title = focalBlastoidOnly
+      ? (blast === "OBSERVED"
+          ? "Elemento blástico / blastoide focal"
+          : "Suspeita focal para blasto / blastoide")
+      : "Suspeita blástica / blastoide";
+    subtitle = focalBlastoidOnly
+      ? "Achado celular focal — não estabelece população blástica nem percentual."
+      : blast === "OBSERVED"
+        ? "Achado morfológico prioritário — revisão hematológica urgente."
+        : "Achado morfológico prioritário — revisão hematológica recomendada.";
   } else if (severity === "CRITICAL") {
     title = "Alerta hematológico de criticidade muito alta";
     subtitle = "Revisão hematológica prioritária.";
@@ -60,8 +72,13 @@ export function buildCanonicalClinicalPresentation(result = {}) {
     positiveFindings.push({
       key: "focal_blastoid_immaturity",
       domain: "LEUKOCYTE",
-      label: "Imaturidade / blastoidia focal",
+      label: focalBlastoidOnly
+        ? (blast === "OBSERVED"
+            ? "Elemento blástico/blastoide focal"
+            : "Célula focal suspeita para blasto/blastoide")
+        : "Imaturidade / blastoidia focal",
       description: firstUnique([
+        focalBlastoidOnly ? focalCardinality.presentationText : "",
         result.morphologyAnalysis?.cellMorphology?.focalHematopoieticCell?.summary,
         v2.criticalFindings?.blastLike?.evidence?.[0],
         result.morphologyAnalysis?.leukocyteReview,
@@ -83,9 +100,11 @@ export function buildCanonicalClinicalPresentation(result = {}) {
 
   const used = [title, subtitle, ...positiveFindings.map((f) => f.description)];
   const interpretation = firstUnique([
-    blastPositive && limited
-      ? "A morfologia focal sustenta suspeição de imaturidade/blastoidia, mas a representatividade do campo não permite inferência populacional nem classificação diagnóstica pela imagem isolada."
-      : "",
+    focalBlastoidOnly
+      ? "A morfologia focal sustenta um achado suspeito/positivo para blasto ou blastoide em nível celular. Esse achado não estabelece população blástica, blastose, percentual de blastos ou diagnóstico pela imagem isolada."
+      : blastPositive && limited
+        ? "A morfologia focal sustenta suspeição de imaturidade/blastoidia, mas a representatividade do campo não permite inferência populacional nem classificação diagnóstica pela imagem isolada."
+        : "",
     result.interpretiveSynthesis,
     result.morphologyAnalysis?.biologicalInterpretation,
     result.clinicalMeaning,
@@ -93,8 +112,10 @@ export function buildCanonicalClinicalPresentation(result = {}) {
   if (interpretation) used.push(interpretation);
 
   const limitation = limited
-    ? "Campo de representatividade limitada; achados não visualizados não podem ser excluídos globalmente."
-    : firstUnique(arr(v2.quality?.limitations), used);
+    ? "Campo de representatividade limitada; achados não visualizados não podem ser excluídos globalmente. O achado blástico/blastoide descrito permanece focal e não autoriza inferência de frequência populacional."
+    : focalBlastoidOnly
+      ? "A cardinalidade do achado blástico/blastoide é focal; não há base estruturada para inferir população ou percentual."
+      : firstUnique(arr(v2.quality?.limitations), used);
   if (limitation) used.push(limitation);
 
   const recommendation = firstUnique([
@@ -123,12 +144,17 @@ export function buildCanonicalClinicalPresentation(result = {}) {
       singleLimitation: true,
       singleRecommendation: true,
       findingSeverityIndependentFromGlobalCriticality: true,
+      focalBlastoidFindingDoesNotEstablishPopulation: focalBlastoidOnly,
+      blastPercentageInferenceAllowed: focalBlastoidOnly ? false : true,
       legacyFieldsRetainedForCompatibility: true,
     },
     provenance: {
       source: "clinicalResultV2",
       craVersion: v2.provenance?.craVersion || "CRA-001.1",
       authorityVersion: CANONICAL_CLINICAL_PRESENTATION_AUTHORITY_VERSION,
+      baseAuthorityVersion: CANONICAL_CLINICAL_PRESENTATION_BASE_VERSION,
+      focalCardinalityAuthorityVersion:
+        focalCardinality.version || null,
     },
   };
 }

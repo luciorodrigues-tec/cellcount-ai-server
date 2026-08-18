@@ -7,6 +7,9 @@
 export const PERIPHERAL_FOCAL_CELL_CYTOMORPHOLOGY_VERSION = "BE-FIX-005.50.7";
 export const PERIPHERAL_MATURATION_STATE_RESOLUTION_VERSION = "BE-FIX-005.50.7";
 export const PERIPHERAL_CELL_FEATURE_PROVENANCE_VERSION = "BE-FIX-005.50.7";
+export const PERIPHERAL_FOCAL_CYTOMORPHOLOGY_CALIBRATION_VERSION = "BE-FIX-005.50.10";
+export const PERIPHERAL_MATURITY_POSITIVE_SUPPORT_GATE_VERSION = "BE-FIX-005.50.10";
+export const PERIPHERAL_UNRESOLVED_FEATURE_DOWNGRADE_VERSION = "BE-FIX-005.50.10";
 
 const POSITIVE = "OBSERVED";
 const NEGATIVE = "NOT_OBSERVED_IN_EVALUABLE_CELL";
@@ -29,6 +32,20 @@ function state(value) {
 }
 function isPositive(value) { return state(value) === POSITIVE; }
 function isNegative(value) { return state(value) === NEGATIVE; }
+function norm(value) {
+  return String(value || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+}
+function hasResolutionUncertainty(value) {
+  const t = norm(value);
+  if (!t) return false;
+  return [
+    "detalhe limitado", "resolucao limitada", "parcialmente limitado",
+    "nao visualizado de modo confiavel", "nao visualizados de modo confiavel", "de modo confiavel",
+    "nao avaliado com seguranca", "nao avaliavel com seguranca",
+    "nao claramente discernivel", "nao claramente discerniveis",
+    "limites parcialmente discerniveis", "nao confiavel", "inconclusivo",
+  ].some((signal) => t.includes(signal));
+}
 function unique(values = []) {
   return [...new Set(values.map((v) => text(v)).filter(Boolean))];
 }
@@ -66,6 +83,33 @@ function featureMap(deep = {}) {
   return out;
 }
 
+function calibrateResolutionSensitiveFeatures(deep = {}, rawFeatures = {}) {
+  const features = { ...rawFeatures };
+  const downgrades = [];
+
+  const rules = [
+    ["openFineChromatin", [deep.chromatinDescription, deep.openFineChromatinEvidence]],
+    ["visibleNucleoli", [deep.nucleoliDescription, deep.visibleNucleoliEvidence]],
+    ["highNCRatio", [deep.nuclearDescription, deep.cytoplasmDescription, deep.highNCRatioEvidence]],
+    ["scantCytoplasm", [deep.cytoplasmDescription, deep.scantCytoplasmEvidence]],
+  ];
+
+  for (const [key, evidenceParts] of rules) {
+    if (features[key] !== NEGATIVE) continue;
+    const corpus = evidenceParts.map((v) => text(v)).filter(Boolean).join(" | ");
+    if (!hasResolutionUncertainty(corpus)) continue;
+    features[key] = UNKNOWN;
+    downgrades.push({
+      feature: key,
+      from: NEGATIVE,
+      to: UNKNOWN,
+      reason: "Resolution/visibility uncertainty prevents a hard cell-level negative.",
+    });
+  }
+
+  return { features, downgrades };
+}
+
 export function evaluatePeripheralFocalHematopoieticCytomorphology(result = {}) {
   const { lmeWbc, rawWbc, currentWbc, deep } = sourceOf(result);
   const hematopoieticCandidate =
@@ -80,7 +124,9 @@ export function evaluatePeripheralFocalHematopoieticCytomorphology(result = {}) 
     finite(currentWbc.approximateVisibleCells);
 
   const deepObserved = upper(deep.state) === "OBSERVED";
-  const features = featureMap(deep);
+  const rawFeatures = featureMap(deep);
+  const calibration = calibrateResolutionSensitiveFeatures(deep, rawFeatures);
+  const features = calibration.features;
   const evaluatedFeatureCount = Object.values(features).filter((v) => v !== UNKNOWN).length;
 
   // Core nuclear immaturity. High N:C or scant cytoplasm alone are common in
@@ -95,13 +141,13 @@ export function evaluatePeripheralFocalHematopoieticCytomorphology(result = {}) 
   ].filter((v) => v === POSITIVE).length;
   const immatureFeatureCount = nuclearImmaturity + otherImmaturity;
 
-  const matureFeatureCount = [
+  // BE-FIX-005.50.10 — maturity needs POSITIVE mature morphology.
+  // Absence of open chromatin or visible nucleoli is not, by itself, mature evidence.
+  const maturePositiveFeatures = [
     features.condensedChromatin,
     features.segmentedOrLobulatedNucleus,
-  ].filter((v) => v === POSITIVE).length + [
-    features.openFineChromatin,
-    features.visibleNucleoli,
-  ].filter((v) => v === NEGATIVE).length;
+  ].filter((v) => v === POSITIVE).length;
+  const matureFeatureCount = maturePositiveFeatures;
 
   const coreNuclearAssessable =
     features.openFineChromatin !== UNKNOWN &&
@@ -118,7 +164,7 @@ export function evaluatePeripheralFocalHematopoieticCytomorphology(result = {}) 
     hematopoieticCandidate &&
     deepObserved &&
     coreNuclearAssessable &&
-    matureFeatureCount >= 3 &&
+    maturePositiveFeatures >= 2 &&
     nuclearImmaturity === 0;
 
   let maturationState = "INDETERMINATE";
@@ -157,6 +203,13 @@ export function evaluatePeripheralFocalHematopoieticCytomorphology(result = {}) 
     coreNuclearAssessable,
     immatureFeatureCount,
     matureFeatureCount,
+    maturePositiveFeatures,
+    featureCalibration: {
+      version: PERIPHERAL_FOCAL_CYTOMORPHOLOGY_CALIBRATION_VERSION,
+      unresolvedFeatureDowngradeVersion: PERIPHERAL_UNRESOLVED_FEATURE_DOWNGRADE_VERSION,
+      downgrades: calibration.downgrades,
+    },
+    maturityPositiveSupportGateVersion: PERIPHERAL_MATURITY_POSITIVE_SUPPORT_GATE_VERSION,
     immatureOrBlastoidSupported,
     matureSupported,
     maturationState,

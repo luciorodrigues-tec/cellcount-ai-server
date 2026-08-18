@@ -16,6 +16,7 @@
 // ============================================================================
 
 export const VISUAL_MORPHOLOGY_EVIDENCE_ACQUISITION_VERSION = "VME-1.0";
+export const PERIPHERAL_FOCAL_EVIDENCE_CALIBRATION_ACQUISITION_VERSION = "BE-FIX-005.50.10";
 export const PRODUCTION_VME_ENFORCEMENT_VERSION = "BE-FIX-005.8";
 export const LOCAL_MORPHOLOGY_ACQUISITION_RECOVERY_VERSION = "BE-FIX-005.9";
 export const SINGLE_BLAST_CONFIRMATION_ACQUISITION_VERSION = "BE-FIX-005.17";
@@ -909,9 +910,13 @@ REGRAS OBRIGATÓRIAS:
   para significar desconhecido.
 - Campo limitado restringe inferência populacional, mas NÃO apaga morfologia
   local diretamente observada.
-- BE-FIX-005.50.4: avalie POLICROMASIA explicitamente. Hemácias azuladas/acinzentadas
+- BE-FIX-005.50.4/005.50.10: avalie POLICROMASIA explicitamente. Hemácias azuladas/acinzentadas
   com policromatofilia diretamente visível devem gerar polychromasiaState=OBSERVED;
   não atribua policromasia a variação de iluminação, balanço de branco, precipitado ou sobreposição.
+  REGRA DE CONTRADIÇÃO: se polychromasiaEvidence disser que policromatofilia confiável NÃO foi
+  identificada, ou atribuir a tonalidade azul somente à borda/iluminação/artefato, polychromasiaState
+  NÃO pode ser OBSERVED; use NOT_OBSERVED_IN_EVALUABLE_FIELD quando realmente avaliável ou
+  NOT_ASSESSABLE quando a distinção for tecnicamente incerta.
 - BE-FIX-005.50.4: toda célula nucleada focal deve ser primeiro arbitrada como elemento
   hematopoiético versus estrutura não celular. Se núcleo/cromatina/citoplasma forem reconhecíveis,
   preserve hematopoieticCellCandidate=true. Se houver traços de imaturidade mas insuficientes
@@ -929,9 +934,13 @@ REGRAS OBRIGATÓRIAS:
   citoplasmática, granulação e inclusões. Para cada feature use exatamente OBSERVED,
   NOT_OBSERVED_IN_EVALUABLE_CELL ou NOT_ASSESSABLE. Falta de resolução NÃO é ausência.
   Não classifique a célula como madura apenas por núcleo arredondado/oval ou por ausência de
-  um único critério blastoide. Maturação madura exige suporte citomorfológico positivo; se
-  cromatina, nucléolos ou limites citoplasmáticos essenciais não forem suficientemente avaliáveis,
-  use modelMaturationImpression=INDETERMINATE. Contexto clínico não pode preencher features.
+  um único critério blastoide. Maturação madura exige suporte citomorfológico POSITIVO; ausência
+  de cromatina aberta/fina ou de nucléolo NÃO conta, por si só, como evidência madura.
+  BE-FIX-005.50.10: se a descrição disser "detalhe limitado", "não visualizado de modo confiável",
+  "parcialmente discernível" ou equivalente, a feature correspondente DEVE ser NOT_ASSESSABLE,
+  nunca NOT_OBSERVED_IN_EVALUABLE_CELL. Se cromatina, nucléolos, relação N:C ou limites
+  citoplasmáticos essenciais não forem suficientemente avaliáveis, use modelMaturationImpression=INDETERMINATE.
+  Contexto clínico não pode preencher features.
 - BE-FIX-005.50.4: não promova hemoparasita apenas por uma estrutura púrpura/alongada ou pela
   expressão “estrutura incomum”. Parasita OBSERVED exige morfologia parasitária estruturada
   independente da célula hematopoiética concorrente.

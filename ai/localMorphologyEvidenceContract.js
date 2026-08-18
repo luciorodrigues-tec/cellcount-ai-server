@@ -21,6 +21,7 @@ export const MARROW_PRECURSOR_FALSE_POSITIVE_CONTAINMENT_LME_VERSION = MARROW_PR
 export const PERIPHERAL_POSITIVE_MORPHOLOGY_LME_VERSION = "BE-FIX-005.50.4";
 export const PERIPHERAL_BLASTOID_CYTOLOGY_LME_VERSION = "BE-FIX-005.50.5";
 export const PERIPHERAL_FOCAL_CELL_CYTOMORPHOLOGY_LME_VERSION = "BE-FIX-005.50.7";
+export const PERIPHERAL_POLYCHROMASIA_LME_CONTRADICTION_GUARD_VERSION = "BE-FIX-005.50.10";
 
 const GENERIC_LIMITATION_PATTERNS = [
   /campo microsc[oó]pico limitado/i,
@@ -40,6 +41,19 @@ function asArray(value) {
     .filter((item) => item !== "" && item !== null && item !== undefined);
 }
 function asText(value) { return typeof value === "string" ? value.trim() : ""; }
+function normalizeMorphologySemanticText(value = "") {
+  return String(value || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+}
+function polychromasiaEvidenceContradictsObserved(value = "") {
+  const t = normalizeMorphologySemanticText(value);
+  if (!t) return false;
+  return (
+    /(?:nao|sem|ausencia|ausente)[\s\S]{0,120}(?:policrom|polychrom|policromatof)/.test(t) ||
+    /nao se identificam[\s\S]{0,140}(?:policrom|polychrom|policromatof)/.test(t) ||
+    (/(?:policrom|polychrom|policromatof)/.test(t) && /(?:borda|iluminacao|balanco de branco|artefat|precipitado)/.test(t))
+  );
+}
+
 function firstText(...values) {
   for (const value of values) { const text = asText(value); if (text) return text; }
   return "";
@@ -420,8 +434,13 @@ export function createLocalMorphologyEvidence({
       size: firstText(explicitRbc.size, legacyRbc.size),
       shape: firstText(explicitRbc.shape),
       chromia: firstText(explicitRbc.chromia, legacyRbc.chromia),
-      polychromasiaState: firstText(explicitRbc.polychromasiaState, legacyRbc.polychromasiaState).toUpperCase() || "NOT_ASSESSABLE",
-      polychromasiaEvidence: firstText(explicitRbc.polychromasiaEvidence, legacyRbc.polychromasiaEvidence),
+      polychromasiaState: guardedPolychromasiaState,
+      polychromasiaEvidence: rawPolychromasiaEvidence,
+      polychromasiaContradictionGuard: {
+        version: "BE-FIX-005.50.10",
+        contradictionDetected: polychromasiaContradiction,
+        originalState: rawPolychromasiaState,
+      },
       positiveMorphologyVersion: PERIPHERAL_POSITIVE_MORPHOLOGY_LME_VERSION,
       distribution: firstText(explicitRbc.distribution),
       anisocytosis: firstText(explicitRbc.anisocytosis, legacyRbc.anisocytosis),

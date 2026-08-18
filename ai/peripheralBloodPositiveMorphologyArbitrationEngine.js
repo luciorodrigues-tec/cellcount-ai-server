@@ -12,6 +12,10 @@ export const PERIPHERAL_HEMATOPOIETIC_PARASITE_ARBITRATION_VERSION =
   "BE-FIX-005.50.4";
 export const PERIPHERAL_LIMITED_FIELD_NON_SUPPRESSION_VERSION =
   "BE-FIX-005.50.4";
+export const PERIPHERAL_POLYCHROMASIA_CONTRADICTION_GUARD_VERSION =
+  "BE-FIX-005.50.10";
+export const PERIPHERAL_FOCAL_CARDINALITY_SIGNAL_VERSION =
+  "BE-FIX-005.50.9";
 
 function asObject(value) {
   return value && typeof value === "object" && !Array.isArray(value) ? value : {};
@@ -26,11 +30,27 @@ function finite(value) {
 function norm(value) {
   return String(value || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
 }
-function containsPositivePolychromasia(value) {
+function evaluatePolychromasiaText(value) {
   const t = norm(value);
-  if (!t) return false;
-  if (/(nao|sem|ausencia|ausente|not observed|absent).{0,20}(policrom|polychrom)/.test(t)) return false;
-  return /policrom|polychrom|policromatof|hemacias? azulad|hemacias? acinzentad|bluish erythro/.test(t);
+  if (!t) return { positive: false, explicitNegative: false, artifactOnly: false };
+
+  const mentions = /policrom|polychrom|policromatof|hemacias? azulad|hemacias? acinzentad|bluish erythro/.test(t);
+  const explicitNegative =
+    /(?:nao|sem|ausencia|ausente|not observed|absent)[\s\S]{0,120}(?:policrom|polychrom|policromatof|hemacias? azulad|hemacias? acinzentad)/.test(t) ||
+    /(?:policrom|polychrom|policromatof)[\s\S]{0,80}(?:nao identific|nao observ|ausent|not observed|absent)/.test(t) ||
+    /nao se identificam[\s\S]{0,140}(?:policrom|polychrom|policromatof)/.test(t);
+  const artifactOnly =
+    mentions && /(?:borda|iluminacao|balanco de branco|white balance|artefat|precipitado|sobreposicao)/.test(t) &&
+    /(?:concentrad|atribu|explic|relacionad|provavel|favorec)/.test(t);
+
+  return {
+    positive: mentions && !explicitNegative && !artifactOnly,
+    explicitNegative,
+    artifactOnly,
+  };
+}
+function containsPositivePolychromasia(value) {
+  return evaluatePolychromasiaText(value).positive;
 }
 function parasiteMorphologySignalCount(profile = {}) {
   return [
@@ -83,7 +103,13 @@ export function evaluatePeripheralPositiveMorphologyArbitration(result = {}) {
     rawRbc.description, rawRbc.chromia, rawRbc.polychromasiaEvidence,
     ...asArray(rbc.positiveFindings), ...asArray(lme.positiveEvidence)].join(" | ");
   const polychromasiaState = upper(rbc.polychromasiaState || rawRbc.polychromasiaState);
-  const polychromasiaObserved = polychromasiaState === "OBSERVED" || containsPositivePolychromasia(rbcCorpus);
+  const polychromasiaTextAssessment = evaluatePolychromasiaText(rbcCorpus);
+  const polychromasiaContradiction =
+    polychromasiaState === "OBSERVED" &&
+    (polychromasiaTextAssessment.explicitNegative || polychromasiaTextAssessment.artifactOnly);
+  const polychromasiaObserved =
+    !polychromasiaContradiction &&
+    (polychromasiaState === "OBSERVED" || polychromasiaTextAssessment.positive);
 
   const focalState = upper(wbc.focalImmatureCellState || rawWbc.focalImmatureCellState);
   const wbcCorpus = [wbc.description, wbc.nuclearMorphology, wbc.chromatin, wbc.nucleoli,
@@ -125,10 +151,18 @@ export function evaluatePeripheralPositiveMorphologyArbitration(result = {}) {
     version: PERIPHERAL_BLOOD_POSITIVE_MORPHOLOGY_ARBITRATION_VERSION,
     polychromasia: {
       observed: polychromasiaObserved,
-      state: polychromasiaObserved ? "OBSERVED" : (polychromasiaState || "NOT_ASSESSABLE"),
+      state: polychromasiaObserved
+        ? "OBSERVED"
+        : polychromasiaContradiction
+          ? "NOT_ASSESSABLE"
+          : (polychromasiaState || "NOT_ASSESSABLE"),
       evidence: text(rbc.polychromasiaEvidence || rawRbc.polychromasiaEvidence),
       fieldScoped: true,
       globalExclusionAllowed: false,
+      contradictionGuardVersion: PERIPHERAL_POLYCHROMASIA_CONTRADICTION_GUARD_VERSION,
+      contradictionDetected: polychromasiaContradiction,
+      explicitNegativeEvidence: polychromasiaTextAssessment.explicitNegative,
+      artifactOnlyColorSignal: polychromasiaTextAssessment.artifactOnly,
     },
     focalHematopoieticCell: {
       observedCellCount,
@@ -137,7 +171,11 @@ export function evaluatePeripheralPositiveMorphologyArbitration(result = {}) {
       immatureSuspicious: focalImmatureSuspicious,
       state: focalImmatureObserved ? "OBSERVED" : focalImmatureSuspicious ? "SUSPICIOUS_INDETERMINATE" : (focalState || "NOT_ASSESSABLE"),
       evidence: text(wbc.focalImmatureCellEvidence || rawWbc.focalImmatureCellEvidence),
+      cardinality: "FOCAL_CELL",
+      cardinalityVersion: PERIPHERAL_FOCAL_CARDINALITY_SIGNAL_VERSION,
       populationInferenceAllowed: false,
+      populationEvidenceEstablished: false,
+      blastPercentageInferenceAllowed: false,
     },
     parasiteArbitration: {
       priorEvidenceState: parasiteState || "NOT_ASSESSABLE",
@@ -168,6 +206,15 @@ export function applyPeripheralPositiveMorphologyArbitration(result = {}) {
       focalHematopoieticCell: decision.focalHematopoieticCell,
     },
   };
+
+  if (decision.polychromasia.contradictionDetected) {
+    result.erythrocyteFindings = asObject(result.erythrocyteFindings);
+    result.erythrocyteFindings.polychromasia = false;
+    result.erythrocyteFindings.polychromasiaState = "NOT_ASSESSABLE";
+    result.positiveFindings = asArray(result.positiveFindings).filter(
+      (item) => !/policrom|polychrom/i.test(String(item || "")),
+    );
+  }
 
   if (decision.polychromasia.observed) {
     result.erythrocyteFindings = asObject(result.erythrocyteFindings);

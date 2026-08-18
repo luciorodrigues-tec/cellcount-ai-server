@@ -7,6 +7,8 @@
 export const PERIPHERAL_BLASTOID_CYTOLOGY_AUTHORITY_VERSION = "BE-FIX-005.50.6";
 export const PERIPHERAL_NEGATIVE_FINDING_AUTHORITY_CONTROL_VERSION = "BE-FIX-005.50.6";
 export const PERIPHERAL_FOCAL_VS_POPULATION_SEPARATION_VERSION = "BE-FIX-005.50.6";
+export const PERIPHERAL_FOCAL_BLASTOID_CARDINALITY_AUTHORITY_VERSION = "BE-FIX-005.50.9";
+export const PERIPHERAL_FOCAL_BLASTOID_PRESENTATION_LOCK_VERSION = "BE/FE-FIX-005.50.9";
 
 function asObject(value) {
   return value && typeof value === "object" && !Array.isArray(value) ? value : {};
@@ -179,7 +181,10 @@ export function evaluatePeripheralBlastoidCytologyAuthority(result = {}) {
       rawWbc.focalImmatureCellEvidence,
     ),
     reactiveMimicFeatures: text(structured.reactiveMimicFeatures),
+    cardinality: "FOCAL_CELL",
     populationInferenceAllowed: false,
+    populationEvidenceEstablished: false,
+    blastPercentageInferenceAllowed: false,
     amlDiagnosisAllowed: false,
     focalOnlyField,
     focalNegativeAuthorityBlocked,
@@ -232,7 +237,10 @@ export function applyPeripheralBlastoidCytologyAuthority(result = {}) {
     featureCount: decision.featureCount,
     evidence: decision.evidence,
     fieldScoped: true,
+    cardinality: "FOCAL_CELL",
     populationInferenceAllowed: false,
+    populationEvidenceEstablished: false,
+    blastPercentageInferenceAllowed: false,
     version: PERIPHERAL_BLASTOID_CYTOLOGY_AUTHORITY_VERSION,
   };
 
@@ -371,6 +379,175 @@ export function applyPeripheralNegativeFindingAuthorityControl(result = {}) {
     result.whatAISees.negativeFindings =
       result.negativeFindingsStructured.join("\n");
   }
+
+  return result;
+}
+
+
+function explicitPeripheralBlastoidPopulationEvidence(result = {}) {
+  const morphology = asObject(result.morphologyAnalysis);
+  const population = asObject(morphology.populationPatternAnalysis);
+  const direct = asObject(result.populationMorphologyEvidence);
+
+  const explicitBoolean = [
+    population.populationInferenceSupported,
+    population.populationEstablished,
+    population.sustainedPopulation,
+    population.repeatedPopulation,
+    population.coherentPopulation,
+    population.monomorphicPopulationObserved,
+    population.blastoidPopulationObserved,
+    direct.populationEstablished,
+    direct.blastoidPopulationObserved,
+  ].some((value) => value === true);
+
+  const state = upper(
+    population.blastoidPopulationState ||
+    population.state ||
+    direct.blastoidPopulationState ||
+    direct.state,
+  );
+
+  const count =
+    finite(population.blastoidCellCount) ??
+    finite(population.observedCellCount) ??
+    finite(direct.blastoidCellCount) ??
+    finite(direct.observedCellCount);
+
+  const repeatedStructuredEvidence =
+    count !== null &&
+    count >= 2 &&
+    ["OBSERVED", "SUSPICIOUS_INDETERMINATE"].includes(state);
+
+  return {
+    established: explicitBoolean || repeatedStructuredEvidence,
+    explicitBoolean,
+    repeatedStructuredEvidence,
+    state: state || "NOT_ASSESSABLE",
+    observedCellCount: count,
+  };
+}
+
+function focalBlastoidPresentationText(state) {
+  if (state === "OBSERVED") {
+    return "Elemento hematopoiético focal com morfologia blástica/blastoide diretamente sustentada no campo avaliado. O achado é celular e focal; não estabelece população blástica, percentual de blastos ou diagnóstico pela imagem isolada.";
+  }
+
+  return "Célula hematopoiética focal com características morfológicas suspeitas para blasto/blastoide no campo avaliado. O achado é celular e focal; não estabelece população blástica, percentual de blastos ou diagnóstico pela imagem isolada.";
+}
+
+function focalBlastoidClinicalMeaning(state) {
+  return state === "OBSERVED"
+    ? "Achado morfológico focal de alta relevância: há um elemento com morfologia blástica/blastoide diretamente sustentada. A cardinalidade permanece focal e não autoriza inferência de população, blastose ou percentual; requer revisão microscópica especializada e correlação com hemograma."
+    : "Achado morfológico focal de alta relevância: há uma célula hematopoiética com características suspeitas para blasto/blastoide. A cardinalidade permanece focal e não autoriza inferência de população, blastose ou percentual; requer revisão microscópica especializada e correlação com hemograma.";
+}
+
+export function evaluatePeripheralFocalBlastoidCardinalityAuthority(result = {}) {
+  const authority = asObject(result.peripheralBlastoidCytologyAuthority);
+  const deep = asObject(result.peripheralFocalHematopoieticCytomorphology);
+  const focalPositive =
+    authority.active === true &&
+    ["OBSERVED", "SUSPICIOUS_INDETERMINATE"].includes(upper(authority.effectiveState));
+
+  const state = upper(authority.effectiveState) || "NOT_ASSESSABLE";
+  const hematopoieticCandidate =
+    authority.hematopoieticCandidate === true ||
+    deep.hematopoieticCandidate === true ||
+    result.findings?.focalHematopoieticCellObserved === true;
+
+  const population = explicitPeripheralBlastoidPopulationEvidence(result);
+  const focalOnly = focalPositive && hematopoieticCandidate && !population.established;
+
+  return {
+    version: PERIPHERAL_FOCAL_BLASTOID_CARDINALITY_AUTHORITY_VERSION,
+    presentationLockVersion: PERIPHERAL_FOCAL_BLASTOID_PRESENTATION_LOCK_VERSION,
+    active: focalPositive,
+    state,
+    cardinality: focalOnly ? "FOCAL_CELL_ONLY" : population.established ? "POPULATION_EVIDENCE_PRESENT" : "UNRESOLVED",
+    focalOnly,
+    hematopoieticCandidate,
+    observedCellCount: finite(authority.cellCount) ?? finite(deep.cellCount),
+    populationEvidenceEstablished: population.established,
+    populationEvidence: population,
+    populationInferenceAllowed: population.established,
+    blastPercentageInferenceAllowed: population.established,
+    diagnosticInferenceAllowed: false,
+    amlDiagnosisAllowed: false,
+    presentationText: focalOnly ? focalBlastoidPresentationText(state) : "",
+    clinicalMeaning: focalOnly ? focalBlastoidClinicalMeaning(state) : "",
+    principle: "FOCAL_BLASTOID_CELL_DOES_NOT_ESTABLISH_BLAST_POPULATION",
+  };
+}
+
+export function applyPeripheralFocalBlastoidCardinalityAuthority(result = {}) {
+  if (!result || typeof result !== "object") return result;
+
+  const decision = evaluatePeripheralFocalBlastoidCardinalityAuthority(result);
+  result.peripheralFocalBlastoidCardinalityAuthority = decision;
+
+  if (!decision.focalOnly) return result;
+
+  result.findings = asObject(result.findings);
+  result.findings.focalHematopoieticCellObserved = true;
+  result.findings.focalImmatureCellState = decision.state;
+  result.findings.blastEvidenceState = decision.state;
+  result.findings.blastSuspicion = true;
+  result.findings.immatureCells = true;
+  result.findings.blastCardinality = "FOCAL_CELL_ONLY";
+  result.findings.blastPopulationEstablished = false;
+
+  // A legacy boolean cannot, by itself, convert one focal cell into a
+  // monomorphic/blast population. Genuine structured population evidence is
+  // protected above and bypasses this lock.
+  result.findings.monomorphicPopulation = false;
+
+  result.peripheralMorphologyClassification =
+    decision.state === "OBSERVED"
+      ? "FOCAL_BLASTOID_CELL_OBSERVED"
+      : "FOCAL_BLASTOID_CELL_SUSPECTED";
+
+  result.normalityBlocked = true;
+  result.requiresHumanReview = true;
+
+  result.mainFinding = decision.presentationText;
+  result.primaryFinding = decision.presentationText;
+  result.finalConclusion = decision.presentationText;
+  result.interpretiveSynthesis = decision.presentationText;
+  result.clinicalMeaning = decision.clinicalMeaning;
+
+  result.overallAssessment = asObject(result.overallAssessment);
+  result.overallAssessment.requiresHumanReview = true;
+  result.overallAssessment.mainImpression = decision.presentationText;
+
+  result.structuredReport = asObject(result.structuredReport);
+  result.structuredReport.conclusion = decision.presentationText;
+  result.structuredReport.hematologicMeaning = decision.clinicalMeaning;
+  result.structuredReport.recommendation =
+    "Revisão microscópica especializada de múltiplos campos e correlação com hemograma e dados clínicos. Não inferir percentual ou população blástica a partir do achado focal isolado.";
+
+  result.morphologyAnalysis = asObject(result.morphologyAnalysis);
+  result.morphologyAnalysis.summary = decision.presentationText;
+  result.morphologyAnalysis.overview = decision.presentationText;
+  const currentLeukocyteReview = text(result.morphologyAnalysis.leukocyteReview);
+  if (!currentLeukocyteReview.includes(decision.presentationText)) {
+    result.morphologyAnalysis.leukocyteReview =
+      [currentLeukocyteReview, decision.presentationText]
+        .filter(Boolean)
+        .join(" ");
+  }
+
+  result.whatAISees = asObject(result.whatAISees);
+  result.whatAISees.dominantFinding = decision.presentationText;
+
+  result.positiveFindings = unique([
+    ...asArray(result.positiveFindings),
+    decision.presentationText,
+  ]);
+
+  result.blockNormalReason = unique([
+    ...asArray(result.blockNormalReason),
+    "Achado blástico/blastoide focal requer revisão especializada; cardinalidade populacional não estabelecida.",
+  ]);
 
   return result;
 }
