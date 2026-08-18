@@ -30,6 +30,7 @@ export const MARROW_IMMATURE_CYTOMORPHOLOGY_ACQUISITION_STABILITY_VERSION = "BE-
 export const MARROW_CROSS_PASS_EVIDENCE_PRESERVATION_VERSION = "BE-FIX-005.50.15";
 export const MARROW_UNRESOLVED_IMMATURITY_SEMANTIC_TRIGGER_VERSION = "BE-FIX-005.50.15.1";
 export const MARROW_STABILITY_RECOVERY_UNRESOLVED_LOCK_VERSION = "BE-FIX-005.50.15.1";
+export const MARROW_PRIMARY_POSITIVE_CYTOLOGY_STABILITY_RECOVERY_VERSION = "BE-FIX-005.50.15.4";
 export const MARROW_REPAIR_EVIDENCE_STATE_SEMANTIC_CANONICALIZATION_VERSION = "BE-FIX-005.50.15.2";
 export const BONE_MARROW_COMPACT_ACQUISITION_VERSION = "BE-FIX-005.39";
 export const BONE_MARROW_COMPLETE_LENGTH_RECOVERY_VERSION = "BE-FIX-005.39";
@@ -360,12 +361,29 @@ function marrowImmatureCellCytologyRecoveryNeed(raw = {}) {
     !positiveState &&
     blast.observed!==true;
 
-  const stabilityDiscriminationRecommended =
-    (precursorRichField || semanticUnresolvedImmaturity) &&
+  // BE-FIX-005.50.15.4 — primary positive cytology stability recovery.
+  // A single acquired blast-associated cytologic feature in a multiple/repeated
+  // immature-cell context is not enough to establish a blast population, but it
+  // is also not allowed to terminate acquisition as a settled physiologic pattern.
+  // Request one bounded focal re-observation so the feature can be confirmed,
+  // refuted, or remain explicitly unresolved.
+  const primaryPositiveCytologyStabilityRecoveryRecommended =
+    multiple &&
+    repeated &&
     characterized<=1 &&
-    positive===0 &&
+    positive>=1 &&
     !positiveState &&
     blast.observed!==true;
+
+  const stabilityDiscriminationRecommended =
+    (
+      (precursorRichField || semanticUnresolvedImmaturity) &&
+      characterized<=1 &&
+      positive===0 &&
+      !positiveState &&
+      blast.observed!==true
+    ) ||
+    primaryPositiveCytologyStabilityRecoveryRecommended;
 
   return {
     version:"BE-FIX-005.33",
@@ -375,8 +393,11 @@ function marrowImmatureCellCytologyRecoveryNeed(raw = {}) {
       MARROW_UNRESOLVED_IMMATURITY_SEMANTIC_TRIGGER_VERSION,
     stabilityRecoveryUnresolvedLockVersion:
       MARROW_STABILITY_RECOVERY_UNRESOLVED_LOCK_VERSION,
+    primaryPositiveCytologyStabilityRecoveryVersion:
+      MARROW_PRIMARY_POSITIVE_CYTOLOGY_STABILITY_RECOVERY_VERSION,
     required,
     stabilityDiscriminationRecommended,
+    primaryPositiveCytologyStabilityRecoveryRecommended,
     precursorRichField,
     explicitImmaturitySemantic,
     semanticUnresolvedImmaturity,
@@ -467,7 +488,11 @@ export function assessBoneMarrowVisualEvidenceAcquisition({
     immatureCellCytologyRecovery.multipleImmatureCells === true &&
     immatureCellCytologyRecovery.repeatedImmatureCells === true &&
     immatureCellCytologyRecovery.positiveBlastCytologyCount >= 1 &&
-    narrativeStructuredDiscordance === true &&
+    (
+      narrativeStructuredDiscordance === true ||
+      immatureCellCytologyRecovery
+        .primaryPositiveCytologyStabilityRecoveryRecommended === true
+    ) &&
     !["OBSERVED_POPULATION","SUSPICIOUS_POPULATION","FOCAL_SUSPICION"].includes(
       asText(blastAssessment.evidenceState).toUpperCase(),
     );

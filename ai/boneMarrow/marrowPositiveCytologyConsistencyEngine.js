@@ -15,6 +15,7 @@
 
 export const MARROW_POSITIVE_CYTOLOGY_CONSISTENCY_VERSION = "BE-FIX-005.35";
 export const MARROW_ACQUISITION_DISCORDANCE_RECOVERY_VERSION = "BE-FIX-005.35";
+export const MARROW_PRIMARY_OR_RECOVERED_POSITIVE_BLASTOID_CYTOLOGY_PRESERVATION_VERSION = "BE-FIX-005.50.15.4";
 
 function obj(v){return v&&typeof v==="object"&&!Array.isArray(v)?v:{};}
 function txt(v){return typeof v==="string"?v.trim():"";}
@@ -111,15 +112,29 @@ export function evaluateMarrowPositiveCytologyDiscordance(result={}){
 
   // Narrow 005.35 state: there is acquired positive cytology in a repeated
   // immature population, but not enough architecture to call blasts.
-  const unresolvedPositiveCytology =
+  // BE-FIX-005.50.15.4 — primary-or-recovered positive cytology preservation.
+  // A stale physiologic continuum lock is not evidence that a directly acquired
+  // blast-associated cytologic feature has been refuted. When multiple/repeated
+  // immature cells carry >=1 acquired positive cytology signal but population
+  // architecture is not established, preserve the epistemic middle state even
+  // if 005.37 ran earlier and temporarily set a physiologic lock.
+  const primaryOrRecoveredPositiveCytology =
     marrowScope(result) &&
     multipleImmature &&
     repeatedImmature &&
+    characterizedCytologyCount>=1 &&
     positiveCytologyCount>=1 &&
-    !physiologicContinuumLock &&
-    !structuredPositive &&
-    (!structuredRepeat || !coherentSubset || !distinctSubset ||
-      narrativeStructuredDiscordance);
+    !structuredPositive;
+
+  const unresolvedPositiveCytology =
+    primaryOrRecoveredPositiveCytology &&
+    (
+      physiologicContinuumLock ||
+      !structuredRepeat ||
+      !coherentSubset ||
+      !distinctSubset ||
+      narrativeStructuredDiscordance
+    );
 
   return {
     version:MARROW_POSITIVE_CYTOLOGY_CONSISTENCY_VERSION,
@@ -132,6 +147,9 @@ export function evaluateMarrowPositiveCytologyDiscordance(result={}){
       repairArchitectureProvenance.repairArchitectureProvenanceVersion || null,
     repairAttempted,singlePassArchitectureCore,
     architectureQualifiedForStructuredPositive,
+    primaryOrRecoveredPositiveCytologyPreservationVersion:
+      MARROW_PRIMARY_OR_RECOVERED_POSITIVE_BLASTOID_CYTOLOGY_PRESERVATION_VERSION,
+    primaryOrRecoveredPositiveCytology,
     unresolvedPositiveCytology,
     state:unresolvedPositiveCytology
       ?"UNRESOLVED_BLASTOID_CYTOLOGY"
@@ -163,7 +181,12 @@ export function applyMarrowPositiveCytologyConsistency(result={}){
   a.globalAbsenceAllowed=false;
 
   // Preserve indeterminacy; do not fabricate OBSERVED/SUSPICIOUS population.
-  if(["","NOT_ASSESSABLE","NOT_OBSERVED_IN_EVALUABLE_FIELD"].includes(prior)){
+  if([
+    "",
+    "NOT_ASSESSABLE",
+    "NOT_OBSERVED_IN_EVALUABLE_FIELD",
+    "PHYSIOLOGIC_PRECURSOR_PATTERN"
+  ].includes(prior)){
     a.evidenceState="UNRESOLVED_BLASTOID_CYTOLOGY";
   }
 
@@ -173,6 +196,25 @@ export function applyMarrowPositiveCytologyConsistency(result={}){
   ].filter(Boolean).join(" ");
 
   result.blastAssessment=a;
+
+  // 005.50.15.4 — revoke only the stale physiologic auto-resolution. This is
+  // non-promotional: no OBSERVED/SUSPICIOUS population is manufactured.
+  if(obj(result.marrowPhysiologicMaturationContinuumLock).active===true){
+    result.marrowPhysiologicMaturationContinuumLock={
+      ...obj(result.marrowPhysiologicMaturationContinuumLock),
+      active:false,
+      revoked:true,
+      revokedBy:
+        MARROW_PRIMARY_OR_RECOVERED_POSITIVE_BLASTOID_CYTOLOGY_PRESERVATION_VERSION,
+      priorEvidenceState:prior||null,
+      finalEvidenceState:"UNRESOLVED_BLASTOID_CYTOLOGY",
+      positiveBlastPopulationSuppressed:false,
+      negativeBlastExclusionAllowed:false,
+      reason:
+        "Primary or recovered positive blast-associated cytology remains unresolved until focal discrimination; coexistence with maturation does not constitute explicit cytologic refutation.",
+    };
+  }
+
   result.marrowPositiveCytologyConsistency={
     ...e,
     active:true,
