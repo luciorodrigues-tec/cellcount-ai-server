@@ -30,6 +30,7 @@ export const MARROW_IMMATURE_CYTOMORPHOLOGY_ACQUISITION_STABILITY_VERSION = "BE-
 export const MARROW_CROSS_PASS_EVIDENCE_PRESERVATION_VERSION = "BE-FIX-005.50.15";
 export const MARROW_UNRESOLVED_IMMATURITY_SEMANTIC_TRIGGER_VERSION = "BE-FIX-005.50.15.1";
 export const MARROW_STABILITY_RECOVERY_UNRESOLVED_LOCK_VERSION = "BE-FIX-005.50.15.1";
+export const MARROW_REPAIR_EVIDENCE_STATE_SEMANTIC_CANONICALIZATION_VERSION = "BE-FIX-005.50.15.2";
 export const BONE_MARROW_COMPACT_ACQUISITION_VERSION = "BE-FIX-005.39";
 export const BONE_MARROW_COMPLETE_LENGTH_RECOVERY_VERSION = "BE-FIX-005.39";
 export const PERIPHERAL_POSITIVE_MORPHOLOGY_ACQUISITION_VERSION = "BE-FIX-005.50.4";
@@ -718,8 +719,56 @@ export function mergeVisualMorphologyRepair(
             : originalValue
         );
 
+  // BE-FIX-005.50.15.2 — semantic evidence-state canonicalization.
+  // Repair payloads historically used both contract enums and descriptive
+  // camelCase states (e.g. positiveMorphologicSuspicionInLimitedField).
+  // Ranking raw strings caused a true positive repair state to rank as zero,
+  // allowing NOT_ASSESSABLE from the primary pass to win the monotonic merge.
+  const canonicalEvidenceState = (value) => {
+    const raw = asText(value);
+    if (!raw) return null;
+
+    const token = raw
+      .replace(/([a-z0-9])([A-Z])/g, "$1_$2")
+      .replace(/[^A-Za-z0-9]+/g, "_")
+      .replace(/^_+|_+$/g, "")
+      .toUpperCase();
+
+    if (token === "OBSERVED_POPULATION") return "OBSERVED_POPULATION";
+    if (token === "SUSPICIOUS_POPULATION") return "SUSPICIOUS_POPULATION";
+    if (token === "FOCAL_SUSPICION") return "FOCAL_SUSPICION";
+
+    // Positive focal morphology in a limited field is positive LOCAL evidence;
+    // it is not population-level proof. Canonicalize conservatively to the
+    // existing FOCAL_SUSPICION state rather than escalating to a population.
+    if (
+      token.includes("POSITIVE") &&
+      token.includes("MORPHOLOG") &&
+      (token.includes("SUSPICION") || token.includes("EVIDENCE"))
+    ) return "FOCAL_SUSPICION";
+
+    if (
+      token.includes("BLASTLIKE_CELLS") ||
+      token.includes("BLAST_LIKE_CELLS")
+    ) return "FOCAL_SUSPICION";
+
+    if (
+      token === "UNRESOLVED_BLASTOID_CYTOLOGY" ||
+      token === "IMMATURE_POPULATION_REQUIRES_DISCRIMINATION" ||
+      token === "LIMITEDMORPHOLOGICEVIDENCE" ||
+      token === "LIMITED_MORPHOLOGIC_EVIDENCE"
+    ) return token;
+
+    if (token === "NOT_ASSESSABLE" || token === "NOTASSESSABLE")
+      return "NOT_ASSESSABLE";
+    if (token === "NOT_OBSERVED_IN_EVALUABLE_FIELD")
+      return "NOT_OBSERVED_IN_EVALUABLE_FIELD";
+
+    return token;
+  };
+
   const evidenceStateRank = (value) => {
-    const state = asText(value).toUpperCase();
+    const state = canonicalEvidenceState(value);
     if (state === "OBSERVED_POPULATION") return 6;
     if (state === "SUSPICIOUS_POPULATION") return 5;
     if (state === "FOCAL_SUSPICION") return 4;
@@ -737,9 +786,13 @@ export function mergeVisualMorphologyRepair(
   const preserveEvidenceState = (originalValue, repairValue) => {
     const o = asText(originalValue);
     const r = asText(repairValue);
-    if (!o) return r || null;
-    if (!r) return o || null;
-    return evidenceStateRank(r) > evidenceStateRank(o) ? r : o;
+    if (!o) return canonicalEvidenceState(r);
+    if (!r) return canonicalEvidenceState(o);
+
+    const oRank = evidenceStateRank(o);
+    const rRank = evidenceStateRank(r);
+    const winner = rRank > oRank ? r : o;
+    return canonicalEvidenceState(winner);
   };
 
   const preserveCount = (repairValue, originalValue, { preferMax = false } = {}) => {
@@ -1114,6 +1167,8 @@ export function mergeVisualMorphologyRepair(
       MARROW_UNRESOLVED_IMMATURITY_SEMANTIC_TRIGGER_VERSION,
     stabilityRecoveryUnresolvedLockVersion:
       MARROW_STABILITY_RECOVERY_UNRESOLVED_LOCK_VERSION,
+    repairEvidenceStateSemanticCanonicalizationVersion:
+      MARROW_REPAIR_EVIDENCE_STATE_SEMANTIC_CANONICALIZATION_VERSION,
     singlePassArchitectureCore:
       originalCytologySnapshot.architectureCore === true ||
       repairCytologySnapshot.architectureCore === true,
@@ -1148,6 +1203,8 @@ export function mergeVisualMorphologyRepair(
       MARROW_UNRESOLVED_IMMATURITY_SEMANTIC_TRIGGER_VERSION,
     stabilityRecoveryUnresolvedLockVersion:
       MARROW_STABILITY_RECOVERY_UNRESOLVED_LOCK_VERSION,
+    repairEvidenceStateSemanticCanonicalizationVersion:
+      MARROW_REPAIR_EVIDENCE_STATE_SEMANTIC_CANONICALIZATION_VERSION,
     originalImmatureCellCount:
       preserveCount(originalBlast.approximateImmatureCellCount, null),
     repairImmatureCellCount:
