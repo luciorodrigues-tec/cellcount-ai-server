@@ -144,6 +144,14 @@ import {
 } from "./ai/boneMarrow/marrowUnresolvedImmaturityFinalStateCoherenceEngine.js";
 
 import {
+  applyMarrowTrueAmlPositiveCytomorphologyRecovery,
+  MARROW_TRUE_AML_POSITIVE_CYTOMORPHOLOGY_RECOVERY_VERSION,
+  MARROW_BLASTOID_CELL_SAMPLING_AUTHORITY_VERSION,
+  MARROW_MATURATION_COEXISTENCE_NON_SUPPRESSION_VERSION,
+  MARROW_POSITIVE_CYTOLOGY_POPULATION_SEPARATION_VERSION,
+} from "./ai/boneMarrow/marrowTrueAmlPositiveCytomorphologyRecoveryEngine.js";
+
+import {
   MARROW_POSITIVE_CYTOLOGY_CONSISTENCY_VERSION,
   MARROW_ACQUISITION_DISCORDANCE_RECOVERY_VERSION,
   MARROW_PRIMARY_OR_RECOVERED_POSITIVE_BLASTOID_CYTOLOGY_PRESERVATION_VERSION,
@@ -387,6 +395,7 @@ import {
   MARROW_PRIMARY_POSITIVE_CYTOLOGY_STABILITY_RECOVERY_VERSION,
   MARROW_IMMATURE_BLASTOID_CELL_LEVEL_CYTOMORPHOLOGY_ACQUISITION_RECOVERY_VERSION,
   MARROW_CELL_LEVEL_UNRESOLVED_IMMATURITY_LOCK_VERSION,
+  MARROW_BLASTOID_CELL_SAMPLING_ACQUISITION_VERSION,
   MARROW_REPAIR_EVIDENCE_STATE_SEMANTIC_CANONICALIZATION_VERSION,
   BONE_MARROW_COMPACT_ACQUISITION_VERSION,
   BONE_MARROW_COMPLETE_LENGTH_RECOVERY_VERSION,
@@ -4895,6 +4904,20 @@ BE-FIX-005.31 — COERÊNCIA NARRATIVA-ESTRUTURA E RECUPERAÇÃO FISIOLÓGICA:
         JSON.stringify(parsed.marrowImmatureCellCytologyRecovery || {}, null, 2),
       );
 
+      // BE-FIX-005.50.18 — recover independently qualified cell-level
+      // blastoid cytomorphology before consistency/projection. This is
+      // deliberately non-populational: it may preserve FOCAL_SUSPICION but
+      // cannot manufacture SUSPICIOUS/OBSERVED population architecture.
+      parsed = applyMarrowTrueAmlPositiveCytomorphologyRecovery(parsed);
+      console.log(
+        "BE-FIX-005.50.18 — TRUE AML POSITIVE CYTOMORPHOLOGY RECOVERY / UNDER-CALL PREVENTION",
+        JSON.stringify(
+          parsed.marrowTrueAmlPositiveCytomorphologyRecovery || {},
+          null,
+          2,
+        ),
+      );
+
       // BE-FIX-005.35 — preserve unresolved positive cytology as an epistemic
       // middle state before 005.34 projection and before LME/precursor scoring.
       parsed = applyMarrowPositiveCytologyConsistency(parsed);
@@ -7134,6 +7157,16 @@ app.get("/runtime-version", (_req, res) => {
       MARROW_UNRESOLVED_IMMATURITY_PRESENTATION_LOCK_VERSION,
     clinicalInternalVersionTagSanitizationVersion:
       CLINICAL_INTERNAL_VERSION_TAG_SANITIZATION_VERSION,
+    marrowTrueAmlPositiveCytomorphologyRecoveryVersion:
+      MARROW_TRUE_AML_POSITIVE_CYTOMORPHOLOGY_RECOVERY_VERSION,
+    marrowBlastoidCellSamplingAuthorityVersion:
+      MARROW_BLASTOID_CELL_SAMPLING_AUTHORITY_VERSION,
+    marrowMaturationCoexistenceNonSuppressionVersion:
+      MARROW_MATURATION_COEXISTENCE_NON_SUPPRESSION_VERSION,
+    marrowPositiveCytologyPopulationSeparationVersion:
+      MARROW_POSITIVE_CYTOLOGY_POPULATION_SEPARATION_VERSION,
+    marrowBlastoidCellSamplingAcquisitionVersion:
+      MARROW_BLASTOID_CELL_SAMPLING_ACQUISITION_VERSION,
     marrowRepairEvidenceStateSemanticCanonicalizationVersion:
       MARROW_REPAIR_EVIDENCE_STATE_SEMANTIC_CANONICALIZATION_VERSION,
     marrowUnresolvedImmaturitySemanticRecoveryVersion:

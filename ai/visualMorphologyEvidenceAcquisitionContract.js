@@ -33,6 +33,7 @@ export const MARROW_STABILITY_RECOVERY_UNRESOLVED_LOCK_VERSION = "BE-FIX-005.50.
 export const MARROW_PRIMARY_POSITIVE_CYTOLOGY_STABILITY_RECOVERY_VERSION = "BE-FIX-005.50.15.4";
 export const MARROW_IMMATURE_BLASTOID_CELL_LEVEL_CYTOMORPHOLOGY_ACQUISITION_RECOVERY_VERSION = "BE-FIX-005.50.16";
 export const MARROW_CELL_LEVEL_UNRESOLVED_IMMATURITY_LOCK_VERSION = "BE-FIX-005.50.16";
+export const MARROW_BLASTOID_CELL_SAMPLING_ACQUISITION_VERSION = "BE-FIX-005.50.18";
 export const MARROW_REPAIR_EVIDENCE_STATE_SEMANTIC_CANONICALIZATION_VERSION = "BE-FIX-005.50.15.2";
 export const BONE_MARROW_COMPACT_ACQUISITION_VERSION = "BE-FIX-005.39";
 export const BONE_MARROW_COMPLETE_LENGTH_RECOVERY_VERSION = "BE-FIX-005.39";
@@ -638,7 +639,7 @@ JSON OBRIGATÓRIO:
   "myeloidSeries":{"status":"present|notObserved|notAssessable|indeterminate","maturation":"","dysplasia":"","summary":"","expansionContext":{"relativeMyeloidPredominance":null,"broadMaturationSpectrum":null,"numerousGranulocyticPrecursors":null,"matureNeutrophilicFormsPresent":null,"leftShiftedMaturationSpectrum":null,"basophilEosinophilEnrichment":null,"erythroidRelativeReduction":null,"disproportionateMyeloidRepresentation":null,"denseMyeloidField":null}},
   "erythroidSeries":{"status":"present|notObserved|notAssessable|indeterminate","maturation":"","dysplasia":"","summary":""},
   "megakaryocyticSeries":{"status":"present|notObserved|notAssessable|indeterminate","maturation":"","dysplasia":"","summary":""},
-  "blastAssessment":{"status":"present|notObserved|notAssessable|indeterminate","observed":null,"estimatedPercentage":null,"globalAbsenceAllowed":false,"evidenceState":"OBSERVED_POPULATION|SUSPICIOUS_POPULATION|FOCAL_SUSPICION|NOT_OBSERVED_IN_EVALUABLE_FIELD|NOT_ASSESSABLE","approximateBlastLikeCells":null,"approximateImmatureCellCount":null,"immatureCellBurden":"none|few|multiple|numerous|dominant|indeterminate","spatialDistribution":"isolated|focal|repeated_across_field|diffuse|indeterminate","morphologicFeatureCount":null,"populationPattern":"dominant|repeated|focal|heterogeneous|indeterminate","morphologySupport":{"highNCRatio":null,"openFineChromatin":null,"nucleoli":null,"scantBasophilicCytoplasm":null,"monomorphism":null,"repeatedAcrossField":null},"immatureCellCytology":{"highNCRatio":null,"openFineChromatin":null,"nucleoli":null,"scantBasophilicCytoplasm":null,"morphologicallyCoherent":null,"repeatedSubsetAcrossField":null,"distinctFromMaturationContinuum":null},"precursorContext":{"maturationHeterogeneity":null,"maturationContinuum":null,"matureFormsPresent":null,"lineageDiversity":null,"orderlyGranulocyticMaturation":null,"nonMonomorphicBackground":null},"blastoidSubpopulationContext":{"distinctFromMaturationContinuum":null,"morphologicallyCoherent":null,"repeatedSubsetAcrossField":null,"disproportionateImmatureSubset":null,"matureFormsCoexist":null},"lineageAssignable":false,"lineage":"indeterminate","summary":""},
+  "blastAssessment":{"status":"present|notObserved|notAssessable|indeterminate","observed":null,"estimatedPercentage":null,"globalAbsenceAllowed":false,"evidenceState":"OBSERVED_POPULATION|SUSPICIOUS_POPULATION|FOCAL_SUSPICION|NOT_OBSERVED_IN_EVALUABLE_FIELD|NOT_ASSESSABLE","approximateBlastLikeCells":null,"approximateImmatureCellCount":null,"immatureCellBurden":"none|few|multiple|numerous|dominant|indeterminate","spatialDistribution":"isolated|focal|repeated_across_field|diffuse|indeterminate","morphologicFeatureCount":null,"populationPattern":"dominant|repeated|focal|heterogeneous|indeterminate","morphologySupport":{"highNCRatio":null,"openFineChromatin":null,"nucleoli":null,"scantBasophilicCytoplasm":null,"monomorphism":null,"repeatedAcrossField":null},"immatureCellCytology":{"highNCRatio":null,"openFineChromatin":null,"nucleoli":null,"scantBasophilicCytoplasm":null,"morphologicallyCoherent":null,"repeatedSubsetAcrossField":null,"distinctFromMaturationContinuum":null},"blastoidCellSampling":{"sampledCellCount":0,"blastoidQualifiedCellCount":0,"assessedCells":[{"cellIndex":1,"highNCRatio":null,"openFineChromatin":null,"nucleoli":null,"scantBasophilicCytoplasm":null,"distinctFromMaturationContinuum":null,"morphologicallyCoherent":null,"repeatedWithSimilarCells":null}]},"precursorContext":{"maturationHeterogeneity":null,"maturationContinuum":null,"matureFormsPresent":null,"lineageDiversity":null,"orderlyGranulocyticMaturation":null,"nonMonomorphicBackground":null},"blastoidSubpopulationContext":{"distinctFromMaturationContinuum":null,"morphologicallyCoherent":null,"repeatedSubsetAcrossField":null,"disproportionateImmatureSubset":null,"matureFormsCoexist":null},"lineageAssignable":false,"lineage":"indeterminate","summary":""},
   "spiculeAssessment":{"status":"present|notObserved|notAssessable|indeterminate","observed":null,"summary":""},
   "hemodilutionAssessment":{"status":"present|notObserved|notAssessable|indeterminate","suspected":null,"summary":""},
   "cellularityAssessment":{"status":"present|notObserved|notAssessable|indeterminate","scope":"field_limited","globalEstimateAllowed":false,"estimate":null,"summary":""},
@@ -650,6 +651,10 @@ JSON OBRIGATÓRIO:
 
 DISCRIMINAÇÃO BLASTO/PRECURSOR:
 - Imaturidade medular não é sinônimo de blasto.
+- BE-FIX-005.50.18: examine individualmente até 6 células imaturas/blastoides mais informativas em blastoidCellSampling.assessedCells. Para cada célula, registre highNCRatio, openFineChromatin, nucleoli, scantBasophilicCytoplasm e distinctFromMaturationContinuum como true/false/null.
+- Não use a coexistência de formas mieloides maduras como evidência contra citologia blastoide em outra célula. Maturação global e citologia blastoide são eixos independentes.
+- blastoidQualifiedCellCount deve contar apenas células com conjunto citomorfológico blastóide concordante (>=3 critérios positivos, ou >=2 critérios positivos + distinção clara do continuum).
+- Uma ou mais células qualificadas podem sustentar FOCAL_SUSPICION, mas NÃO autorizam SUSPICIOUS_POPULATION/OBSERVED_POPULATION sem arquitetura populacional independente.
 - Preserve continuum maturativo, heterogeneidade e formas maduras quando observados.
 - SUSPICIOUS/OBSERVED exige subpopulação distinta/coerente/repetida + citologia sustentada.
 - N:C, cromatina, nucléolo ou citoplasma isolados não bastam.
@@ -714,6 +719,13 @@ export function buildBoneMarrowVisualRepairPrompt({
 
   const stabilityInstructions = stabilityFocused
     ? `
+BE-FIX-005.50.18 — AMOSTRAGEM CELULAR BLASTOIDE ANTI-UNDERCALL:
+- Além do resumo agregado, preencha blastAssessment.blastoidCellSampling com até 6 células imaturas/blastoides mais informativas.
+- Para cada célula, marque true/false/null para highNCRatio, openFineChromatin, nucleoli, scantBasophilicCytoplasm, distinctFromMaturationContinuum, morphologicallyCoherent e repeatedWithSimilarCells.
+- Se pelo menos uma célula tiver >=3 critérios blastoides, ou >=2 + distinção clara do continuum, registre-a em blastoidQualifiedCellCount.
+- Formas maduras coexistentes NÃO anulam citologia blastoide positiva em outra célula.
+- A amostragem celular NÃO autoriza inferência de percentual nem população; arquitetura permanece separada.
+
 BE-FIX-005.50.15 — DISCRIMINAÇÃO CITOMORFOLÓGICA DE ESTABILIDADE:
 - Reobserve ativamente as células imaturas/precursoras em várias regiões do campo.
 - Não presuma blasto por imaturidade, tamanho ou relação N:C isolados.

@@ -21,6 +21,9 @@ export const MARROW_POSITIVE_BLAST_EVIDENCE_SEMANTIC_SUPERSESSION_VERSION =
 export const MARROW_FINAL_BLAST_PROJECTION_LOCK_VERSION =
   "BE-FIX-005.50.15.5";
 
+export const MARROW_TRUE_POSITIVE_CYTOLOGY_SUPERSESSION_PROTECTION_VERSION =
+  "BE-FIX-005.50.18";
+
 function obj(value) {
   return value && typeof value === "object" && !Array.isArray(value)
     ? value
@@ -71,6 +74,9 @@ export function evaluateMarrowPositiveBlastEvidenceSemanticSupersession(
   );
 
   const recovered = obj(result?.marrowRecoveredCytologyProjection);
+  const positiveCytologyAuthority = obj(
+    result?.marrowTrueAmlPositiveCytomorphologyRecovery,
+  );
   const focalGate = obj(result?.marrowFocalCytologyContextualization);
   const rawBlast = obj(result?.rawResponse?.blastAssessment);
   const directBlast = obj(result?.blastAssessment);
@@ -190,14 +196,21 @@ export function evaluateMarrowPositiveBlastEvidenceSemanticSupersession(
       result?.marrowMyeloidExpansionDiscrimination?.maturationContinuumSupported === true
     );
 
+  const truePositiveCytologyProtected =
+    positiveCytologyAuthority.active === true &&
+    positiveCytologyAuthority.cellLevelPositiveCytology === true;
+
   const active =
+    !truePositiveCytologyProtected &&
     (
-      protectedExpansion &&
-      focalOnly &&
-      architectureAbsent &&
-      explicitlyWithinContinuum
-    ) ||
-    physiologicMaturationContradiction;
+      (
+        protectedExpansion &&
+        focalOnly &&
+        architectureAbsent &&
+        explicitlyWithinContinuum
+      ) ||
+      physiologicMaturationContradiction
+    );
 
   const supersessionMode = physiologicMaturationContradiction
     ? "PHYSIOLOGIC_MATURATION_CONTRADICTION_LOCK"
@@ -224,7 +237,12 @@ export function evaluateMarrowPositiveBlastEvidenceSemanticSupersession(
       active && approximateBlastLikeCells !== null && approximateBlastLikeCells > 0,
     unresolvedImmatureCandidateAfterAcquisition,
     physiologicMaturationContradiction,
-    supersessionMode,
+    truePositiveCytologyProtected,
+    truePositiveCytologySupersessionProtectionVersion:
+      MARROW_TRUE_POSITIVE_CYTOLOGY_SUPERSESSION_PROTECTION_VERSION,
+    supersessionMode: truePositiveCytologyProtected
+      ? "TRUE_POSITIVE_CYTOLOGY_PROTECTED_FROM_MATURATION_SUPERSESSION"
+      : supersessionMode,
     populationInferenceAllowed,
     focalPopulationScopeBlocked,
     populationPositiveAllowed:
@@ -238,11 +256,13 @@ export function evaluateMarrowPositiveBlastEvidenceSemanticSupersession(
       ),
     focalCytologyPopulationScopeLockVersion: "BE-FIX-005.50.15.5",
     negativeBlastExclusionAllowed: false,
-    reason: physiologicMaturationContradiction
-      ? "Suspicious architecture is not sufficient to establish a structured blastoid population when morphology is explicitly within a physiologic maturation continuum, no blast-like cells are counted, no observed blast population exists, and no independent structured architecture is present."
-      : active
-        ? "Legacy focal blast-like cytology is preserved as focal morphology but is semantically superseded as population-level blast evidence by protected pathologic myeloid expansion with maturation and absent blastoid architecture."
-        : "No semantic supersession applied.",
+    reason: truePositiveCytologyProtected
+      ? "Cell-level positive blastoid cytomorphology is independently qualified and cannot be erased by coexistence of myeloid maturation; population inference remains architecture-gated."
+      : physiologicMaturationContradiction
+        ? "Suspicious architecture is not sufficient to establish a structured blastoid population when morphology is explicitly within a physiologic maturation continuum, no blast-like cells are counted, no observed blast population exists, and no independent structured architecture is present."
+        : active
+          ? "Legacy focal blast-like cytology is preserved as focal morphology but is semantically superseded as population-level blast evidence by protected pathologic myeloid expansion with maturation and absent blastoid architecture."
+          : "No semantic supersession applied.",
   };
 }
 
