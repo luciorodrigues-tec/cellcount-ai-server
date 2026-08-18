@@ -18,7 +18,7 @@ export const MARROW_MYELOID_EXPANSION_DISCRIMINATION_VERSION = "BE-FIX-005.38";
 export const MARROW_PATHOLOGIC_MATURATION_CONTINUUM_VERSION = "BE-FIX-005.38";
 export const MARROW_MYELOID_MATURATION_EVIDENCE_PROJECTION_VERSION = "BE-FIX-005.41";
 export const MARROW_EXPANSION_CLASSIFICATION_RECOVERY_VERSION = "BE-FIX-005.41";
-export const MARROW_POPULATION_INFERENCE_REPRESENTATIVITY_GATE_VERSION = "BE-FIX-005.50.11";
+export const MARROW_POPULATION_INFERENCE_REPRESENTATIVITY_GATE_VERSION = "BE-FIX-005.50.12";
 
 function obj(v) {
   return v && typeof v === "object" && !Array.isArray(v) ? v : {};
@@ -72,6 +72,48 @@ function populationInferenceRepresentativity(result = {}) {
     ...obj(raw.marrowAdequacyMorphologyAxis),
     ...obj(result.marrowAdequacyMorphologyAxis),
   };
+  const cellularity = {
+    ...obj(raw.cellularityAssessment),
+    ...obj(result.cellularityAssessment),
+  };
+  const visual = {
+    ...obj(raw.visualEvidence),
+    ...obj(result.visualEvidence),
+  };
+
+  const limitationText = norm([
+    marrow.status,
+    marrow.representativity,
+    marrow.summary,
+    marrow.technicalQuality,
+    cellularity.status,
+    cellularity.scope,
+    cellularity.summary,
+    visual.fieldScope,
+    ...(
+      Array.isArray(raw.marrowLimitations) ? raw.marrowLimitations : []
+    ),
+    ...(
+      Array.isArray(result.marrowLimitations) ? result.marrowLimitations : []
+    ),
+  ].filter(Boolean).join(" "));
+
+  const limitedScopeToken =
+    ["field_limited", "single_high_power_field", "single_field", "focal_field"]
+      .includes(norm(cellularity.scope)) ||
+    ["field_limited", "single_high_power_field", "single_field", "focal_field"]
+      .includes(norm(visual.fieldScope));
+
+  const globalInferenceExplicitlyForbidden =
+    cellularity.globalEstimateAllowed === false ||
+    marrow.globalEstimateAllowed === false ||
+    marrow.globalInferenceAllowed === false ||
+    field.globalInferenceAllowed === false;
+
+  const narrativeLimited =
+    /campo unico|single high power field|single field|field limited|area focal|representatividade global nao inferivel|nao para celularidade|nao.*representatividade global|global nao avaliavel|global.*not assessable|sem espicul|espiculas nao observ/.test(
+      limitationText,
+    );
 
   const explicitlyLimited =
     field.limitedField === true ||
@@ -79,20 +121,42 @@ function populationInferenceRepresentativity(result = {}) {
     marrow.limitedField === true ||
     marrow.adequateForPopulationAssessment === false ||
     axis.adequacyClassification === "CLASS_1_LIMITED_FIELD" ||
-    axis.populationInferenceAllowed === false;
+    axis.populationInferenceAllowed === false ||
+    limitedScopeToken ||
+    globalInferenceExplicitlyForbidden ||
+    narrativeLimited;
 
   const explicitlyAdequate =
-    field.adequateForPopulationAssessment === true ||
-    marrow.adequateForPopulationAssessment === true ||
-    axis.populationInferenceAllowed === true;
+    !explicitlyLimited &&
+    (
+      field.adequateForPopulationAssessment === true ||
+      marrow.adequateForPopulationAssessment === true ||
+      axis.populationInferenceAllowed === true
+    );
+
+  const sourceSignals = {
+    legacyFieldGate:
+      field.limitedField === true ||
+      field.adequateForPopulationAssessment === false,
+    marrowAdequacyGate:
+      marrow.limitedField === true ||
+      marrow.adequateForPopulationAssessment === false,
+    morphologyAxisGate:
+      axis.adequacyClassification === "CLASS_1_LIMITED_FIELD" ||
+      axis.populationInferenceAllowed === false,
+    cellularityScopeGate: limitedScopeToken,
+    globalInferenceGate: globalInferenceExplicitlyForbidden,
+    narrativeRepresentativityGate: narrativeLimited,
+  };
 
   return {
     version: MARROW_POPULATION_INFERENCE_REPRESENTATIVITY_GATE_VERSION,
     limitedField: explicitlyLimited,
     explicitlyAdequate,
     populationInferenceAllowed: !explicitlyLimited,
+    sourceSignals,
     reason: explicitlyLimited
-      ? "Limited/non-representative field cannot establish a population-level disproportionate myeloid expansion."
+      ? "Limited/non-representative marrow evidence cannot establish a population-level disproportionate myeloid expansion."
       : explicitlyAdequate
         ? "Population-level inference is explicitly supported by adequacy metadata."
         : "No explicit limited-field population-inference prohibition was found; legacy behavior is preserved.",

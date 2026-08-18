@@ -398,6 +398,34 @@ export function createLocalMorphologyEvidence({
     finiteNumber(legacyWbc.approximateVisibleCells) ??
     finiteNumber(fieldAdequacy.visibleLeukocytes);
 
+  // BE-FIX-005.50.12 — restore the 005.50.10 polychromasia contradiction
+  // guard inputs before the evidence object is assembled. Positive morphology
+  // remains preserved unless the accompanying evidence explicitly contradicts
+  // an observed state or identifies a technical/artifactual explanation.
+  const rawPolychromasiaState = firstText(
+    explicitRbc.polychromasiaState,
+    legacyRbc.polychromasiaState,
+    explicitRbc.polychromasia,
+    legacyRbc.polychromasia,
+  ).toUpperCase() || "NOT_ASSESSABLE";
+
+  const rawPolychromasiaEvidence = firstText(
+    explicitRbc.polychromasiaEvidence,
+    legacyRbc.polychromasiaEvidence,
+    explicitRbc.description,
+    legacyRbc.description,
+    erythrocyteDescription,
+  );
+
+  const polychromasiaContradiction =
+    rawPolychromasiaState === "OBSERVED" &&
+    polychromasiaEvidenceContradictsObserved(rawPolychromasiaEvidence);
+
+  const guardedPolychromasiaState =
+    polychromasiaContradiction
+      ? "NOT_ASSESSABLE"
+      : rawPolychromasiaState;
+
   return {
     contractVersion: LOCAL_MORPHOLOGY_EVIDENCE_VERSION,
     capturedBeforeGovernors: true,
