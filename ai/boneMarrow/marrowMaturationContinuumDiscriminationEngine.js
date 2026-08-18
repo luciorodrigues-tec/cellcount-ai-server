@@ -13,6 +13,7 @@ export const MARROW_UNRESOLVED_IMMATURE_CANDIDATE_CONTINUUM_SAFETY_GATE_VERSION 
 export const MARROW_POST_RECOVERY_MATURATION_CONTINUUM_REEVALUATION_VERSION = "BE-FIX-005.50.14.1";
 export const MARROW_SEMANTIC_UNRESOLVED_IMMATURITY_CONTINUUM_GATE_VERSION = "BE-FIX-005.50.15.3";
 export const MARROW_POSITIVE_RECOVERED_BLASTOID_CYTOLOGY_CONTINUUM_LOCK_VERSION = "BE-FIX-005.50.15.3";
+export const MARROW_CELL_LEVEL_UNRESOLVED_IMMATURITY_CONTINUUM_GATE_VERSION = "BE-FIX-005.50.16";
 
 function obj(v){return v&&typeof v==="object"&&!Array.isArray(v)?v:{};}
 function txt(v){return typeof v==="string"?v.trim():"";}
@@ -175,6 +176,7 @@ export function evaluateMarrowMaturationContinuum(result={}){
   const unresolvedByState =
     candidateState==="IMMATURE_POPULATION_REQUIRES_DISCRIMINATION" ||
     candidateState==="UNRESOLVED_BLASTOID_CYTOLOGY" ||
+    candidateState==="FOCAL_UNRESOLVED_IMMATURE_CYTOLOGY" ||
     assessment.cytologyRecoveryRequired===true ||
     assessment.cytologyResolutionRequired===true ||
     recovery.unresolvedCandidate===true ||

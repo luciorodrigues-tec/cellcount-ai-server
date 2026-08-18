@@ -31,6 +31,8 @@ export const MARROW_CROSS_PASS_EVIDENCE_PRESERVATION_VERSION = "BE-FIX-005.50.15
 export const MARROW_UNRESOLVED_IMMATURITY_SEMANTIC_TRIGGER_VERSION = "BE-FIX-005.50.15.1";
 export const MARROW_STABILITY_RECOVERY_UNRESOLVED_LOCK_VERSION = "BE-FIX-005.50.15.1";
 export const MARROW_PRIMARY_POSITIVE_CYTOLOGY_STABILITY_RECOVERY_VERSION = "BE-FIX-005.50.15.4";
+export const MARROW_IMMATURE_BLASTOID_CELL_LEVEL_CYTOMORPHOLOGY_ACQUISITION_RECOVERY_VERSION = "BE-FIX-005.50.16";
+export const MARROW_CELL_LEVEL_UNRESOLVED_IMMATURITY_LOCK_VERSION = "BE-FIX-005.50.16";
 export const MARROW_REPAIR_EVIDENCE_STATE_SEMANTIC_CANONICALIZATION_VERSION = "BE-FIX-005.50.15.2";
 export const BONE_MARROW_COMPACT_ACQUISITION_VERSION = "BE-FIX-005.39";
 export const BONE_MARROW_COMPLETE_LENGTH_RECOVERY_VERSION = "BE-FIX-005.39";
@@ -375,6 +377,36 @@ function marrowImmatureCellCytologyRecoveryNeed(raw = {}) {
     !positiveState &&
     blast.observed!==true;
 
+  // BE-FIX-005.50.16 — cell-level acquisition recovery.
+  // A precursor-rich field with visibly present immature cells may remain
+  // unresolved after a directed stability reassessment. In that case, zero
+  // characterized blastoid traits is UNKNOWN cytomorphology, not negative
+  // blast evidence and not proof of physiologic maturation.
+  const stability=asObject(blast.immatureCellCytologyStability);
+  const stabilityTraits=[
+    stability.highNCRatio,
+    stability.openFineChromatin,
+    stability.nucleoli,
+    stability.scantBasophilicCytoplasm,
+  ];
+  const stabilityCharacterized=stabilityTraits.filter(v=>typeof v==="boolean").length;
+  const stabilityReassessed=Object.keys(stability).length>0 ||
+    ["reassessed","indeterminate","notassessable","not_assessable"].includes(
+      asText(stability.status).toLowerCase().replace(/[^a-z_]/g,"")
+    );
+  const immatureBurdenVisiblyPresent =
+    !["","none","indeterminate","notassessable","not_assessable"].includes(burden) ||
+    (Number.isFinite(immatureCount)&&immatureCount>=1);
+  const cellLevelUnresolvedImmaturity =
+    precursorRichField &&
+    immatureBurdenVisiblyPresent &&
+    characterized===0 &&
+    positive===0 &&
+    !positiveState &&
+    blast.observed!==true &&
+    stabilityReassessed &&
+    stabilityCharacterized===0;
+
   const stabilityDiscriminationRecommended =
     (
       (precursorRichField || semanticUnresolvedImmaturity) &&
@@ -395,6 +427,16 @@ function marrowImmatureCellCytologyRecoveryNeed(raw = {}) {
       MARROW_STABILITY_RECOVERY_UNRESOLVED_LOCK_VERSION,
     primaryPositiveCytologyStabilityRecoveryVersion:
       MARROW_PRIMARY_POSITIVE_CYTOLOGY_STABILITY_RECOVERY_VERSION,
+    immatureBlastoidCellLevelCytomorphologyAcquisitionRecoveryVersion:
+      MARROW_IMMATURE_BLASTOID_CELL_LEVEL_CYTOMORPHOLOGY_ACQUISITION_RECOVERY_VERSION,
+    cellLevelUnresolvedImmaturityLockVersion:
+      MARROW_CELL_LEVEL_UNRESOLVED_IMMATURITY_LOCK_VERSION,
+    cellLevelCytomorphologyState: cellLevelUnresolvedImmaturity
+      ? "UNRESOLVED_IMMATURE"
+      : (characterized>=2 ? (positive>=2 ? "RESOLVED_BLASTOID" : "RESOLVED_NON_BLASTOID") : "INDETERMINATE"),
+    cellLevelUnresolvedImmaturity,
+    stabilityReassessed,
+    stabilityCharacterizedCytologyCount: stabilityCharacterized,
     required,
     stabilityDiscriminationRecommended,
     primaryPositiveCytologyStabilityRecoveryRecommended,
@@ -531,7 +573,8 @@ export function assessBoneMarrowVisualEvidenceAcquisition({
     status: effectiveComplete ? STATUS.COMPLETE : STATUS.INCOMPLETE,
     complete: effectiveComplete,
     retryRecommended:
-      !effectiveComplete || immatureCytomorphologyStabilityRecoveryRecommended,
+      !effectiveComplete || immatureCytomorphologyStabilityRecoveryRecommended ||
+      immatureCellCytologyRecovery.cellLevelUnresolvedImmaturity === true,
     immatureCellCytologyRecoveryRequired:
       immatureCellCytologyRecovery.required === true,
     immatureCytomorphologyStabilityRecoveryRecommended,
@@ -544,7 +587,12 @@ export function assessBoneMarrowVisualEvidenceAcquisition({
     stabilityRecoveryUnresolvedLockVersion:
       MARROW_STABILITY_RECOVERY_UNRESOLVED_LOCK_VERSION,
     semanticUnresolvedImmaturity:
-      immatureCellCytologyRecovery.semanticUnresolvedImmaturity === true,
+      immatureCellCytologyRecovery.semanticUnresolvedImmaturity === true ||
+      immatureCellCytologyRecovery.cellLevelUnresolvedImmaturity === true,
+    immatureBlastoidCellLevelCytomorphologyAcquisitionRecoveryVersion:
+      MARROW_IMMATURE_BLASTOID_CELL_LEVEL_CYTOMORPHOLOGY_ACQUISITION_RECOVERY_VERSION,
+    cellLevelUnresolvedImmaturityLockVersion:
+      MARROW_CELL_LEVEL_UNRESOLVED_IMMATURITY_LOCK_VERSION,
     positiveCytologyConsistencyVersion: "BE-FIX-005.35",
     acquisitionDiscordanceRecoveryVersion: "BE-FIX-005.35",
     immatureCellCytologyRecovery,
@@ -779,6 +827,7 @@ export function mergeVisualMorphologyRepair(
 
     if (
       token === "UNRESOLVED_BLASTOID_CYTOLOGY" ||
+      token === "FOCAL_UNRESOLVED_IMMATURE_CYTOLOGY" ||
       token === "IMMATURE_POPULATION_REQUIRES_DISCRIMINATION" ||
       token === "LIMITEDMORPHOLOGICEVIDENCE" ||
       token === "LIMITED_MORPHOLOGIC_EVIDENCE"
@@ -799,6 +848,7 @@ export function mergeVisualMorphologyRepair(
     if (state === "FOCAL_SUSPICION") return 4;
     if (
       state === "UNRESOLVED_BLASTOID_CYTOLOGY" ||
+      state === "FOCAL_UNRESOLVED_IMMATURE_CYTOLOGY" ||
       state === "IMMATURE_POPULATION_REQUIRES_DISCRIMINATION" ||
       state === "LIMITEDMORPHOLOGICEVIDENCE" ||
       state === "LIMITED_MORPHOLOGIC_EVIDENCE"

@@ -4,6 +4,8 @@ export const MARROW_CROSS_PASS_IMMATURE_CYTOMORPHOLOGY_RECOVERY_VERSION = "BE-FI
 export const MARROW_UNRESOLVED_IMMATURITY_SEMANTIC_RECOVERY_VERSION = "BE-FIX-005.50.15.1";
 export const MARROW_RECOVERED_IMMATURE_CARDINALITY_UNRESOLVED_LOCK_VERSION = "BE-FIX-005.50.15.1";
 export const MARROW_SEMANTIC_UNRESOLVED_IMMATURITY_PROPAGATION_VERSION = "BE-FIX-005.50.15.3";
+export const MARROW_CELL_LEVEL_CYTOMORPHOLOGY_RECOVERY_VERSION = "BE-FIX-005.50.16";
+export const MARROW_CELL_LEVEL_UNRESOLVED_IMMATURITY_PRESERVATION_VERSION = "BE-FIX-005.50.16";
 
 function obj(v){return v&&typeof v==="object"&&!Array.isArray(v)?v:{};}
 function text(v){return typeof v==="string"?v.trim():"";}
@@ -74,7 +76,13 @@ export function evaluateMarrowImmatureCellCytologyGap(result = {}) {
     assessment.observed===true ||
     (blastLikeCount!==null&&blastLikeCount>=1) ||
     positiveCytologyCount>=2;
+  const vme=obj(result.visualMorphologyEvidenceAcquisition);
+  const vmeRecovery=obj(vme.immatureCellCytologyRecovery);
+  const cellLevelUnresolvedImmaturity =
+    vmeRecovery.cellLevelUnresolvedImmaturity===true ||
+    vmeRecovery.cellLevelCytomorphologyState==="UNRESOLVED_IMMATURE";
   const semanticUnresolvedImmaturity =
+    cellLevelUnresolvedImmaturity ||
     crossPass.semanticUnresolvedImmaturity===true ||
     crossPass.unresolvedEvidenceStatePreserved===true ||
     crossPass.recoveredMultipleUncharacterizedImmaturity===true;
@@ -91,12 +99,10 @@ export function evaluateMarrowImmatureCellCytologyGap(result = {}) {
   // This is non-promotional and does not create blast positivity.
   const unresolvedCandidate=
     marrow &&
-    multipleImmature &&
-    uncharacterizedCytology &&
     !directPositiveProtected &&
     (
-      repeatedImmature ||
-      crossPassUnresolvedSemantic
+      (multipleImmature && uncharacterizedCytology && (repeatedImmature || crossPassUnresolvedSemantic)) ||
+      cellLevelUnresolvedImmaturity
     );
   return {
     version:MARROW_IMMATURE_CELL_CYTOLOGY_RECOVERY_VERSION,marrow,immatureCount,blastLikeCount,
@@ -115,7 +121,10 @@ export function evaluateMarrowImmatureCellCytologyGap(result = {}) {
     semanticUnresolvedImmaturity,
     semanticUnresolvedImmaturityPropagationVersion:
       MARROW_SEMANTIC_UNRESOLVED_IMMATURITY_PROPAGATION_VERSION,
-    candidateState:unresolvedCandidate?"IMMATURE_POPULATION_REQUIRES_DISCRIMINATION":null
+    cellLevelCytomorphologyRecoveryVersion: MARROW_CELL_LEVEL_CYTOMORPHOLOGY_RECOVERY_VERSION,
+    cellLevelUnresolvedImmaturityPreservationVersion: MARROW_CELL_LEVEL_UNRESOLVED_IMMATURITY_PRESERVATION_VERSION,
+    cellLevelUnresolvedImmaturity,
+    candidateState:unresolvedCandidate?(cellLevelUnresolvedImmaturity?"FOCAL_UNRESOLVED_IMMATURE_CYTOLOGY":"IMMATURE_POPULATION_REQUIRES_DISCRIMINATION"):null
   };
 }
 
@@ -139,10 +148,14 @@ export function applyMarrowImmatureCellCytologyRecovery(result = {}) {
     prior==="LIMITED_MORPHOLOGIC_EVIDENCE" ||
     !prior
   ){
-    a.evidenceState="IMMATURE_POPULATION_REQUIRES_DISCRIMINATION";
+    a.evidenceState=e.cellLevelUnresolvedImmaturity
+      ? "FOCAL_UNRESOLVED_IMMATURE_CYTOLOGY"
+      : "IMMATURE_POPULATION_REQUIRES_DISCRIMINATION";
   }
   a.summary=[text(a.summary),
-    "BE-FIX-005.33: múltiplas células imaturas repetidas permanecem como população candidata indeterminada porque a citologia blastoide discriminativa não foi suficientemente caracterizada. Não promover para blastos e não reduzir automaticamente a padrão fisiológico até discriminação focal."
+    e.cellLevelUnresolvedImmaturity
+      ? "BE-FIX-005.50.16: há imaturidade celular visível em campo rico em precursores, mas a citomorfologia discriminativa permaneceu não resolvida após reobservação focal. Preservar candidato focal indeterminado; não promover para população blastoide e não reduzir automaticamente a padrão fisiológico."
+      : "BE-FIX-005.33: múltiplas células imaturas repetidas permanecem como população candidata indeterminada porque a citologia blastoide discriminativa não foi suficientemente caracterizada. Não promover para blastos e não reduzir automaticamente a padrão fisiológico até discriminação focal."
   ].filter(Boolean).join(" ");
   result.blastAssessment=a;
   result.marrowImmatureCellCytologyRecovery={...e,active:true,priorEvidenceState:prior||null,
