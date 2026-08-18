@@ -10,13 +10,45 @@ import {
 } from "./boneMarrow/marrowPositiveBlastEvidenceSemanticSupersessionEngine.js";
 
 export const MARROW_GLOBAL_PATTERN_COHERENCE_RECONCILIATION_VERSION = "BE-FIX-005.43";
+export const MARROW_FOCAL_BLASTOID_SCOPE_GLOBAL_PATTERN_PROPAGATION_VERSION =
+  "BE-FIX-005.50.20";
+export const MARROW_FOCAL_BLASTOID_GLOBAL_PATTERN_SEMANTIC_COHERENCE_VERSION =
+  "BE-FIX-005.50.20";
+export const MARROW_FOCAL_BLASTOID_POPULATION_SEMANTIC_NON_PROMOTION_VERSION =
+  "BE-FIX-005.50.20";
+
 
 function asObject(value) {
   return value && typeof value === "object" && !Array.isArray(value) ? value : {};
 }
 
+function readFocalBlastoidScopeAuthority(result = {}) {
+  const lock = asObject(result?.marrowPositiveCellLevelBlastoidScopeLock);
+  const governance = asObject(result?.evidenceGovernance);
+
+  const active =
+    lock.active === true &&
+    lock.cellLevelPositiveBlastoidCytology === true &&
+    (
+      lock.populationInferenceForbidden === true ||
+      lock.populationPositiveAllowed === false ||
+      governance.populationInferenceAllowed === false ||
+      governance.populationPositiveAllowed === false
+    );
+
+  return {
+    active,
+    cellLevelPositiveBlastoidCytology: active,
+    populationInferenceAllowed: active ? false : null,
+    populationPositiveAllowed: active ? false : null,
+    blastPercentageInferenceAllowed: active ? false : null,
+    effectiveEvidenceState: active ? "FOCAL_SUSPICION" : null,
+    version: MARROW_FOCAL_BLASTOID_SCOPE_GLOBAL_PATTERN_PROPAGATION_VERSION,
+  };
+}
+
 function hasPositiveMarrowBlastEvidence(result = {}) {
-  if (result?.marrowPositiveCellLevelBlastoidScopeLock?.active === true) {
+  if (readFocalBlastoidScopeAuthority(result).active === true) {
     return false;
   }
   const semanticSupersession =
@@ -133,9 +165,10 @@ export function analyzeGlobalPattern(result = {}) {
   const atypical = findings.atypicalLymphocytes === true || findings.largeMononuclearCells === true ||
     findings.atypicalPopulation === true || monomorphic;
   const marrowPositiveBlastEvidence = hasPositiveMarrowBlastEvidence(result);
+  const focalBlastoidScopeAuthority =
+    readFocalBlastoidScopeAuthority(result);
   const focalPositiveBlastoidCytology =
-    result?.marrowPositiveCellLevelBlastoidScopeLock?.active === true &&
-    result?.marrowPositiveCellLevelBlastoidScopeLock?.cellLevelPositiveBlastoidCytology === true;
+    focalBlastoidScopeAuthority.active === true;
   const marrowBlastSemanticSupersession =
     evaluateMarrowPositiveBlastEvidenceSemanticSupersession(result);
   const blastLike = marrowPositiveBlastEvidence || findings.blastSuspicion === true ||
@@ -186,7 +219,23 @@ export function analyzeGlobalPattern(result = {}) {
     // field is inadequate for global negative exclusion.
     marrowPositiveBlastEvidence,
     marrowPositiveBlastoidCytology: focalPositiveBlastoidCytology,
-    marrowPopulationBlastEvidence: marrowPositiveBlastEvidence,
+    marrowPopulationBlastEvidence:
+      focalPositiveBlastoidCytology ? false : marrowPositiveBlastEvidence,
+    focalBlastoidScopeAuthority,
+    populationInferenceAllowed:
+      focalPositiveBlastoidCytology ? false : null,
+    populationPositiveAllowed:
+      focalPositiveBlastoidCytology ? false : null,
+    blastPercentageInferenceAllowed:
+      focalPositiveBlastoidCytology ? false : null,
+    focalBlastoidFindingDoesNotEstablishPopulation:
+      focalPositiveBlastoidCytology,
+    marrowFocalBlastoidScopeGlobalPatternPropagationVersion:
+      MARROW_FOCAL_BLASTOID_SCOPE_GLOBAL_PATTERN_PROPAGATION_VERSION,
+    marrowFocalBlastoidGlobalPatternSemanticCoherenceVersion:
+      MARROW_FOCAL_BLASTOID_GLOBAL_PATTERN_SEMANTIC_COHERENCE_VERSION,
+    marrowFocalBlastoidPopulationSemanticNonPromotionVersion:
+      MARROW_FOCAL_BLASTOID_POPULATION_SEMANTIC_NON_PROMOTION_VERSION,
     physiologicPrecursorPattern,
     pathologicMyeloidExpansionPattern,
     marrowPositiveBlastEvidenceSemanticSupersession:
@@ -197,9 +246,11 @@ export function analyzeGlobalPattern(result = {}) {
     marrowGlobalPatternCoherenceReconciliationVersion: MARROW_GLOBAL_PATTERN_COHERENCE_RECONCILIATION_VERSION,
     globalPatternCoherenceVersion: MARROW_GLOBAL_PATTERN_COHERENCE_RECONCILIATION_VERSION,
     blastAssessmentIndeterminate: !blastAssessable && !marrowPositiveBlastEvidence,
-    blastAssessmentState: marrowPositiveBlastEvidence
-      ? "POSITIVE_EVIDENCE_PRESERVED"
-      : (blastAssessable ? "EVALUABLE" : "NOT_ASSESSABLE"),
+    blastAssessmentState: focalPositiveBlastoidCytology
+      ? "FOCAL_POSITIVE_CYTOLOGY_POPULATION_NOT_ESTABLISHED"
+      : marrowPositiveBlastEvidence
+        ? "POSITIVE_EVIDENCE_PRESERVED"
+        : (blastAssessable ? "EVALUABLE" : "NOT_ASSESSABLE"),
     globalSummary: focalPositiveBlastoidCytology
       ? "Citomorfologia blastoide positiva preservada em escopo focal; a representatividade limitada impede inferência populacional e estimativa percentual de blastos."
       : marrowPositiveBlastEvidence

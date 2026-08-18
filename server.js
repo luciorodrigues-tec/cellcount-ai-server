@@ -433,6 +433,9 @@ import {
 
 import analyzeGlobalPattern, {
   MARROW_GLOBAL_PATTERN_COHERENCE_RECONCILIATION_VERSION,
+  MARROW_FOCAL_BLASTOID_SCOPE_GLOBAL_PATTERN_PROPAGATION_VERSION,
+  MARROW_FOCAL_BLASTOID_GLOBAL_PATTERN_SEMANTIC_COHERENCE_VERSION,
+  MARROW_FOCAL_BLASTOID_POPULATION_SEMANTIC_NON_PROMOTION_VERSION,
 } from './ai/globalPatternEngine.js';
 
 import {
@@ -7199,6 +7202,12 @@ app.get("/runtime-version", (_req, res) => {
       MARROW_BLAST_PERCENTAGE_SCOPE_LOCK_VERSION,
     marrowTerminalFocalBlastoidPresentationCoherenceVersion:
       MARROW_TERMINAL_FOCAL_BLASTOID_PRESENTATION_COHERENCE_VERSION,
+    marrowFocalBlastoidScopeGlobalPatternPropagationVersion:
+      MARROW_FOCAL_BLASTOID_SCOPE_GLOBAL_PATTERN_PROPAGATION_VERSION,
+    marrowFocalBlastoidGlobalPatternSemanticCoherenceVersion:
+      MARROW_FOCAL_BLASTOID_GLOBAL_PATTERN_SEMANTIC_COHERENCE_VERSION,
+    marrowFocalBlastoidPopulationSemanticNonPromotionVersion:
+      MARROW_FOCAL_BLASTOID_POPULATION_SEMANTIC_NON_PROMOTION_VERSION,
     marrowRepairEvidenceStateSemanticCanonicalizationVersion:
       MARROW_REPAIR_EVIDENCE_STATE_SEMANTIC_CANONICALIZATION_VERSION,
     marrowUnresolvedImmaturitySemanticRecoveryVersion:
