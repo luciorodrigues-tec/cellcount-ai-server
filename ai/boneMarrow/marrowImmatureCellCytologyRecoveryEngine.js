@@ -1,6 +1,8 @@
 export const MARROW_IMMATURE_CELL_CYTOLOGY_RECOVERY_VERSION = "BE-FIX-005.33";
 export const MARROW_BLASTOID_CANDIDATE_PRESERVATION_VERSION = "BE-FIX-005.33";
 export const MARROW_CROSS_PASS_IMMATURE_CYTOMORPHOLOGY_RECOVERY_VERSION = "BE-FIX-005.50.15";
+export const MARROW_UNRESOLVED_IMMATURITY_SEMANTIC_RECOVERY_VERSION = "BE-FIX-005.50.15.1";
+export const MARROW_RECOVERED_IMMATURE_CARDINALITY_UNRESOLVED_LOCK_VERSION = "BE-FIX-005.50.15.1";
 
 function obj(v){return v&&typeof v==="object"&&!Array.isArray(v)?v:{};}
 function text(v){return typeof v==="string"?v.trim():"";}
@@ -31,8 +33,13 @@ export function evaluateMarrowImmatureCellCytologyGap(result = {}) {
   );
   const burden=text(assessment.immatureCellBurden).toLowerCase();
   const distribution=text(assessment.spatialDistribution).toLowerCase();
+  const crossPassMaximumImmatureCount=finite(
+    crossPass.maximumImmatureCellCount
+  );
   const multipleImmature=
     crossPass.multipleImmatureAnyPass===true ||
+    crossPass.recoveredMultipleUncharacterizedImmaturity===true ||
+    (crossPassMaximumImmatureCount!==null&&crossPassMaximumImmatureCount>=3) ||
     (immatureCount!==null&&immatureCount>=3) ||
     ["multiple","numerous","dominant","increased"].includes(burden);
   const repeatedImmature=
@@ -66,8 +73,28 @@ export function evaluateMarrowImmatureCellCytologyGap(result = {}) {
     assessment.observed===true ||
     (blastLikeCount!==null&&blastLikeCount>=1) ||
     positiveCytologyCount>=2;
-  const uncharacterizedCytology=multipleImmature&&characterizedCytologyCount<=1&&positiveCytologyCount===0;
-  const unresolvedCandidate=marrow&&multipleImmature&&repeatedImmature&&uncharacterizedCytology&&!directPositiveProtected;
+  const crossPassUnresolvedSemantic =
+    crossPass.unresolvedEvidenceStatePreserved===true ||
+    crossPass.recoveredMultipleUncharacterizedImmaturity===true;
+
+  const uncharacterizedCytology=
+    multipleImmature &&
+    characterizedCytologyCount<=1 &&
+    positiveCytologyCount===0;
+
+  // BE-FIX-005.50.15.1 — if a valid stability repair recovers several immature
+  // cells but cannot characterize their discriminative cytology, preserve an
+  // unresolved candidate even when repetition could not be established.
+  // This is non-promotional and does not create blast positivity.
+  const unresolvedCandidate=
+    marrow &&
+    multipleImmature &&
+    uncharacterizedCytology &&
+    !directPositiveProtected &&
+    (
+      repeatedImmature ||
+      crossPassUnresolvedSemantic
+    );
   return {
     version:MARROW_IMMATURE_CELL_CYTOLOGY_RECOVERY_VERSION,marrow,immatureCount,blastLikeCount,
     immatureCellBurden:burden||null,spatialDistribution:distribution||null,multipleImmature,repeatedImmature,
@@ -75,7 +102,13 @@ export function evaluateMarrowImmatureCellCytologyGap(result = {}) {
     directPositiveProtected,unresolvedCandidate,
     crossPassRecoveryVersion:
       MARROW_CROSS_PASS_IMMATURE_CYTOMORPHOLOGY_RECOVERY_VERSION,
+    unresolvedImmaturitySemanticRecoveryVersion:
+      MARROW_UNRESOLVED_IMMATURITY_SEMANTIC_RECOVERY_VERSION,
+    recoveredImmatureCardinalityUnresolvedLockVersion:
+      MARROW_RECOVERED_IMMATURE_CARDINALITY_UNRESOLVED_LOCK_VERSION,
     crossPassEvidenceAvailable:Object.keys(crossPass).length>0,
+    crossPassMaximumImmatureCount,
+    crossPassUnresolvedSemantic,
     candidateState:unresolvedCandidate?"IMMATURE_POPULATION_REQUIRES_DISCRIMINATION":null
   };
 }
@@ -93,7 +126,13 @@ export function applyMarrowImmatureCellCytologyRecovery(result = {}) {
   a.candidateEvidenceState="IMMATURE_POPULATION_REQUIRES_DISCRIMINATION";
   a.cytologyRecoveryRequired=true;
   a.globalAbsenceAllowed=false;
-  if(prior==="NOT_OBSERVED_IN_EVALUABLE_FIELD"||prior==="NOT_ASSESSABLE"||!prior){
+  if(
+    prior==="NOT_OBSERVED_IN_EVALUABLE_FIELD" ||
+    prior==="NOT_ASSESSABLE" ||
+    prior==="LIMITEDMORPHOLOGICEVIDENCE" ||
+    prior==="LIMITED_MORPHOLOGIC_EVIDENCE" ||
+    !prior
+  ){
     a.evidenceState="IMMATURE_POPULATION_REQUIRES_DISCRIMINATION";
   }
   a.summary=[text(a.summary),
