@@ -18,6 +18,7 @@ export const MARROW_MYELOID_EXPANSION_DISCRIMINATION_VERSION = "BE-FIX-005.38";
 export const MARROW_PATHOLOGIC_MATURATION_CONTINUUM_VERSION = "BE-FIX-005.38";
 export const MARROW_MYELOID_MATURATION_EVIDENCE_PROJECTION_VERSION = "BE-FIX-005.41";
 export const MARROW_EXPANSION_CLASSIFICATION_RECOVERY_VERSION = "BE-FIX-005.41";
+export const MARROW_POPULATION_INFERENCE_REPRESENTATIVITY_GATE_VERSION = "BE-FIX-005.50.11";
 
 function obj(v) {
   return v && typeof v === "object" && !Array.isArray(v) ? v : {};
@@ -57,6 +58,47 @@ function marrowScope(result = {}) {
     Object.keys(obj(raw.marrowAdequacy)).length > 0
   );
 }
+function populationInferenceRepresentativity(result = {}) {
+  const raw = obj(result.rawResponse);
+  const field = {
+    ...obj(raw.fieldAdequacy),
+    ...obj(result.fieldAdequacy),
+  };
+  const marrow = {
+    ...obj(raw.marrowAdequacy),
+    ...obj(result.marrowAdequacy),
+  };
+  const axis = {
+    ...obj(raw.marrowAdequacyMorphologyAxis),
+    ...obj(result.marrowAdequacyMorphologyAxis),
+  };
+
+  const explicitlyLimited =
+    field.limitedField === true ||
+    field.adequateForPopulationAssessment === false ||
+    marrow.limitedField === true ||
+    marrow.adequateForPopulationAssessment === false ||
+    axis.adequacyClassification === "CLASS_1_LIMITED_FIELD" ||
+    axis.populationInferenceAllowed === false;
+
+  const explicitlyAdequate =
+    field.adequateForPopulationAssessment === true ||
+    marrow.adequateForPopulationAssessment === true ||
+    axis.populationInferenceAllowed === true;
+
+  return {
+    version: MARROW_POPULATION_INFERENCE_REPRESENTATIVITY_GATE_VERSION,
+    limitedField: explicitlyLimited,
+    explicitlyAdequate,
+    populationInferenceAllowed: !explicitlyLimited,
+    reason: explicitlyLimited
+      ? "Limited/non-representative field cannot establish a population-level disproportionate myeloid expansion."
+      : explicitlyAdequate
+        ? "Population-level inference is explicitly supported by adequacy metadata."
+        : "No explicit limited-field population-inference prohibition was found; legacy behavior is preserved.",
+  };
+}
+
 function collectMyeloidNarrative(result = {}) {
   const raw = obj(result.rawResponse);
   const my = {
@@ -195,6 +237,7 @@ export function evaluateMarrowMyeloidExpansion(result = {}) {
   const exp = structuredExpansionContext(result);
   const narrative = collectMyeloidNarrative(result);
   const blast = blastArchitecture(result);
+  const representativity = populationInferenceRepresentativity(result);
   const my = {
     ...obj(raw.myeloidSeries),
     ...obj(result.myeloidSeries),
@@ -319,6 +362,7 @@ export function evaluateMarrowMyeloidExpansion(result = {}) {
   const pathologicMyeloidExpansionSupported =
     marrowScope(result) &&
     !blast.structuredPathologicSubset &&
+    representativity.populationInferenceAllowed &&
     maturationAxis &&
     disproportionateAxis &&
     expansionBurdenAxis &&
@@ -349,6 +393,10 @@ export function evaluateMarrowMyeloidExpansion(result = {}) {
     disproportionateAxis,
     expansionBurdenAxis,
     maturationAxis,
+    populationInferenceRepresentativity: representativity,
+    populationInferenceAllowed: representativity.populationInferenceAllowed,
+    populationInferenceRepresentativityGateVersion:
+      MARROW_POPULATION_INFERENCE_REPRESENTATIVITY_GATE_VERSION,
     blastArchitecture: blast,
     structuredPathologicSubset: blast.structuredPathologicSubset,
     pathologicMyeloidExpansionSupported,

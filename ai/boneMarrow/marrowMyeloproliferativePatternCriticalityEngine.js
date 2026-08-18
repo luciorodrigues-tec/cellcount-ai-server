@@ -39,6 +39,9 @@ export const MARROW_EVIDENCE_WEIGHTED_CRITICALITY_VERSION =
 export const MARROW_CORE_MYELOID_SALIENCE_CALIBRATION_VERSION =
   "BE-FIX-005.50.3";
 
+export const MARROW_POPULATION_CRITICALITY_REPRESENTATIVITY_GATE_VERSION =
+  "BE-FIX-005.50.11";
+
 function obj(value) {
   return value && typeof value === "object" && !Array.isArray(value)
     ? value
@@ -74,6 +77,23 @@ function appendSentence(existing, sentence) {
   if (left.toLowerCase().includes(right.toLowerCase())) return left;
 
   return `${left} ${right}`.trim();
+}
+
+function populationInferenceAllowed(result = {}, expansion = {}) {
+  if (expansion.populationInferenceAllowed === false) return false;
+
+  const field = obj(result.fieldAdequacy);
+  const marrow = obj(result.marrowAdequacy);
+  const axis = obj(result.marrowAdequacyMorphologyAxis);
+
+  return !(
+    field.limitedField === true ||
+    field.adequateForPopulationAssessment === false ||
+    marrow.limitedField === true ||
+    marrow.adequateForPopulationAssessment === false ||
+    axis.adequacyClassification === "CLASS_1_LIMITED_FIELD" ||
+    axis.populationInferenceAllowed === false
+  );
 }
 
 function readStructuredBlastAuthority(result = {}) {
@@ -143,6 +163,8 @@ export function evaluateMarrowMyeloproliferativePatternCriticality(
   const lock = obj(result.marrowPathologicMaturationContinuumLock);
   const signals = obj(expansion.expansionSignals);
   const blast = readStructuredBlastAuthority(result);
+  const populationRepresentativityGate =
+    populationInferenceAllowed(result, expansion);
 
   const protectedExpansion =
     (
@@ -153,6 +175,7 @@ export function evaluateMarrowMyeloproliferativePatternCriticality(
       result.morphologicRiskClass ===
         "MARROW_MYELOID_EXPANSION_WITH_MATURATION_PATTERN"
     ) &&
+    populationRepresentativityGate &&
     (
       expansion.pathologicMyeloidExpansionSupported === true ||
       lock.active === true ||
@@ -277,6 +300,9 @@ export function evaluateMarrowMyeloproliferativePatternCriticality(
     version: MARROW_MYELOPROLIFERATIVE_PATTERN_CORRELATION_VERSION,
     active: protectedExpansion && !blast.suspicious,
     protectedExpansion,
+    populationInferenceAllowed: populationRepresentativityGate,
+    populationCriticalityRepresentativityGateVersion:
+      MARROW_POPULATION_CRITICALITY_REPRESENTATIVITY_GATE_VERSION,
     structuredBlastAuthority: blast,
     severityScore: score,
     severityLevel: level,

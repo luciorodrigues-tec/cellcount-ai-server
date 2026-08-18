@@ -79,6 +79,7 @@ import {
   MARROW_PATHOLOGIC_MATURATION_CONTINUUM_VERSION,
   MARROW_MYELOID_MATURATION_EVIDENCE_PROJECTION_VERSION,
   MARROW_EXPANSION_CLASSIFICATION_RECOVERY_VERSION,
+  MARROW_POPULATION_INFERENCE_REPRESENTATIVITY_GATE_VERSION,
   applyMarrowMyeloidExpansionDiscrimination,
 } from "./ai/boneMarrow/marrowMyeloidExpansionDiscriminationEngine.js";
 
@@ -117,6 +118,7 @@ import {
   MARROW_HIGH_SALIENCE_CRITICALITY_LOCK_VERSION,
   MARROW_EVIDENCE_WEIGHTED_CRITICALITY_VERSION,
   MARROW_CORE_MYELOID_SALIENCE_CALIBRATION_VERSION,
+  MARROW_POPULATION_CRITICALITY_REPRESENTATIVITY_GATE_VERSION,
 } from "./ai/boneMarrow/marrowMyeloproliferativePatternCriticalityEngine.js";
 
 import {
@@ -296,16 +298,21 @@ import {
   applyPeripheralPositiveMorphologyArbitration,
   PERIPHERAL_BLOOD_POSITIVE_MORPHOLOGY_ARBITRATION_VERSION,
   PERIPHERAL_POLYCHROMASIA_PRESERVATION_VERSION,
+  PERIPHERAL_POLYCHROMASIA_CONTRADICTION_GUARD_VERSION,
   PERIPHERAL_HEMATOPOIETIC_PARASITE_ARBITRATION_VERSION,
   PERIPHERAL_LIMITED_FIELD_NON_SUPPRESSION_VERSION,
+  PERIPHERAL_FOCAL_CARDINALITY_SIGNAL_VERSION,
 } from "./ai/peripheralBloodPositiveMorphologyArbitrationEngine.js";
 
 import {
   applyPeripheralBlastoidCytologyAuthority,
   applyPeripheralNegativeFindingAuthorityControl,
+  applyPeripheralFocalBlastoidCardinalityAuthority,
   PERIPHERAL_BLASTOID_CYTOLOGY_AUTHORITY_VERSION,
   PERIPHERAL_NEGATIVE_FINDING_AUTHORITY_CONTROL_VERSION,
   PERIPHERAL_FOCAL_VS_POPULATION_SEPARATION_VERSION,
+  PERIPHERAL_FOCAL_BLASTOID_CARDINALITY_AUTHORITY_VERSION,
+  PERIPHERAL_FOCAL_BLASTOID_PRESENTATION_LOCK_VERSION,
 } from "./ai/peripheralBlastoidCytologyAuthorityEngine.js";
 
 import {
@@ -313,6 +320,9 @@ import {
   PERIPHERAL_FOCAL_CELL_CYTOMORPHOLOGY_VERSION,
   PERIPHERAL_MATURATION_STATE_RESOLUTION_VERSION,
   PERIPHERAL_CELL_FEATURE_PROVENANCE_VERSION,
+  PERIPHERAL_FOCAL_CYTOMORPHOLOGY_CALIBRATION_VERSION,
+  PERIPHERAL_MATURITY_POSITIVE_SUPPORT_GATE_VERSION,
+  PERIPHERAL_UNRESOLVED_FEATURE_DOWNGRADE_VERSION,
 } from "./ai/peripheralFocalHematopoieticCytomorphologyEngine.js";
 
 import {
@@ -334,6 +344,7 @@ import {
 
 import {
   PRODUCTION_VME_ENFORCEMENT_VERSION,
+  PERIPHERAL_FOCAL_EVIDENCE_CALIBRATION_ACQUISITION_VERSION,
   LOCAL_MORPHOLOGY_ACQUISITION_RECOVERY_VERSION,
   assessVisualMorphologyEvidenceAcquisition,
   buildPrimaryVisualMorphologyAcquisitionPrompt,
@@ -6930,6 +6941,8 @@ app.get("/runtime-version", (_req, res) => {
       MARROW_MYELOID_MATURATION_EVIDENCE_PROJECTION_VERSION,
     marrowExpansionClassificationRecoveryVersion:
       MARROW_EXPANSION_CLASSIFICATION_RECOVERY_VERSION,
+    marrowPopulationInferenceRepresentativityGateVersion:
+      MARROW_POPULATION_INFERENCE_REPRESENTATIVITY_GATE_VERSION,
     marrowDominantPatternStateReconciliationVersion:
       MARROW_DOMINANT_PATTERN_STATE_RECONCILIATION_VERSION,
     marrowPrecursorBlastSemanticSeparationVersion:
@@ -6984,6 +6997,8 @@ app.get("/runtime-version", (_req, res) => {
       MARROW_EVIDENCE_WEIGHTED_CRITICALITY_VERSION,
     marrowCoreMyeloidSalienceCalibrationVersion:
       MARROW_CORE_MYELOID_SALIENCE_CALIBRATION_VERSION,
+    marrowPopulationCriticalityRepresentativityGateVersion:
+      MARROW_POPULATION_CRITICALITY_REPRESENTATIVITY_GATE_VERSION,
     marrowResidualBlastSemanticCleanupVersion:
       MARROW_RESIDUAL_BLAST_SEMANTIC_CLEANUP_VERSION,
     marrowImmaturityMaturationSemanticSeparationVersion:
@@ -7048,6 +7063,8 @@ app.get("/runtime-version", (_req, res) => {
       PERIPHERAL_BLOOD_POSITIVE_MORPHOLOGY_ARBITRATION_VERSION,
     peripheralPolychromasiaPreservationVersion:
       PERIPHERAL_POLYCHROMASIA_PRESERVATION_VERSION,
+    peripheralPolychromasiaContradictionGuardVersion:
+      PERIPHERAL_POLYCHROMASIA_CONTRADICTION_GUARD_VERSION,
     peripheralHematopoieticParasiteArbitrationVersion:
       PERIPHERAL_HEMATOPOIETIC_PARASITE_ARBITRATION_VERSION,
     peripheralLimitedFieldNonSuppressionVersion:
@@ -7058,12 +7075,26 @@ app.get("/runtime-version", (_req, res) => {
       PERIPHERAL_NEGATIVE_FINDING_AUTHORITY_CONTROL_VERSION,
     peripheralFocalVsPopulationSeparationVersion:
       PERIPHERAL_FOCAL_VS_POPULATION_SEPARATION_VERSION,
+    peripheralFocalBlastoidCardinalityAuthorityVersion:
+      PERIPHERAL_FOCAL_BLASTOID_CARDINALITY_AUTHORITY_VERSION,
+    peripheralFocalBlastoidPresentationLockVersion:
+      PERIPHERAL_FOCAL_BLASTOID_PRESENTATION_LOCK_VERSION,
+    peripheralFocalCardinalitySignalVersion:
+      PERIPHERAL_FOCAL_CARDINALITY_SIGNAL_VERSION,
     peripheralFocalCellCytomorphologyVersion:
       PERIPHERAL_FOCAL_CELL_CYTOMORPHOLOGY_VERSION,
     peripheralMaturationStateResolutionVersion:
       PERIPHERAL_MATURATION_STATE_RESOLUTION_VERSION,
     peripheralCellFeatureProvenanceVersion:
       PERIPHERAL_CELL_FEATURE_PROVENANCE_VERSION,
+    peripheralFocalCytomorphologyCalibrationVersion:
+      PERIPHERAL_FOCAL_CYTOMORPHOLOGY_CALIBRATION_VERSION,
+    peripheralMaturityPositiveSupportGateVersion:
+      PERIPHERAL_MATURITY_POSITIVE_SUPPORT_GATE_VERSION,
+    peripheralUnresolvedFeatureDowngradeVersion:
+      PERIPHERAL_UNRESOLVED_FEATURE_DOWNGRADE_VERSION,
+    peripheralFocalEvidenceCalibrationAcquisitionVersion:
+      PERIPHERAL_FOCAL_EVIDENCE_CALIBRATION_ACQUISITION_VERSION,
     canonicalClinicalResultArchitectureVersion:
       CRA_001_1_VERSION,
     clinicalResultCoherenceEngineVersion:
@@ -8732,7 +8763,7 @@ if (specimenGate.analysisType === "peripheral_blood") {
   finalResult =
     applyPeripheralFocalHematopoieticCytomorphologyResolution(finalResult);
   console.log(
-    "BE-FIX-005.50.7 — FOCAL HEMATOPOIETIC DEEP CYTOMORPHOLOGY / PRE-SENTINEL",
+    "BE-FIX-005.50.10 — FOCAL CYTOMORPHOLOGY CALIBRATION / PRE-SENTINEL",
     JSON.stringify(
       finalResult.peripheralFocalHematopoieticCytomorphology || {},
       null,
@@ -8815,7 +8846,7 @@ if (specimenGate.analysisType === "peripheral_blood") {
   finalResult = applyPeripheralBlastoidCytologyAuthority(finalResult);
   finalResult = applyPeripheralNegativeFindingAuthorityControl(finalResult);
   console.log(
-    "BE-FIX-005.50.7 — FOCAL CELL MATURATION RESOLUTION / TERMINAL PROJECTION",
+    "BE-FIX-005.50.10 — FOCAL CELL MATURATION CALIBRATION / TERMINAL PROJECTION",
     JSON.stringify(
       finalResult.peripheralFocalHematopoieticCytomorphology || {},
       null,
@@ -8829,6 +8860,24 @@ if (specimenGate.analysisType === "peripheral_blood") {
         blastoid: finalResult.peripheralBlastoidCytologyAuthority || {},
         negativeAuthority: finalResult.negativeFindingAuthority || {},
       },
+      null,
+      2,
+    ),
+  );
+
+  // ========================================================================
+  // BE/FE-FIX-005.50.9 — FOCAL BLASTOID CARDINALITY AUTHORITY
+  // One focal blastoid cell remains a positive focal finding, but may not be
+  // promoted to a blast population, blast percentage or diagnosis unless a
+  // separate structured population-evidence gate is established.
+  // ========================================================================
+  finalResult =
+    applyPeripheralFocalBlastoidCardinalityAuthority(finalResult);
+
+  console.log(
+    "BE-FIX-005.50.9 — FOCAL BLASTOID CARDINALITY AUTHORITY",
+    JSON.stringify(
+      finalResult.peripheralFocalBlastoidCardinalityAuthority || {},
       null,
       2,
     ),
@@ -9106,7 +9155,7 @@ if (specimenGate.analysisType === "bone_marrow") {
 }
 
 // ============================================================================
-// BE/FE-FIX-005.50.8 — CANONICAL CLINICAL PRESENTATION AUTHORITY
+// BE/FE-FIX-005.50.9 — CANONICAL CLINICAL PRESENTATION / FOCAL CARDINALITY LOCK
 // Presentation-only projection. It must not rewrite morphology, evidence,
 // maturation state, negative-finding authority or clinical criticality.
 // ============================================================================
@@ -9116,7 +9165,7 @@ finalResult =
   );
 
 console.log(
-  "BE-FIX-005.50.8 — CANONICAL CLINICAL PRESENTATION",
+  "BE-FIX-005.50.9 — CANONICAL CLINICAL PRESENTATION",
   JSON.stringify(finalResult.clinicalPresentation || {}, null, 2),
 );
 
