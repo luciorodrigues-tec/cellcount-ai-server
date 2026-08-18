@@ -28,6 +28,7 @@ function obj(value) {
 }
 
 export function evaluateMarrowMorphologyAdequacyProjectionLock(result = {}) {
+  const focalScopeLock = obj(result.marrowPositiveCellLevelBlastoidScopeLock);
   const authority = obj(result.finalMarrowAuthority);
   const axis = obj(result.marrowAdequacyMorphologyAxis);
   const expansion = obj(result.marrowMyeloidExpansionDiscrimination);
@@ -84,8 +85,12 @@ export function evaluateMarrowMorphologyAdequacyProjectionLock(result = {}) {
       !physiologicMaturationContradiction
     );
 
+  const effectiveTrueBlastoid =
+    focalScopeLock.active === true ? false : trueBlastoid;
+
   const positiveMarrowMorphology =
-    trueBlastoid ||
+    focalScopeLock.active === true ||
+    effectiveTrueBlastoid ||
     protectedExpansion ||
     (
       typeof morphologyClassification === "string" &&
@@ -99,20 +104,26 @@ export function evaluateMarrowMorphologyAdequacyProjectionLock(result = {}) {
     limitedField,
     positiveMarrowMorphology,
     protectedExpansion,
-    trueBlastoid,
+    trueBlastoid: effectiveTrueBlastoid,
     physiologicMaturationContradiction,
-    morphologyClassification,
+    morphologyClassification:
+      focalScopeLock.active === true
+        ? "MARROW_BLASTOID_FOCAL_SUSPICION"
+        : morphologyClassification,
     adequacyClassification: limitedField
       ? "CLASS_1_LIMITED_FIELD"
       : "POPULATION_ASSESSABLE",
     populationInferenceAllowed: field.populationInferenceAllowed !== false,
     populationPositiveAllowed:
-      trueBlastoid ||
-      (field.populationInferenceAllowed !== false && positiveMarrowMorphology),
+      focalScopeLock.active === true
+        ? false
+        : effectiveTrueBlastoid ||
+          (field.populationInferenceAllowed !== false && positiveMarrowMorphology),
     focalCytologyPopulationScopeLocked:
-      field.populationInferenceAllowed === false &&
+      focalScopeLock.active === true ||
+      (field.populationInferenceAllowed === false &&
       authority.structuredBlast?.focalOnly === true &&
-      trueBlastoid === false,
+      effectiveTrueBlastoid === false),
     globalNegativeExclusionAllowed:
       field.globalNegativeExclusionAllowed === true,
     blastSuspicion:
@@ -142,6 +153,35 @@ export function applyMarrowMorphologyAdequacyProjectionLock(result = {}) {
   };
 
   if (!decision.active) {
+    return out;
+  }
+
+  if (result.marrowPositiveCellLevelBlastoidScopeLock?.active === true) {
+    const cls = "MARROW_BLASTOID_FOCAL_SUSPICION";
+    out.finalClassification = cls;
+    out.morphologicRiskClass = cls;
+    out.overallAssessment.riskCategory = cls;
+    out.evidenceGovernance.populationInferenceAllowed = false;
+    out.evidenceGovernance.populationPositiveAllowed = false;
+    out.evidenceGovernance.blastPercentageInferenceAllowed = false;
+    out.evidenceGovernance.globalNegativeExclusionAllowed = false;
+    out.evidenceGovernance.cellLevelPositiveBlastoidCytology = true;
+    out.marrowTerminalMorphologyAdequacyProjectionLock = {
+      ...decision,
+      morphologyClassification: cls,
+      populationInferenceAllowed: false,
+      populationPositiveAllowed: false,
+      focalCytologyPopulationScopeLocked: true,
+      blastSuspicion: true,
+      focalBlastoidScopeLockVersion: "BE-FIX-005.50.19",
+    };
+    out.marrowAdequacyMorphologyAxis = {
+      ...out.marrowAdequacyMorphologyAxis,
+      morphologyClassification: cls,
+      adequacyClassification: "CLASS_1_LIMITED_FIELD",
+      limitedField: true,
+      morphologyOverridesAdequacy: true,
+    };
     return out;
   }
 

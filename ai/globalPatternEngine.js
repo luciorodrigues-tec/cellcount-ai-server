@@ -16,6 +16,9 @@ function asObject(value) {
 }
 
 function hasPositiveMarrowBlastEvidence(result = {}) {
+  if (result?.marrowPositiveCellLevelBlastoidScopeLock?.active === true) {
+    return false;
+  }
   const semanticSupersession =
     evaluateMarrowPositiveBlastEvidenceSemanticSupersession(result);
 
@@ -130,6 +133,9 @@ export function analyzeGlobalPattern(result = {}) {
   const atypical = findings.atypicalLymphocytes === true || findings.largeMononuclearCells === true ||
     findings.atypicalPopulation === true || monomorphic;
   const marrowPositiveBlastEvidence = hasPositiveMarrowBlastEvidence(result);
+  const focalPositiveBlastoidCytology =
+    result?.marrowPositiveCellLevelBlastoidScopeLock?.active === true &&
+    result?.marrowPositiveCellLevelBlastoidScopeLock?.cellLevelPositiveBlastoidCytology === true;
   const marrowBlastSemanticSupersession =
     evaluateMarrowPositiveBlastEvidenceSemanticSupersession(result);
   const blastLike = marrowPositiveBlastEvidence || findings.blastSuspicion === true ||
@@ -153,7 +159,8 @@ export function analyzeGlobalPattern(result = {}) {
     result.normalityBlocked !== true && blastAssessable;
 
   let dominantPattern = "GLOBAL_UNREMARKABLE_PATTERN";
-  if (marrowPositiveBlastEvidence) dominantPattern = "MARROW_POSITIVE_BLASTOID_POPULATION_PATTERN";
+  if (focalPositiveBlastoidCytology) dominantPattern = "MARROW_FOCAL_POSITIVE_BLASTOID_CYTOLOGY_PATTERN";
+  else if (marrowPositiveBlastEvidence) dominantPattern = "MARROW_POSITIVE_BLASTOID_POPULATION_PATTERN";
   else if (pathologicMyeloidExpansionPattern)
     dominantPattern = "MARROW_PATHOLOGIC_MYELOID_EXPANSION_WITH_MATURATION";
   else if (physiologicPrecursorPattern) dominantPattern = limitedMarrow || !blastAssessable
@@ -178,6 +185,8 @@ export function analyzeGlobalPattern(result = {}) {
     // A structured positive marrow blast signal remains positive even when a
     // field is inadequate for global negative exclusion.
     marrowPositiveBlastEvidence,
+    marrowPositiveBlastoidCytology: focalPositiveBlastoidCytology,
+    marrowPopulationBlastEvidence: marrowPositiveBlastEvidence,
     physiologicPrecursorPattern,
     pathologicMyeloidExpansionPattern,
     marrowPositiveBlastEvidenceSemanticSupersession:
@@ -191,7 +200,9 @@ export function analyzeGlobalPattern(result = {}) {
     blastAssessmentState: marrowPositiveBlastEvidence
       ? "POSITIVE_EVIDENCE_PRESERVED"
       : (blastAssessable ? "EVALUABLE" : "NOT_ASSESSABLE"),
-    globalSummary: marrowPositiveBlastEvidence
+    globalSummary: focalPositiveBlastoidCytology
+      ? "Citomorfologia blastoide positiva preservada em escopo focal; a representatividade limitada impede inferência populacional e estimativa percentual de blastos."
+      : marrowPositiveBlastEvidence
       ? "Evidência medular positiva de população blastoide/imatura preservada; a limitação do campo restringe exclusões e quantificação global, não o achado positivo."
       : pathologicMyeloidExpansionPattern
         ? "Padrão medular dominante de expansão mieloide/granulocítica desproporcional com maturação preservado. O achado é morfológico e requer correlação clínico-laboratorial; não estabelece etiologia nem entidade hematológica específica."

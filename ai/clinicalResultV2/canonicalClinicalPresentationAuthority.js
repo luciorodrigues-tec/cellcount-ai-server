@@ -39,10 +39,12 @@ export function buildCanonicalClinicalPresentation(result = {}) {
   const blast = blastState(v2);
   const blastPositive = blast === "OBSERVED" || blast === "SUSPICIOUS_INDETERMINATE";
   const focalCardinality = obj(result.peripheralFocalBlastoidCardinalityAuthority);
+  const marrowFocalScopeLock = obj(result.marrowPositiveCellLevelBlastoidScopeLock);
   const focalBlastoidOnly =
-    focalCardinality.active === true &&
-    focalCardinality.focalOnly === true &&
-    focalCardinality.populationEvidenceEstablished !== true;
+    (focalCardinality.active === true &&
+      focalCardinality.focalOnly === true &&
+      focalCardinality.populationEvidenceEstablished !== true) ||
+    marrowFocalScopeLock.active === true;
   const polychromasia = v2.lineages?.erythrocytes?.positiveMorphology?.polychromasia === true;
   const limited = v2.scope?.limitedField === true || result.fieldAdequacy?.limitedField === true;
 
@@ -146,6 +148,10 @@ export function buildCanonicalClinicalPresentation(result = {}) {
       findingSeverityIndependentFromGlobalCriticality: true,
       focalBlastoidFindingDoesNotEstablishPopulation: focalBlastoidOnly,
       blastPercentageInferenceAllowed: focalBlastoidOnly ? false : true,
+      populationInferenceAllowed: focalBlastoidOnly ? false : true,
+      populationPositiveAllowed: focalBlastoidOnly ? false : true,
+      cellLevelPositiveBlastoidCytology:
+        marrowFocalScopeLock.active === true || undefined,
       legacyFieldsRetainedForCompatibility: true,
     },
     provenance: {
@@ -155,6 +161,8 @@ export function buildCanonicalClinicalPresentation(result = {}) {
       baseAuthorityVersion: CANONICAL_CLINICAL_PRESENTATION_BASE_VERSION,
       focalCardinalityAuthorityVersion:
         focalCardinality.version || null,
+      marrowFocalBlastoidScopeLockVersion:
+        marrowFocalScopeLock.version || null,
     },
   };
 }

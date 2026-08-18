@@ -152,6 +152,14 @@ import {
 } from "./ai/boneMarrow/marrowTrueAmlPositiveCytomorphologyRecoveryEngine.js";
 
 import {
+  applyMarrowPositiveCellLevelBlastoidScopeLock,
+  MARROW_POSITIVE_CELL_LEVEL_BLASTOID_SCOPE_PRESERVATION_VERSION,
+  MARROW_FOCAL_BLASTOID_POPULATION_ANTI_PROMOTION_VERSION,
+  MARROW_BLAST_PERCENTAGE_SCOPE_LOCK_VERSION,
+  MARROW_TERMINAL_FOCAL_BLASTOID_PRESENTATION_COHERENCE_VERSION,
+} from "./ai/boneMarrow/marrowPositiveCellLevelBlastoidScopeLockEngine.js";
+
+import {
   MARROW_POSITIVE_CYTOLOGY_CONSISTENCY_VERSION,
   MARROW_ACQUISITION_DISCORDANCE_RECOVERY_VERSION,
   MARROW_PRIMARY_OR_RECOVERED_POSITIVE_BLASTOID_CYTOLOGY_PRESERVATION_VERSION,
@@ -4918,6 +4926,8 @@ BE-FIX-005.31 — COERÊNCIA NARRATIVA-ESTRUTURA E RECUPERAÇÃO FISIOLÓGICA:
         ),
       );
 
+      parsed = applyMarrowPositiveCellLevelBlastoidScopeLock(parsed);
+
       // BE-FIX-005.35 — preserve unresolved positive cytology as an epistemic
       // middle state before 005.34 projection and before LME/precursor scoring.
       parsed = applyMarrowPositiveCytologyConsistency(parsed);
@@ -4967,6 +4977,12 @@ BE-FIX-005.31 — COERÊNCIA NARRATIVA-ESTRUTURA E RECUPERAÇÃO FISIOLÓGICA:
           null,
           2,
         ),
+      );
+
+      parsed = applyMarrowPositiveCellLevelBlastoidScopeLock(parsed);
+      console.log(
+        "BE-FIX-005.50.19 — POSITIVE CELL-LEVEL BLASTOID CYTOLOGY SCOPE / POPULATION ANTI-PROMOTION",
+        JSON.stringify(parsed.marrowPositiveCellLevelBlastoidScopeLock || {}, null, 2),
       );
 
       console.log(
@@ -5161,6 +5177,8 @@ if (
         applyMarrowPositiveBlastEvidenceSemanticSupersession(
           mergedAnalysis,
         );
+      mergedAnalysis =
+        applyMarrowPositiveCellLevelBlastoidScopeLock(mergedAnalysis);
     }
 
     let globalPattern =
@@ -5170,6 +5188,12 @@ if (
 
     mergedAnalysis.globalPattern =
       globalPattern;
+
+    if (analysisType === "bone_marrow") {
+      mergedAnalysis =
+        applyMarrowPositiveCellLevelBlastoidScopeLock(mergedAnalysis);
+      globalPattern = mergedAnalysis.globalPattern || globalPattern;
+    }
 
     // BE-FIX-005.50.17 — unresolved immature-cell evidence is an epistemic
     // middle state. It must not appear as GLOBAL_UNREMARKABLE_PATTERN or a
@@ -7167,6 +7191,14 @@ app.get("/runtime-version", (_req, res) => {
       MARROW_POSITIVE_CYTOLOGY_POPULATION_SEPARATION_VERSION,
     marrowBlastoidCellSamplingAcquisitionVersion:
       MARROW_BLASTOID_CELL_SAMPLING_ACQUISITION_VERSION,
+    marrowPositiveCellLevelBlastoidScopePreservationVersion:
+      MARROW_POSITIVE_CELL_LEVEL_BLASTOID_SCOPE_PRESERVATION_VERSION,
+    marrowFocalBlastoidPopulationAntiPromotionVersion:
+      MARROW_FOCAL_BLASTOID_POPULATION_ANTI_PROMOTION_VERSION,
+    marrowBlastPercentageScopeLockVersion:
+      MARROW_BLAST_PERCENTAGE_SCOPE_LOCK_VERSION,
+    marrowTerminalFocalBlastoidPresentationCoherenceVersion:
+      MARROW_TERMINAL_FOCAL_BLASTOID_PRESENTATION_COHERENCE_VERSION,
     marrowRepairEvidenceStateSemanticCanonicalizationVersion:
       MARROW_REPAIR_EVIDENCE_STATE_SEMANTIC_CANONICALIZATION_VERSION,
     marrowUnresolvedImmaturitySemanticRecoveryVersion:
@@ -9081,6 +9113,9 @@ if (specimenGate.analysisType === "bone_marrow") {
       2,
     ),
   );
+
+  finalResult =
+    applyMarrowPositiveCellLevelBlastoidScopeLock(finalResult);
 }
 
 // ============================================================================
@@ -9091,6 +9126,7 @@ if (specimenGate.analysisType === "bone_marrow") {
 // ============================================================================
 if (specimenGate.analysisType === "bone_marrow") {
   finalResult = applyFinalMarrowAuthority(finalResult);
+  finalResult = applyMarrowPositiveCellLevelBlastoidScopeLock(finalResult);
 
   console.log(
     "BE-FIX-005.46 — FINAL MARROW AUTHORITY / POST-LEGACY RECONCILIATION",
@@ -9195,6 +9231,8 @@ if (specimenGate.analysisType === "bone_marrow") {
 if (specimenGate.analysisType === "bone_marrow") {
   finalResult =
     applyMarrowUnresolvedImmaturityFinalStateCoherence(finalResult);
+  finalResult =
+    applyMarrowPositiveCellLevelBlastoidScopeLock(finalResult);
 
   console.log(
     "BE-FIX-005.50.17 — MARROW UNRESOLVED IMMATURE-CELL FINAL-STATE COHERENCE",
@@ -9339,6 +9377,8 @@ finalResult =
 if (specimenGate.analysisType === "bone_marrow") {
   finalResult =
     applyMarrowUnresolvedImmaturityFinalStateCoherence(finalResult);
+  finalResult =
+    applyMarrowPositiveCellLevelBlastoidScopeLock(finalResult);
 }
 
 console.log(

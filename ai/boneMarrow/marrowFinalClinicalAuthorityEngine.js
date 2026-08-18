@@ -47,6 +47,26 @@ function uniqueStrings(values = []) {
 }
 
 function evaluateStructuredBlastAuthority(result = {}) {
+  const focalScopeLock = obj(result.marrowPositiveCellLevelBlastoidScopeLock);
+  if (focalScopeLock.active === true) {
+    return {
+      observed: false,
+      suspicious: false,
+      structured: false,
+      evidenceState: "FOCAL_SUSPICION",
+      approximateBlastLikeCells:
+        num(result.blastAssessment?.approximateBlastLikeCells) ??
+        num(result.rawResponse?.blastAssessment?.approximateBlastLikeCells),
+      explicitlyWithinContinuum: false,
+      physiologicMaturationContradiction: false,
+      populationInferenceAllowed: false,
+      focalOnly: true,
+      focalPopulationScopeBlocked: true,
+      populationPositiveAllowed: false,
+      cellLevelPositiveCytology: true,
+      focalCytologyPopulationScopeLockVersion: "BE-FIX-005.50.19",
+    };
+  }
   const marrowEvidence = obj(result.marrowBlastPopulationEvidence);
   const precursor = obj(
     result.marrowPrecursorDiscrimination ||
@@ -241,6 +261,7 @@ export function applyFinalMarrowAuthority(result = {}) {
   if (!result || typeof result !== "object") return result;
 
   const authority = evaluateFinalMarrowAuthority(result);
+  const focalScopeLock = obj(result.marrowPositiveCellLevelBlastoidScopeLock);
 
   const out = {
     ...result,
@@ -263,6 +284,65 @@ export function applyFinalMarrowAuthority(result = {}) {
         authority.morphologyClassification !== null,
     },
   };
+
+  if (focalScopeLock.active === true) {
+    const cls = "MARROW_BLASTOID_FOCAL_SUSPICION";
+    const finding =
+      "Citomorfologia blastoide focal positiva, sem autoridade para inferência populacional neste campo limitado.";
+
+    out.finalClassification = cls;
+    out.morphologicRiskClass = cls;
+    out.riskLevel = "Alta prioridade — citomorfologia blastoide focal positiva";
+    out.normalityBlocked = true;
+    out.requiresHumanReview = true;
+    out.findings.blastSuspicion = true;
+    out.findings.immatureCells = true;
+    out.findings.blastEvidenceState = "FOCAL_SUSPICION";
+    out.findings.cellLevelPositiveBlastoidCytology = true;
+    out.mainFinding = finding;
+    out.primaryFinding = finding;
+    out.finalConclusion = finding;
+    out.overallAssessment.requiresHumanReview = true;
+    out.overallAssessment.riskCategory = cls;
+    out.overallAssessment.mainImpression = finding;
+    out.structuredReport.conclusion = finding;
+    out.patternRecognition.overallPattern =
+      "MARROW_FOCAL_POSITIVE_BLASTOID_CYTOLOGY_PATTERN";
+    out.evidenceGovernance = {
+      ...obj(result.evidenceGovernance),
+      populationInferenceAllowed: false,
+      populationPositiveAllowed: false,
+      blastPercentageInferenceAllowed: false,
+      globalNegativeExclusionAllowed: false,
+      cellLevelPositiveBlastoidCytology: true,
+      evidenceScope: "FIELD_SCOPED",
+    };
+    out.finalMarrowAuthority = {
+      ...authority,
+      active: true,
+      morphologyClassification: cls,
+      structuredBlast: {
+        ...authority.structuredBlast,
+        observed: false,
+        suspicious: false,
+        structured: false,
+        focalOnly: true,
+        focalPopulationScopeBlocked: true,
+        populationInferenceAllowed: false,
+        populationPositiveAllowed: false,
+        cellLevelPositiveCytology: true,
+      },
+      focalBlastoidScopeLockVersion: "BE-FIX-005.50.19",
+    };
+    out.marrowAdequacyMorphologyAxis = {
+      ...out.marrowAdequacyMorphologyAxis,
+      morphologyClassification: cls,
+      adequacyClassification: "CLASS_1_LIMITED_FIELD",
+      limitedField: true,
+      morphologyOverridesAdequacy: true,
+    };
+    return out;
+  }
 
   // True structured blast evidence always outranks expansion authority.
   if (authority.structuredBlast.observed || authority.structuredBlast.suspicious) {
