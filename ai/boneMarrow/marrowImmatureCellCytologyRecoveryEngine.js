@@ -1,5 +1,6 @@
 export const MARROW_IMMATURE_CELL_CYTOLOGY_RECOVERY_VERSION = "BE-FIX-005.33";
 export const MARROW_BLASTOID_CANDIDATE_PRESERVATION_VERSION = "BE-FIX-005.33";
+export const MARROW_CROSS_PASS_IMMATURE_CYTOMORPHOLOGY_RECOVERY_VERSION = "BE-FIX-005.50.15";
 
 function obj(v){return v&&typeof v==="object"&&!Array.isArray(v)?v:{};}
 function text(v){return typeof v==="string"?v.trim():"";}
@@ -12,6 +13,10 @@ export function evaluateMarrowImmatureCellCytologyGap(result = {}) {
   const marrow=specimenType.includes("BONE_MARROW")||specimenType.includes("MEDULA")||
     Object.keys(obj(result.marrowAdequacy)).length>0||Object.keys(obj(raw.marrowAdequacy)).length>0;
   const assessment={...obj(raw.blastAssessment),...obj(result.blastAssessment)};
+  const crossPass=obj(
+    result.marrowCrossPassImmatureCytomorphologyEvidence ||
+    raw.marrowCrossPassImmatureCytomorphologyEvidence
+  );
   const support=obj(assessment.morphologySupport);
   const cytology=obj(assessment.immatureCellCytology);
   const subpopulation=obj(assessment.blastoidSubpopulationContext);
@@ -26,8 +31,13 @@ export function evaluateMarrowImmatureCellCytologyGap(result = {}) {
   );
   const burden=text(assessment.immatureCellBurden).toLowerCase();
   const distribution=text(assessment.spatialDistribution).toLowerCase();
-  const multipleImmature=(immatureCount!==null&&immatureCount>=3)||["multiple","numerous","increased"].includes(burden);
-  const repeatedImmature=distribution.includes("repeated")||distribution.includes("across_field")||
+  const multipleImmature=
+    crossPass.multipleImmatureAnyPass===true ||
+    (immatureCount!==null&&immatureCount>=3) ||
+    ["multiple","numerous","dominant","increased"].includes(burden);
+  const repeatedImmature=
+    crossPass.repeatedImmatureAnyPass===true ||
+    distribution.includes("repeated")||distribution.includes("across_field")||
     text(assessment.populationPattern).toLowerCase().includes("repeated")||
     support.repeatedAcrossField===true||subpopulation.repeatedSubsetAcrossField===true||
     subpopulation.repeatedCellsWithSimilarFeatures===true||
@@ -50,8 +60,12 @@ export function evaluateMarrowImmatureCellCytologyGap(result = {}) {
   const evidenceState=upper(assessment.evidenceState);
   const positiveEvidenceState=["OBSERVED_POPULATION","SUSPICIOUS_POPULATION","FOCAL_SUSPICION"].includes(evidenceState)||
     evidenceState.includes("POSITIVE")||evidenceState.includes("BLASTLIKECELLS");
-  const directPositiveProtected=positiveEvidenceState||assessment.observed===true||
-    (blastLikeCount!==null&&blastLikeCount>=1)||positiveCytologyCount>=2;
+  const directPositiveProtected=
+    crossPass.positiveEvidenceStatePreserved===true ||
+    positiveEvidenceState ||
+    assessment.observed===true ||
+    (blastLikeCount!==null&&blastLikeCount>=1) ||
+    positiveCytologyCount>=2;
   const uncharacterizedCytology=multipleImmature&&characterizedCytologyCount<=1&&positiveCytologyCount===0;
   const unresolvedCandidate=marrow&&multipleImmature&&repeatedImmature&&uncharacterizedCytology&&!directPositiveProtected;
   return {
@@ -59,6 +73,9 @@ export function evaluateMarrowImmatureCellCytologyGap(result = {}) {
     immatureCellBurden:burden||null,spatialDistribution:distribution||null,multipleImmature,repeatedImmature,
     characterizedCytologyCount,characterizedArchitectureCount,positiveCytologyCount,uncharacterizedCytology,
     directPositiveProtected,unresolvedCandidate,
+    crossPassRecoveryVersion:
+      MARROW_CROSS_PASS_IMMATURE_CYTOMORPHOLOGY_RECOVERY_VERSION,
+    crossPassEvidenceAvailable:Object.keys(crossPass).length>0,
     candidateState:unresolvedCandidate?"IMMATURE_POPULATION_REQUIRES_DISCRIMINATION":null
   };
 }

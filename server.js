@@ -57,6 +57,7 @@ import {
 import {
   MARROW_IMMATURE_CELL_CYTOLOGY_RECOVERY_VERSION,
   MARROW_BLASTOID_CANDIDATE_PRESERVATION_VERSION,
+  MARROW_CROSS_PASS_IMMATURE_CYTOMORPHOLOGY_RECOVERY_VERSION,
   applyMarrowImmatureCellCytologyRecovery,
 } from "./ai/boneMarrow/marrowImmatureCellCytologyRecoveryEngine.js";
 
@@ -364,6 +365,8 @@ import {
   MARROW_POSITIVE_CYTOLOGY_CARDINALITY_PRESERVATION_VERSION,
   MARROW_REPAIR_ARCHITECTURE_PROVENANCE_VERSION,
   MARROW_CYTOLOGY_TO_ARCHITECTURE_ANTIFABRICATION_VERSION,
+  MARROW_IMMATURE_CYTOMORPHOLOGY_ACQUISITION_STABILITY_VERSION,
+  MARROW_CROSS_PASS_EVIDENCE_PRESERVATION_VERSION,
   BONE_MARROW_COMPACT_ACQUISITION_VERSION,
   BONE_MARROW_COMPLETE_LENGTH_RECOVERY_VERSION,
 } from "./ai/visualMorphologyEvidenceAcquisitionContract.js";
@@ -4512,8 +4515,15 @@ BE-FIX-005.31 — COERÊNCIA NARRATIVA-ESTRUTURA E RECUPERAÇÃO FISIOLÓGICA:
       analysisType === "bone_marrow" &&
       visualMorphologyEvidenceAcquisition
         ?.immatureCellCytologyRecoveryRequired === true;
+    const immatureCytomorphologyStabilityRecoveryRecommended =
+      analysisType === "bone_marrow" &&
+      visualMorphologyEvidenceAcquisition
+        ?.immatureCytomorphologyStabilityRecoveryRecommended === true;
     const effectiveRepairEnabled =
-      visualRepairEnabled || lengthExhausted || immatureCellCytologyRecoveryRequired;
+      visualRepairEnabled ||
+      lengthExhausted ||
+      immatureCellCytologyRecoveryRequired ||
+      immatureCytomorphologyStabilityRecoveryRecommended;
     const effectiveRepairBudgetMs =
       (lengthExhausted || immatureCellCytologyRecoveryRequired)
         ? lengthRecoveryBudgetMs
@@ -4528,6 +4538,11 @@ BE-FIX-005.31 — COERÊNCIA NARRATIVA-ESTRUTURA E RECUPERAÇÃO FISIOLÓGICA:
         generalRepairEnabled: visualRepairEnabled,
         effectiveRepairEnabled,
         immatureCellCytologyRecoveryRequired,
+        immatureCytomorphologyStabilityRecoveryRecommended,
+        immatureCytomorphologyAcquisitionStabilityVersion:
+          MARROW_IMMATURE_CYTOMORPHOLOGY_ACQUISITION_STABILITY_VERSION,
+        crossPassEvidencePreservationVersion:
+          MARROW_CROSS_PASS_EVIDENCE_PRESERVATION_VERSION,
         primaryElapsedMs: visualTiming,
         effectiveRepairBudgetMs,
       }),
@@ -7056,6 +7071,12 @@ app.get("/runtime-version", (_req, res) => {
       MARROW_IMMATURE_CELL_CYTOLOGY_RECOVERY_VERSION,
     marrowBlastoidCandidatePreservationVersion:
       MARROW_BLASTOID_CANDIDATE_PRESERVATION_VERSION,
+    marrowImmatureCytomorphologyAcquisitionStabilityVersion:
+      MARROW_IMMATURE_CYTOMORPHOLOGY_ACQUISITION_STABILITY_VERSION,
+    marrowCrossPassEvidencePreservationVersion:
+      MARROW_CROSS_PASS_EVIDENCE_PRESERVATION_VERSION,
+    marrowCrossPassImmatureCytomorphologyRecoveryVersion:
+      MARROW_CROSS_PASS_IMMATURE_CYTOMORPHOLOGY_RECOVERY_VERSION,
     marrowRecoveredCytologyProjectionVersion:
       MARROW_RECOVERED_CYTOLOGY_PROJECTION_VERSION,
     marrowPositiveBlastE2ELockVersion:

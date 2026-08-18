@@ -26,6 +26,8 @@ export const MARROW_REPAIR_EVIDENCE_MERGE_VERSION = "BE-FIX-005.36";
 export const MARROW_POSITIVE_CYTOLOGY_CARDINALITY_PRESERVATION_VERSION = "BE-FIX-005.36";
 export const MARROW_REPAIR_ARCHITECTURE_PROVENANCE_VERSION = "BE-FIX-005.45";
 export const MARROW_CYTOLOGY_TO_ARCHITECTURE_ANTIFABRICATION_VERSION = "BE-FIX-005.45";
+export const MARROW_IMMATURE_CYTOMORPHOLOGY_ACQUISITION_STABILITY_VERSION = "BE-FIX-005.50.15";
+export const MARROW_CROSS_PASS_EVIDENCE_PRESERVATION_VERSION = "BE-FIX-005.50.15";
 export const BONE_MARROW_COMPACT_ACQUISITION_VERSION = "BE-FIX-005.39";
 export const BONE_MARROW_COMPLETE_LENGTH_RECOVERY_VERSION = "BE-FIX-005.39";
 export const PERIPHERAL_POSITIVE_MORPHOLOGY_ACQUISITION_VERSION = "BE-FIX-005.50.4";
@@ -271,9 +273,42 @@ function marrowImmatureCellCytologyRecoveryNeed(raw = {}) {
   const state=asText(blast.evidenceState).toUpperCase();
   const positiveState=["OBSERVED_POPULATION","SUSPICIOUS_POPULATION","FOCAL_SUSPICION"].includes(state);
   const required=multiple&&repeated&&characterized<=1&&positive===0&&!positiveState&&blast.observed!==true;
-  return {version:"BE-FIX-005.33",required,multipleImmatureCells:multiple,repeatedImmatureCells:repeated,
-    characterizedBlastCytologyCount:characterized,positiveBlastCytologyCount:positive,
-    approximateImmatureCellCount:Number.isFinite(immatureCount)?immatureCount:null};
+
+  // BE-FIX-005.50.15 — acquisition stability pass.
+  // A precursor-rich / left-shifted marrow may contain a pathologic immature
+  // subset even when the first compact pass under-characterizes blast
+  // cytomorphology. Request one bounded focal discrimination pass without
+  // declaring the acquisition incomplete and without manufacturing positivity.
+  const expansion=asObject(asObject(raw.myeloidSeries).expansionContext);
+  const precursorRichField =
+    expansion.numerousGranulocyticPrecursors===true ||
+    (
+      expansion.leftShiftedMaturationSpectrum===true &&
+      expansion.denseMyeloidField===true
+    ) ||
+    multiple ||
+    repeated;
+
+  const stabilityDiscriminationRecommended =
+    precursorRichField &&
+    characterized<=1 &&
+    positive===0 &&
+    !positiveState &&
+    blast.observed!==true;
+
+  return {
+    version:"BE-FIX-005.33",
+    acquisitionStabilityVersion:
+      MARROW_IMMATURE_CYTOMORPHOLOGY_ACQUISITION_STABILITY_VERSION,
+    required,
+    stabilityDiscriminationRecommended,
+    precursorRichField,
+    multipleImmatureCells:multiple,
+    repeatedImmatureCells:repeated,
+    characterizedBlastCytologyCount:characterized,
+    positiveBlastCytologyCount:positive,
+    approximateImmatureCellCount:Number.isFinite(immatureCount)?immatureCount:null
+  };
 }
 
 export function assessBoneMarrowVisualEvidenceAcquisition({
@@ -374,6 +409,17 @@ export function assessBoneMarrowVisualEvidenceAcquisition({
   const effectiveComplete =
     complete && immatureCellCytologyRecovery.required !== true;
 
+  const immatureCytomorphologyStabilityRecoveryRecommended =
+    effectiveComplete === true &&
+    immatureCellCytologyRecovery.stabilityDiscriminationRecommended === true;
+
+  if (
+    immatureCytomorphologyStabilityRecoveryRecommended &&
+    !missingRequirements.includes("blastAssessment.immatureCellCytologyStability")
+  ) {
+    missingRequirements.push("blastAssessment.immatureCellCytologyStability");
+  }
+
   return {
     contractVersion: VISUAL_MORPHOLOGY_EVIDENCE_ACQUISITION_VERSION,
     productionEnforcementVersion: PRODUCTION_VME_ENFORCEMENT_VERSION,
@@ -381,9 +427,15 @@ export function assessBoneMarrowVisualEvidenceAcquisition({
     specimenScope: "BONE_MARROW",
     status: effectiveComplete ? STATUS.COMPLETE : STATUS.INCOMPLETE,
     complete: effectiveComplete,
-    retryRecommended: !effectiveComplete,
+    retryRecommended:
+      !effectiveComplete || immatureCytomorphologyStabilityRecoveryRecommended,
     immatureCellCytologyRecoveryRequired:
       immatureCellCytologyRecovery.required === true,
+    immatureCytomorphologyStabilityRecoveryRecommended,
+    immatureCytomorphologyAcquisitionStabilityVersion:
+      MARROW_IMMATURE_CYTOMORPHOLOGY_ACQUISITION_STABILITY_VERSION,
+    crossPassEvidencePreservationVersion:
+      MARROW_CROSS_PASS_EVIDENCE_PRESERVATION_VERSION,
     positiveCytologyConsistencyVersion: "BE-FIX-005.35",
     acquisitionDiscordanceRecoveryVersion: "BE-FIX-005.35",
     immatureCellCytologyRecovery,
@@ -500,12 +552,34 @@ export function buildBoneMarrowVisualRepairPrompt({
     ? missingRequirements.join(", ")
     : "marrow morphology";
 
+  const stabilityFocused =
+    String(missing).includes("blastAssessment.immatureCellCytologyStability");
+
+  const stabilityInstructions = stabilityFocused
+    ? `
+BE-FIX-005.50.15 — DISCRIMINAÇÃO CITOMORFOLÓGICA DE ESTABILIDADE:
+- Reobserve ativamente as células imaturas/precursoras em várias regiões do campo.
+- Não presuma blasto por imaturidade, tamanho ou relação N:C isolados.
+- Caracterize separadamente highNCRatio, openFineChromatin, nucleoli e
+  scantBasophilicCytoplasm como true, false ou null.
+- Atualize approximateImmatureCellCount, approximateBlastLikeCells,
+  immatureCellBurden e spatialDistribution somente pelo que for visível.
+- Se houver subconjunto repetido, diga se ele é morfologicamente coerente e
+  distinto do continuum maturativo. Se não for possível decidir, use null.
+- Uma medula fisiológica deve continuar fisiológica quando a reobservação não
+  demonstrar citologia/arquitetura blastoide.
+- Não produzir OBSERVED_POPULATION/SUSPICIOUS_POPULATION sem suporte visual
+  independente suficiente.
+`
+    : "";
+
   return `CELLCOUNT BE-FIX-005.25 — REPARO DE AQUISIÇÃO MEDULAR
 
 Reanalise as imagens de aspirado/medula e devolva SOMENTE JSON válido.
-A resposta anterior ficou sem evidência medular suficiente.
+A resposta anterior ficou sem evidência medular suficiente ou necessita uma
+segunda observação citomorfológica de estabilidade.
 Itens ausentes: ${missing}.
-
+${stabilityInstructions}
 Prioridade absoluta:
 1. specimenAssessment e marrowAdequacy;
 2. myeloidSeries, erythroidSeries e megakaryocyticSeries;
@@ -560,6 +634,28 @@ export function mergeVisualMorphologyRepair(
             ? repairValue
             : originalValue
         );
+
+  const evidenceStateRank = (value) => {
+    const state = asText(value).toUpperCase();
+    if (state === "OBSERVED_POPULATION") return 6;
+    if (state === "SUSPICIOUS_POPULATION") return 5;
+    if (state === "FOCAL_SUSPICION") return 4;
+    if (
+      state === "UNRESOLVED_BLASTOID_CYTOLOGY" ||
+      state === "IMMATURE_POPULATION_REQUIRES_DISCRIMINATION"
+    ) return 3;
+    if (state === "NOT_ASSESSABLE") return 2;
+    if (state === "NOT_OBSERVED_IN_EVALUABLE_FIELD") return 1;
+    return 0;
+  };
+
+  const preserveEvidenceState = (originalValue, repairValue) => {
+    const o = asText(originalValue);
+    const r = asText(repairValue);
+    if (!o) return r || null;
+    if (!r) return o || null;
+    return evidenceStateRank(r) > evidenceStateRank(o) ? r : o;
+  };
 
   const preserveCount = (repairValue, originalValue, { preferMax = false } = {}) => {
     const r = Number(repairValue);
@@ -824,11 +920,98 @@ export function mergeVisualMorphologyRepair(
       "repeated_across_field";
   }
 
-  // A positive repair evidence state must outrank an indeterminate first pass.
+  // BE-FIX-005.50.15 — evidence-state preservation is monotonic across
+  // primary + repair. A later NOT_ASSESSABLE/NOT_OBSERVED response cannot erase
+  // a stronger positive or unresolved state acquired in an earlier valid pass.
   const repairEvidenceState = asText(repairBlast.evidenceState);
   const originalEvidenceState = asText(originalBlast.evidenceState);
   blast.evidenceState =
-    repairEvidenceState || originalEvidenceState || null;
+    preserveEvidenceState(originalEvidenceState, repairEvidenceState);
+
+  const cytologySnapshot = (b = {}) => {
+    const support = asObject(b.morphologySupport);
+    const cytology = asObject(b.immatureCellCytology);
+    const sub = asObject(b.blastoidSubpopulationContext);
+    const traits = [
+      cytology.highNCRatio ?? support.highNCRatio,
+      cytology.openFineChromatin ?? support.openFineChromatin,
+      cytology.nucleoli ?? support.nucleoli,
+      cytology.scantBasophilicCytoplasm ?? support.scantBasophilicCytoplasm,
+    ];
+    const burden = asText(b.immatureCellBurden).toLowerCase();
+    const spatial = asText(b.spatialDistribution).toLowerCase();
+    const count = Number(
+      b.approximateImmatureCellCount ??
+      b.approximateImmatureCellCountInProvidedFields
+    );
+    return {
+      evidenceState: asText(b.evidenceState) || null,
+      approximateImmatureCellCount: Number.isFinite(count) ? count : null,
+      approximateBlastLikeCells:
+        preserveCount(
+          b.approximateBlastLikeCells ??
+            b.approximateBlastLikeCellCountInProvidedFields,
+          null
+        ),
+      characterizedCytologyCount:
+        traits.filter((v) => typeof v === "boolean").length,
+      positiveCytologyCount:
+        traits.filter((v) => v === true).length,
+      multipleImmature:
+        (Number.isFinite(count) && count >= 3) ||
+        ["multiple", "numerous", "dominant", "increased"].includes(burden),
+      repeatedImmature:
+        spatial.includes("repeated") ||
+        spatial.includes("across_field") ||
+        support.repeatedAcrossField === true ||
+        cytology.repeatedSubsetAcrossField === true ||
+        sub.repeatedSubsetAcrossField === true ||
+        sub.repeatedCellsWithSimilarFeatures === true,
+      architectureCore:
+        architectureCore(architectureSnapshot(cytology, sub, support)),
+    };
+  };
+
+  const originalCytologySnapshot = cytologySnapshot(originalBlast);
+  const repairCytologySnapshot = cytologySnapshot(repairBlast);
+
+  merged.marrowCrossPassImmatureCytomorphologyEvidence = {
+    version: MARROW_CROSS_PASS_EVIDENCE_PRESERVATION_VERSION,
+    original: originalCytologySnapshot,
+    repair: repairCytologySnapshot,
+    finalEvidenceState: blast.evidenceState || null,
+    maximumImmatureCellCount:
+      preserveCount(
+        repairCytologySnapshot.approximateImmatureCellCount,
+        originalCytologySnapshot.approximateImmatureCellCount,
+        { preferMax: true }
+      ),
+    maximumBlastLikeCellCount:
+      preserveCount(
+        repairCytologySnapshot.approximateBlastLikeCells,
+        originalCytologySnapshot.approximateBlastLikeCells,
+        { preferMax: true }
+      ),
+    maximumPositiveCytologyCount:
+      Math.max(
+        originalCytologySnapshot.positiveCytologyCount || 0,
+        repairCytologySnapshot.positiveCytologyCount || 0
+      ),
+    multipleImmatureAnyPass:
+      originalCytologySnapshot.multipleImmature === true ||
+      repairCytologySnapshot.multipleImmature === true,
+    repeatedImmatureAnyPass:
+      originalCytologySnapshot.repeatedImmature === true ||
+      repairCytologySnapshot.repeatedImmature === true,
+    positiveEvidenceStatePreserved:
+      evidenceStateRank(blast.evidenceState) >= 4,
+    unresolvedEvidenceStatePreserved:
+      evidenceStateRank(blast.evidenceState) === 3,
+    singlePassArchitectureCore:
+      originalCytologySnapshot.architectureCore === true ||
+      repairCytologySnapshot.architectureCore === true,
+    crossPassArchitectureSynthesisForbidden: true,
+  };
 
   merged.blastAssessment = blast;
 
@@ -850,6 +1033,10 @@ export function mergeVisualMorphologyRepair(
     version: MARROW_REPAIR_EVIDENCE_MERGE_VERSION,
     positiveCytologyCardinalityPreservationVersion:
       MARROW_POSITIVE_CYTOLOGY_CARDINALITY_PRESERVATION_VERSION,
+    immatureCytomorphologyAcquisitionStabilityVersion:
+      MARROW_IMMATURE_CYTOMORPHOLOGY_ACQUISITION_STABILITY_VERSION,
+    crossPassEvidencePreservationVersion:
+      MARROW_CROSS_PASS_EVIDENCE_PRESERVATION_VERSION,
     originalImmatureCellCount:
       preserveCount(originalBlast.approximateImmatureCellCount, null),
     repairImmatureCellCount:
