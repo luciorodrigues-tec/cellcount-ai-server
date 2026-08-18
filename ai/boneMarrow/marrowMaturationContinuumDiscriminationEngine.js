@@ -8,6 +8,7 @@ export const MARROW_MATURATION_CONTINUUM_DISCRIMINATION_VERSION = "BE-FIX-005.37
 export const MARROW_PHYSIOLOGIC_IMMATURITY_CONTAINMENT_VERSION = "BE-FIX-005.37";
 export const MARROW_MATURATION_EVIDENCE_PROJECTION_VERSION = "BE-FIX-005.41";
 export const MARROW_UNRESOLVED_IMMATURE_CANDIDATE_CONTINUUM_SAFETY_GATE_VERSION = "BE-FIX-005.50.14";
+export const MARROW_POST_RECOVERY_MATURATION_CONTINUUM_REEVALUATION_VERSION = "BE-FIX-005.50.14.1";
 
 function obj(v){return v&&typeof v==="object"&&!Array.isArray(v)?v:{};}
 function txt(v){return typeof v==="string"?v.trim():"";}
@@ -140,11 +141,15 @@ export function evaluateMarrowMaturationContinuum(result={}){
   const vmeRecovery=obj(vme.immatureCellCytologyRecovery);
   const recovery=obj(result.marrowImmatureCellCytologyRecovery);
   const consistency=obj(result.marrowPositiveCytologyConsistency);
+  // BE-FIX-005.50.14.1 — post-recovery state has precedence over a stale
+  // candidateEvidenceState written by the initial physiologic pass.
+  // Otherwise PHYSIOLOGIC_MATURATION_CONTINUUM can mask the later
+  // IMMATURE_POPULATION_REQUIRES_DISCRIMINATION state created by 005.33/35.
   const candidateState=txt(
-    assessment.candidateEvidenceState ||
     recovery.candidateState ||
     recovery.finalEvidenceState ||
-    consistency.state
+    consistency.state ||
+    assessment.candidateEvidenceState
   ).toUpperCase();
   const acquisitionRepeatedImmature =
     vmeRecovery.repeatedImmatureCells===true ||
@@ -221,6 +226,8 @@ export function evaluateMarrowMaturationContinuum(result={}){
     pathologicMaturationContinuumLock,
     unresolvedImmatureCandidateContinuumSafetyGateVersion:
       MARROW_UNRESOLVED_IMMATURE_CANDIDATE_CONTINUUM_SAFETY_GATE_VERSION,
+    postRecoveryMaturationContinuumReevaluationVersion:
+      MARROW_POST_RECOVERY_MATURATION_CONTINUUM_REEVALUATION_VERSION,
     unresolvedImmatureCandidateAfterAcquisition,
     unresolvedCandidateSignals:{
       candidateState:candidateState||null,
@@ -249,6 +256,65 @@ export function applyMarrowMaturationContinuumDiscrimination(result={}){
   if(!e.marrow)return result;
 
   result.marrowMaturationContinuumDiscrimination=e;
+
+  // BE-FIX-005.50.14.1 — post-recovery re-evaluation.
+  // The first 005.50.14 pass can run before 005.33/005.35/005.34 have created
+  // the unresolved-candidate state. If that later evidence appears, revoke any
+  // stale physiologic continuum lock rather than allowing it to survive by
+  // execution order. This is non-promotional: it restores indeterminacy and
+  // does NOT create SUSPICIOUS/OBSERVED blast evidence.
+  if(e.unresolvedImmatureCandidateAfterAcquisition===true){
+    const a=obj(result.blastAssessment);
+    const priorLock=obj(result.marrowPhysiologicMaturationContinuumLock);
+    const priorState=txt(a.evidenceState).toUpperCase();
+    const recovery=obj(result.marrowImmatureCellCytologyRecovery);
+    const consistency=obj(result.marrowPositiveCytologyConsistency);
+    const candidateState=txt(
+      a.candidateEvidenceState ||
+      recovery.candidateState ||
+      recovery.finalEvidenceState ||
+      consistency.state ||
+      "IMMATURE_POPULATION_REQUIRES_DISCRIMINATION"
+    ).toUpperCase();
+
+    if(
+      priorLock.active===true ||
+      priorState==="PHYSIOLOGIC_PRECURSOR_PATTERN" ||
+      a.candidateEvidenceState==="PHYSIOLOGIC_MATURATION_CONTINUUM"
+    ){
+      a.evidenceState="NOT_ASSESSABLE";
+      a.candidateEvidenceState=
+        candidateState==="PHYSIOLOGIC_MATURATION_CONTINUUM"
+          ?"IMMATURE_POPULATION_REQUIRES_DISCRIMINATION"
+          :candidateState;
+      a.observed=false;
+      a.globalAbsenceAllowed=false;
+      a.cytologyResolutionRequired=true;
+      a.cytologyRecoveryRequired=false;
+      a.positiveEvidenceLock={
+        ...obj(a.positiveEvidenceLock),
+        active:false,
+        revokedBy:MARROW_POST_RECOVERY_MATURATION_CONTINUUM_REEVALUATION_VERSION,
+      };
+
+      result.blastAssessment=a;
+      result.marrowPhysiologicMaturationContinuumLock={
+        ...priorLock,
+        version:MARROW_PHYSIOLOGIC_IMMATURITY_CONTAINMENT_VERSION,
+        active:false,
+        revoked:true,
+        revokedBy:MARROW_POST_RECOVERY_MATURATION_CONTINUUM_REEVALUATION_VERSION,
+        priorEvidenceState:priorState||priorLock.priorEvidenceState||null,
+        finalEvidenceState:"NOT_ASSESSABLE",
+        reason:"Post-recovery unresolved immature candidate prevents physiologic auto-resolution; indeterminacy is preserved without manufacturing blast positivity.",
+        positiveBlastPopulationSuppressed:false,
+        negativeBlastExclusionAllowed:false,
+      };
+    }
+
+    return result;
+  }
+
   if(!e.falseBlastPromotionRisk)return result;
 
   const a=obj(result.blastAssessment);

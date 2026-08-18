@@ -163,7 +163,12 @@ export function evaluateMarrowPositiveBlastEvidenceSemanticSupersession(
   // cells inside a maturation continuum, no blast-like cells are counted, no
   // observed blast population exists, and no independent structured
   // architecture is present.
+  const unresolvedImmatureCandidateAfterAcquisition =
+    result?.marrowMaturationContinuumDiscrimination
+      ?.unresolvedImmatureCandidateAfterAcquisition === true;
+
   const physiologicMaturationContradiction =
+    unresolvedImmatureCandidateAfterAcquisition !== true &&
     explicitlyWithinContinuum === true &&
     observedQualified === false &&
     structuredArchitecture === false &&
@@ -208,6 +213,7 @@ export function evaluateMarrowPositiveBlastEvidenceSemanticSupersession(
     approximateBlastLikeCells,
     focalCytologyPreserved:
       active && approximateBlastLikeCells !== null && approximateBlastLikeCells > 0,
+    unresolvedImmatureCandidateAfterAcquisition,
     physiologicMaturationContradiction,
     supersessionMode,
     populationPositiveAllowed: !active,

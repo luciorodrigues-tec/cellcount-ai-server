@@ -71,6 +71,7 @@ import {
   MARROW_MATURATION_CONTINUUM_DISCRIMINATION_VERSION,
   MARROW_PHYSIOLOGIC_IMMATURITY_CONTAINMENT_VERSION,
   MARROW_MATURATION_EVIDENCE_PROJECTION_VERSION,
+  MARROW_POST_RECOVERY_MATURATION_CONTINUUM_REEVALUATION_VERSION,
   applyMarrowMaturationContinuumDiscrimination,
 } from "./ai/boneMarrow/marrowMaturationContinuumDiscriminationEngine.js";
 
@@ -4883,6 +4884,32 @@ BE-FIX-005.31 — COERÊNCIA NARRATIVA-ESTRUTURA E RECUPERAÇÃO FISIOLÓGICA:
         ),
       );
 
+      // BE-FIX-005.50.14.1 — POST-RECOVERY MATURATION CONTINUUM RE-EVALUATION
+      // 005.33/005.35/005.34 can create an unresolved immature-candidate state
+      // after the initial 005.50.14 pass. Re-evaluate now, then refresh 005.44,
+      // so a stale physiologic lock cannot survive only because of call order.
+      // This is non-promotional: unresolved evidence stays indeterminate.
+      parsed = applyMarrowMaturationContinuumDiscrimination(parsed);
+      parsed = applyMarrowPositiveBlastEvidenceSemanticSupersession(parsed);
+
+      console.log(
+        "BE-FIX-005.50.14.1 — POST-RECOVERY MATURATION CONTINUUM RE-EVALUATION",
+        JSON.stringify(
+          {
+            version:
+              MARROW_POST_RECOVERY_MATURATION_CONTINUUM_REEVALUATION_VERSION,
+            discrimination:
+              parsed.marrowMaturationContinuumDiscrimination || {},
+            physiologicLock:
+              parsed.marrowPhysiologicMaturationContinuumLock || {},
+            semanticSupersession:
+              parsed.marrowPositiveBlastEvidenceSemanticSupersession || {},
+          },
+          null,
+          2,
+        ),
+      );
+
       console.log(
         "BE-FIX-005.40 — MARROW FOCAL CYTOLOGY CONTEXTUALIZATION / ARCHITECTURE-GATED BLAST ESCALATION",
         JSON.stringify(
@@ -7005,6 +7032,8 @@ app.get("/runtime-version", (_req, res) => {
       MARROW_IMMATURITY_MATURATION_SEMANTIC_SEPARATION_VERSION,
     marrowMaturationEvidenceProjectionVersion:
       MARROW_MATURATION_EVIDENCE_PROJECTION_VERSION,
+    marrowPostRecoveryMaturationContinuumReevaluationVersion:
+      MARROW_POST_RECOVERY_MATURATION_CONTINUUM_REEVALUATION_VERSION,
     marrowScopePropagationRecoveryVersion:
       MARROW_SCOPE_PROPAGATION_RECOVERY_VERSION,
     marrowBlastEvidenceReconciliationVersion:
