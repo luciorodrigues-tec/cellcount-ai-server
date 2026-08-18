@@ -136,6 +136,14 @@ import {
 } from "./ai/boneMarrow/marrowResidualBlastSemanticCleanupEngine.js";
 
 import {
+  applyMarrowUnresolvedImmaturityFinalStateCoherence,
+  MARROW_UNRESOLVED_IMMATURITY_FINAL_STATE_COHERENCE_VERSION,
+  MARROW_UNRESOLVED_IMMATURITY_GLOBAL_PATTERN_LOCK_VERSION,
+  MARROW_UNRESOLVED_IMMATURITY_PRESENTATION_LOCK_VERSION,
+  CLINICAL_INTERNAL_VERSION_TAG_SANITIZATION_VERSION,
+} from "./ai/boneMarrow/marrowUnresolvedImmaturityFinalStateCoherenceEngine.js";
+
+import {
   MARROW_POSITIVE_CYTOLOGY_CONSISTENCY_VERSION,
   MARROW_ACQUISITION_DISCORDANCE_RECOVERY_VERSION,
   MARROW_PRIMARY_OR_RECOVERED_POSITIVE_BLASTOID_CYTOLOGY_PRESERVATION_VERSION,
@@ -5132,13 +5140,23 @@ if (
         );
     }
 
-    const globalPattern =
+    let globalPattern =
       analyzeGlobalPattern(
         mergedAnalysis,
       );
 
     mergedAnalysis.globalPattern =
       globalPattern;
+
+    // BE-FIX-005.50.17 — unresolved immature-cell evidence is an epistemic
+    // middle state. It must not appear as GLOBAL_UNREMARKABLE_PATTERN or a
+    // physiologic marrow pattern simply because structured blast positivity
+    // was correctly withheld by 005.50.15.5/005.50.16.
+    if (analysisType === "bone_marrow") {
+      mergedAnalysis =
+        applyMarrowUnresolvedImmaturityFinalStateCoherence(mergedAnalysis);
+      globalPattern = mergedAnalysis.globalPattern || globalPattern;
+    }
 
     if (analysisType === "bone_marrow") {
       mergedAnalysis =
@@ -7108,6 +7126,14 @@ app.get("/runtime-version", (_req, res) => {
       MARROW_CELL_LEVEL_UNRESOLVED_IMMATURITY_PRESERVATION_VERSION,
     marrowCellLevelUnresolvedImmaturityContinuumGateVersion:
       MARROW_CELL_LEVEL_UNRESOLVED_IMMATURITY_CONTINUUM_GATE_VERSION,
+    marrowUnresolvedImmaturityFinalStateCoherenceVersion:
+      MARROW_UNRESOLVED_IMMATURITY_FINAL_STATE_COHERENCE_VERSION,
+    marrowUnresolvedImmaturityGlobalPatternLockVersion:
+      MARROW_UNRESOLVED_IMMATURITY_GLOBAL_PATTERN_LOCK_VERSION,
+    marrowUnresolvedImmaturityPresentationLockVersion:
+      MARROW_UNRESOLVED_IMMATURITY_PRESENTATION_LOCK_VERSION,
+    clinicalInternalVersionTagSanitizationVersion:
+      CLINICAL_INTERNAL_VERSION_TAG_SANITIZATION_VERSION,
     marrowRepairEvidenceStateSemanticCanonicalizationVersion:
       MARROW_REPAIR_EVIDENCE_STATE_SEMANTIC_CANONICALIZATION_VERSION,
     marrowUnresolvedImmaturitySemanticRecoveryVersion:
@@ -9128,6 +9154,26 @@ if (specimenGate.analysisType === "bone_marrow") {
 }
 
 // ============================================================================
+// BE-FIX-005.50.17 — UNRESOLVED IMMATURE-CELL FINAL-STATE COHERENCE
+// Runs after terminal marrow authority/criticality and before CRA. The state
+// remains focal + indeterminate, never population-positive, never physiologic
+// by default, and never authorizes blast-percentage inference.
+// ============================================================================
+if (specimenGate.analysisType === "bone_marrow") {
+  finalResult =
+    applyMarrowUnresolvedImmaturityFinalStateCoherence(finalResult);
+
+  console.log(
+    "BE-FIX-005.50.17 — MARROW UNRESOLVED IMMATURE-CELL FINAL-STATE COHERENCE",
+    JSON.stringify(
+      finalResult.marrowUnresolvedImmaturityFinalStateCoherence || {},
+      null,
+      2,
+    ),
+  );
+}
+
+// ============================================================================
 // CRA-001.1 — CANONICAL CLINICAL TRUTH FOUNDATION
 // Runs only after 005.11 → 005.13 → 005.14 → 005.15 and the final field-
 // scoped negative rebuild. The legacy payload is preserved for compatibility;
@@ -9252,6 +9298,15 @@ finalResult =
   applyCanonicalClinicalPresentationAuthority(
     finalResult,
   );
+
+// BE-FIX-005.50.17 — presentation is the last user-facing writer. Reapply the
+// unresolved-immaturity lock after 005.50.9 so no canonical presentation can
+// re-enable blast percentage inference, emit a reassuring normal pattern, or
+// expose internal BE-FIX labels in clinical prose.
+if (specimenGate.analysisType === "bone_marrow") {
+  finalResult =
+    applyMarrowUnresolvedImmaturityFinalStateCoherence(finalResult);
+}
 
 console.log(
   "BE-FIX-005.50.9 — CANONICAL CLINICAL PRESENTATION",
