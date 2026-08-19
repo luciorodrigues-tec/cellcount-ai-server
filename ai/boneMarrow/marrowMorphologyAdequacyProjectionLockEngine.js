@@ -28,7 +28,10 @@ function obj(value) {
 }
 
 export function evaluateMarrowMorphologyAdequacyProjectionLock(result = {}) {
-  const focalScopeLock = obj(result.marrowPositiveCellLevelBlastoidScopeLock);
+  const terminalFocalAuthority = obj(result.marrowFocalBlastoidTerminalAuthority);
+  const focalScopeLock = terminalFocalAuthority.active === true
+    ? terminalFocalAuthority
+    : obj(result.marrowPositiveCellLevelBlastoidScopeLock);
   const authority = obj(result.finalMarrowAuthority);
   const axis = obj(result.marrowAdequacyMorphologyAxis);
   const expansion = obj(result.marrowMyeloidExpansionDiscrimination);
@@ -156,7 +159,7 @@ export function applyMarrowMorphologyAdequacyProjectionLock(result = {}) {
     return out;
   }
 
-  if (result.marrowPositiveCellLevelBlastoidScopeLock?.active === true) {
+  if (result.marrowFocalBlastoidTerminalAuthority?.active === true || result.marrowPositiveCellLevelBlastoidScopeLock?.active === true) {
     const cls = "MARROW_BLASTOID_FOCAL_SUSPICION";
     out.finalClassification = cls;
     out.morphologicRiskClass = cls;

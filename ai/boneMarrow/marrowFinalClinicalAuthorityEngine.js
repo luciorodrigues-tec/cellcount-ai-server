@@ -47,6 +47,27 @@ function uniqueStrings(values = []) {
 }
 
 function evaluateStructuredBlastAuthority(result = {}) {
+  const terminalFocalAuthority = obj(result.marrowFocalBlastoidTerminalAuthority);
+  if (terminalFocalAuthority.active === true) {
+    return {
+      observed: false,
+      suspicious: false,
+      structured: false,
+      evidenceState: "FOCAL_SUSPICION",
+      approximateBlastLikeCells:
+        num(result.blastAssessment?.approximateBlastLikeCells) ??
+        num(result.rawResponse?.blastAssessment?.approximateBlastLikeCells),
+      explicitlyWithinContinuum: false,
+      physiologicMaturationContradiction: false,
+      populationInferenceAllowed: false,
+      focalOnly: true,
+      focalPopulationScopeBlocked: true,
+      populationPositiveAllowed: false,
+      cellLevelPositiveCytology: true,
+      focalCytologyPopulationScopeLockVersion:
+        terminalFocalAuthority.version || "BE-FIX-005.50.21",
+    };
+  }
   const focalScopeLock = obj(result.marrowPositiveCellLevelBlastoidScopeLock);
   if (focalScopeLock.active === true) {
     return {

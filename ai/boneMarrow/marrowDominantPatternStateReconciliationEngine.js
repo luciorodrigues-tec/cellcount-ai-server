@@ -12,6 +12,7 @@ function obj(v) { return v && typeof v === "object" && !Array.isArray(v) ? v : {
 function num(v) { const n = Number(v); return Number.isFinite(n) ? n : null; }
 
 function structuredBlastPopulation(result = {}) {
+  if (result?.marrowFocalBlastoidTerminalAuthority?.active === true) return false;
   const e = obj(result.marrowMyeloidExpansionDiscrimination);
   const b = obj(e.blastArchitecture);
   const p = obj(result.marrowPrecursorDiscrimination);

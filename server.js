@@ -160,6 +160,14 @@ import {
 } from "./ai/boneMarrow/marrowPositiveCellLevelBlastoidScopeLockEngine.js";
 
 import {
+  applyMarrowFocalBlastoidTerminalAuthority,
+  MARROW_FOCAL_BLASTOID_SCOPE_TERMINAL_AUTHORITY_VERSION,
+  MARROW_FOCAL_BLASTOID_LEGACY_NON_REPROMOTION_VERSION,
+  MARROW_FOCAL_BLASTOID_MONOTONIC_SCOPE_VERSION,
+  MARROW_FOCAL_BLASTOID_TERMINAL_PRESENTATION_POLICY_VERSION,
+} from "./ai/boneMarrow/marrowFocalBlastoidTerminalAuthorityEngine.js";
+
+import {
   MARROW_POSITIVE_CYTOLOGY_CONSISTENCY_VERSION,
   MARROW_ACQUISITION_DISCORDANCE_RECOVERY_VERSION,
   MARROW_PRIMARY_OR_RECOVERED_POSITIVE_BLASTOID_CYTOLOGY_PRESERVATION_VERSION,
@@ -5182,6 +5190,8 @@ if (
         );
       mergedAnalysis =
         applyMarrowPositiveCellLevelBlastoidScopeLock(mergedAnalysis);
+      mergedAnalysis =
+        applyMarrowFocalBlastoidTerminalAuthority(mergedAnalysis);
     }
 
     let globalPattern =
@@ -5195,6 +5205,8 @@ if (
     if (analysisType === "bone_marrow") {
       mergedAnalysis =
         applyMarrowPositiveCellLevelBlastoidScopeLock(mergedAnalysis);
+      mergedAnalysis =
+        applyMarrowFocalBlastoidTerminalAuthority(mergedAnalysis);
       globalPattern = mergedAnalysis.globalPattern || globalPattern;
     }
 
@@ -7208,6 +7220,14 @@ app.get("/runtime-version", (_req, res) => {
       MARROW_FOCAL_BLASTOID_GLOBAL_PATTERN_SEMANTIC_COHERENCE_VERSION,
     marrowFocalBlastoidPopulationSemanticNonPromotionVersion:
       MARROW_FOCAL_BLASTOID_POPULATION_SEMANTIC_NON_PROMOTION_VERSION,
+    marrowFocalBlastoidScopeTerminalAuthorityVersion:
+      MARROW_FOCAL_BLASTOID_SCOPE_TERMINAL_AUTHORITY_VERSION,
+    marrowFocalBlastoidLegacyNonRepromotionVersion:
+      MARROW_FOCAL_BLASTOID_LEGACY_NON_REPROMOTION_VERSION,
+    marrowFocalBlastoidMonotonicScopeVersion:
+      MARROW_FOCAL_BLASTOID_MONOTONIC_SCOPE_VERSION,
+    marrowFocalBlastoidTerminalPresentationPolicyVersion:
+      MARROW_FOCAL_BLASTOID_TERMINAL_PRESENTATION_POLICY_VERSION,
     marrowRepairEvidenceStateSemanticCanonicalizationVersion:
       MARROW_REPAIR_EVIDENCE_STATE_SEMANTIC_CANONICALIZATION_VERSION,
     marrowUnresolvedImmaturitySemanticRecoveryVersion:
@@ -8579,6 +8599,10 @@ if (
     shouldPreserveTerminalMarrowMorphology(finalResult);
 
   if (preserveTerminalMarrowMorphology) {
+    // BE-FIX-005.50.21 — establish monotonic focal scope before late projection.
+    if (specimenGate.analysisType === "bone_marrow") {
+      finalResult = applyMarrowFocalBlastoidTerminalAuthority(finalResult);
+    }
     // BE-FIX-005.47 — terminal morphology/adequacy axis lock.
     finalResult =
       applyMarrowMorphologyAdequacyProjectionLock(finalResult);
@@ -8679,6 +8703,7 @@ if (
 
 
 if (specimenGate.analysisType === "bone_marrow") {
+  finalResult = applyMarrowFocalBlastoidTerminalAuthority(finalResult);
   finalResult =
     applyMarrowMorphologyAdequacyProjectionLock(finalResult);
 
@@ -9125,6 +9150,8 @@ if (specimenGate.analysisType === "bone_marrow") {
 
   finalResult =
     applyMarrowPositiveCellLevelBlastoidScopeLock(finalResult);
+  finalResult =
+    applyMarrowFocalBlastoidTerminalAuthority(finalResult);
 }
 
 // ============================================================================
@@ -9136,6 +9163,7 @@ if (specimenGate.analysisType === "bone_marrow") {
 if (specimenGate.analysisType === "bone_marrow") {
   finalResult = applyFinalMarrowAuthority(finalResult);
   finalResult = applyMarrowPositiveCellLevelBlastoidScopeLock(finalResult);
+  finalResult = applyMarrowFocalBlastoidTerminalAuthority(finalResult);
 
   console.log(
     "BE-FIX-005.46 — FINAL MARROW AUTHORITY / POST-LEGACY RECONCILIATION",
@@ -9242,6 +9270,8 @@ if (specimenGate.analysisType === "bone_marrow") {
     applyMarrowUnresolvedImmaturityFinalStateCoherence(finalResult);
   finalResult =
     applyMarrowPositiveCellLevelBlastoidScopeLock(finalResult);
+  finalResult =
+    applyMarrowFocalBlastoidTerminalAuthority(finalResult);
 
   console.log(
     "BE-FIX-005.50.17 — MARROW UNRESOLVED IMMATURE-CELL FINAL-STATE COHERENCE",
@@ -9374,6 +9404,9 @@ if (specimenGate.analysisType === "bone_marrow") {
 // Presentation-only projection. It must not rewrite morphology, evidence,
 // maturation state, negative-finding authority or clinical criticality.
 // ============================================================================
+if (specimenGate.analysisType === "bone_marrow") {
+  finalResult = applyMarrowFocalBlastoidTerminalAuthority(finalResult);
+}
 finalResult =
   applyCanonicalClinicalPresentationAuthority(
     finalResult,
@@ -9388,6 +9421,8 @@ if (specimenGate.analysisType === "bone_marrow") {
     applyMarrowUnresolvedImmaturityFinalStateCoherence(finalResult);
   finalResult =
     applyMarrowPositiveCellLevelBlastoidScopeLock(finalResult);
+  finalResult =
+    applyMarrowFocalBlastoidTerminalAuthority(finalResult);
 }
 
 console.log(

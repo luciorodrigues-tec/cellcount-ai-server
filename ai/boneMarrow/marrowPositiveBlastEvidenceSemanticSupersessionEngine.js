@@ -158,8 +158,10 @@ export function evaluateMarrowPositiveBlastEvidenceSemanticSupersession(
       (num(lmeBlast.approximateBlastLikeCells) ?? 0) <= 2
     );
 
-  const populationInferenceAllowed =
-    result?.fieldAdequacy?.populationInferenceAllowed !== false;
+  const terminalFocalAuthority = obj(result?.marrowFocalBlastoidTerminalAuthority);
+  const populationInferenceAllowed = terminalFocalAuthority.active === true
+    ? false
+    : result?.fieldAdequacy?.populationInferenceAllowed !== false;
   const focalPopulationScopeBlocked =
     focalOnly &&
     !populationInferenceAllowed &&
@@ -246,7 +248,9 @@ export function evaluateMarrowPositiveBlastEvidenceSemanticSupersession(
     populationInferenceAllowed,
     focalPopulationScopeBlocked,
     populationPositiveAllowed:
-      !active &&
+      terminalFocalAuthority.active === true
+        ? false
+        : !active &&
       !focalPopulationScopeBlocked &&
       (
         observedQualified ||

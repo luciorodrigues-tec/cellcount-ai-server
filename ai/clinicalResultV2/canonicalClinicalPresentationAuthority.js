@@ -40,7 +40,9 @@ export function buildCanonicalClinicalPresentation(result = {}) {
   const blastPositive = blast === "OBSERVED" || blast === "SUSPICIOUS_INDETERMINATE";
   const focalCardinality = obj(result.peripheralFocalBlastoidCardinalityAuthority);
   const marrowFocalScopeLock = obj(result.marrowPositiveCellLevelBlastoidScopeLock);
+  const marrowTerminalFocalAuthority = obj(result.marrowFocalBlastoidTerminalAuthority);
   const focalBlastoidOnly =
+    marrowTerminalFocalAuthority.active === true ||
     (focalCardinality.active === true &&
       focalCardinality.focalOnly === true &&
       focalCardinality.populationEvidenceEstablished !== true) ||
@@ -163,6 +165,8 @@ export function buildCanonicalClinicalPresentation(result = {}) {
         focalCardinality.version || null,
       marrowFocalBlastoidScopeLockVersion:
         marrowFocalScopeLock.version || null,
+      marrowFocalBlastoidTerminalAuthorityVersion:
+        marrowTerminalFocalAuthority.version || null,
     },
   };
 }

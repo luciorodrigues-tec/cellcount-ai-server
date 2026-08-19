@@ -23,9 +23,21 @@ function asObject(value) {
 }
 
 function readFocalBlastoidScopeAuthority(result = {}) {
+  const terminal = asObject(result?.marrowFocalBlastoidTerminalAuthority);
+  if (terminal.active === true) {
+    return {
+      active: true,
+      cellLevelPositiveBlastoidCytology: true,
+      populationInferenceAllowed: false,
+      populationPositiveAllowed: false,
+      blastPercentageInferenceAllowed: false,
+      effectiveEvidenceState: "FOCAL_SUSPICION",
+      version: terminal.version || "BE-FIX-005.50.21",
+    };
+  }
+
   const lock = asObject(result?.marrowPositiveCellLevelBlastoidScopeLock);
   const governance = asObject(result?.evidenceGovernance);
-
   const active =
     lock.active === true &&
     lock.cellLevelPositiveBlastoidCytology === true &&
