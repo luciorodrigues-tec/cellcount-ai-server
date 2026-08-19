@@ -271,6 +271,11 @@ import OpenAI from "openai";
 import crypto from "crypto";
 
 import {
+  ANALYSIS_SESSION_CONTRACT_VERSION,
+  AnalysisSessionStore,
+} from "./services/analysisSessionStore.js";
+
+import {
   bootstrapRuntime,
 } from "./bootstrap/runtimeBootstrap.js";
 
@@ -510,6 +515,9 @@ const {
 } = createHttpFoundation({
   securityConfig,
 });
+
+const analysisSessionStore =
+  new AnalysisSessionStore();
 
 // ============================================================================
 // OPENAI
@@ -7371,6 +7379,8 @@ app.get("/runtime-version", (_req, res) => {
       CRA_001_1_VERSION,
     clinicalResultCoherenceEngineVersion:
       CLINICAL_RESULT_COHERENCE_ENGINE_VERSION,
+    resilientAnalysisSessionContractVersion:
+      ANALYSIS_SESSION_CONTRACT_VERSION,
     vmeContract: "VME-1.0",
     model: OPENAI_MODEL,
     defaults: {
@@ -7567,6 +7577,89 @@ Retorne somente JSON:
 );
 
 // ============================================================================
+// BE/FE-FIX-006.1 — PERSISTENT ANALYSIS SESSION CONTRACT
+// ============================================================================
+
+app.post(
+  "/analysis-sessions",
+  auth,
+  jsonBodyParser({ limit: "256kb" }),
+  async (req, res) => {
+    try {
+      const { userId } = getUser(req);
+      const idempotencyKey = String(req.body?.idempotencyKey || "").trim();
+      if (!idempotencyKey) {
+        return res.status(400).json({
+          success: false,
+          error: "idempotencyKey é obrigatório.",
+          contractVersion: ANALYSIS_SESSION_CONTRACT_VERSION,
+        });
+      }
+
+      const created = await analysisSessionStore.createOrReuse({
+        userId,
+        idempotencyKey,
+        metadata: {
+          analysisSource: req.body?.analysisSource || "ai_visual",
+          specimenType: req.body?.specimenType || null,
+          imageCount: Number(req.body?.imageCount || 0),
+          clientCreatedAt: req.body?.clientCreatedAt || null,
+        },
+      });
+
+      return res.status(created.reused ? 200 : 201).json({
+        success: true,
+        reused: created.reused,
+        session: created.session,
+        contractVersion: ANALYSIS_SESSION_CONTRACT_VERSION,
+      });
+    } catch (error) {
+      console.error("ANALYSIS SESSION CREATE ERROR:", error);
+      return res.status(500).json({
+        success: false,
+        error: "Erro ao criar sessão de análise.",
+        detail: error.message,
+        contractVersion: ANALYSIS_SESSION_CONTRACT_VERSION,
+      });
+    }
+  },
+);
+
+app.get(
+  "/analysis-sessions/:analysisId",
+  auth,
+  async (req, res) => {
+    try {
+      const { userId } = getUser(req);
+      const session = await analysisSessionStore.get(
+        req.params.analysisId,
+        userId,
+      );
+      if (!session) {
+        return res.status(404).json({
+          success: false,
+          error: "Sessão de análise não encontrada.",
+          contractVersion: ANALYSIS_SESSION_CONTRACT_VERSION,
+        });
+      }
+      return res.json({
+        success: true,
+        session,
+        contractVersion: ANALYSIS_SESSION_CONTRACT_VERSION,
+      });
+    } catch (error) {
+      console.error("ANALYSIS SESSION READ ERROR:", error);
+      return res.status(500).json({
+        success: false,
+        error: "Erro ao recuperar sessão de análise.",
+        detail: error.message,
+        contractVersion: ANALYSIS_SESSION_CONTRACT_VERSION,
+      });
+    }
+  },
+);
+
+// ============================================================================
 // ANALYZE
 // ============================================================================
 
@@ -7586,12 +7679,57 @@ app.post(
     res,
   ) => {
 
+    let activeAnalysisSession = null;
+    let activeAnalysisSessionUserId = null;
+
     try {
 
       const {
         userId,
         data,
       } = getUser(req);
+
+      activeAnalysisSessionUserId = userId;
+
+      const requestedAnalysisId =
+        String(req.body?.analysisId || "").trim();
+      const idempotencyKey =
+        String(req.body?.idempotencyKey || "").trim();
+
+      if (requestedAnalysisId) {
+        activeAnalysisSession =
+          await analysisSessionStore.get(requestedAnalysisId, userId);
+        if (!activeAnalysisSession) {
+          return res.status(404).json({
+            success: false,
+            error: "Sessão de análise não encontrada.",
+            contractVersion: ANALYSIS_SESSION_CONTRACT_VERSION,
+          });
+        }
+      } else if (idempotencyKey) {
+        const createdSession =
+          await analysisSessionStore.createOrReuse({
+            userId,
+            idempotencyKey,
+            metadata: {
+              analysisSource: req.body?.analysisSource || "ai_visual",
+              specimenType: req.body?.specimenType || null,
+              imageCount: Array.isArray(req.files) ? req.files.length : 0,
+            },
+          });
+        activeAnalysisSession = createdSession.session;
+      }
+
+      if (activeAnalysisSession) {
+        if (activeAnalysisSession.status === "COMPLETED") {
+          return res.json(activeAnalysisSession.result);
+        }
+        activeAnalysisSession =
+          await analysisSessionStore.markProcessing(
+            activeAnalysisSession.analysisId,
+            userId,
+          );
+      }
 
       const uploadedFiles =
         req.files || [];
@@ -9579,7 +9717,7 @@ console.log(
   ),
 );
 
-return res.json({
+const responsePayload = {
 
   success: true,
 
@@ -9607,8 +9745,26 @@ return res.json({
       data.totalUses,
 
     analysisSource,
+
+    analysisSession: activeAnalysisSession
+      ? {
+          analysisId: activeAnalysisSession.analysisId,
+          contractVersion: ANALYSIS_SESSION_CONTRACT_VERSION,
+        }
+      : null,
   },
-});
+};
+
+if (activeAnalysisSession) {
+  activeAnalysisSession =
+    await analysisSessionStore.markCompleted(
+      activeAnalysisSession.analysisId,
+      userId,
+      responsePayload,
+    );
+}
+
+return res.json(responsePayload);
 
     } catch (error) {
 
@@ -9616,6 +9772,22 @@ return res.json({
         "ANALYZE-SLIDE ERROR:",
         error,
       );
+
+      if (activeAnalysisSession && activeAnalysisSessionUserId) {
+        try {
+          await analysisSessionStore.markFailed(
+            activeAnalysisSession.analysisId,
+            activeAnalysisSessionUserId,
+            {
+              code: "ANALYZE_SLIDE_ERROR",
+              message: error.message,
+              statusCode: 500,
+            },
+          );
+        } catch (sessionError) {
+          console.error("ANALYSIS SESSION FAILURE PERSISTENCE ERROR:", sessionError);
+        }
+      }
 
       return res.status(500).json({
 
