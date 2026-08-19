@@ -393,6 +393,8 @@ import {
   CANONICAL_CLINICAL_PRESENTATION_GATE_INHERITANCE_VERSION,
   CANONICAL_CLINICAL_PRESENTATION_LAST_WRITER_VERSION,
   CANONICAL_CLINICAL_PRESENTATION_FOCAL_PROVENANCE_VERSION,
+  CANONICAL_CLINICAL_PRESENTATION_CONTRACT_SYNC_VERSION,
+  CANONICAL_CLINICAL_PRESENTATION_FOCAL_SCOPE_UI_LOCK_VERSION,
 } from "./ai/clinicalResultV2/canonicalClinicalPresentationAuthority.js";
 
 import {
@@ -7283,6 +7285,10 @@ app.get("/runtime-version", (_req, res) => {
       MARROW_FOCAL_BLASTOID_PROVENANCE_GLOBAL_PATTERN_VERSION,
     canonicalClinicalPresentationFocalProvenanceVersion:
       CANONICAL_CLINICAL_PRESENTATION_FOCAL_PROVENANCE_VERSION,
+    canonicalClinicalPresentationContractSynchronizationVersion:
+      CANONICAL_CLINICAL_PRESENTATION_CONTRACT_SYNC_VERSION,
+    canonicalClinicalPresentationFocalScopeUiLockVersion:
+      CANONICAL_CLINICAL_PRESENTATION_FOCAL_SCOPE_UI_LOCK_VERSION,
     marrowContextAwareNarrativeSanitizationVersion:
       MARROW_CONTEXT_AWARE_NARRATIVE_SANITIZATION_VERSION,
     marrowRepairEvidenceStateSemanticCanonicalizationVersion:

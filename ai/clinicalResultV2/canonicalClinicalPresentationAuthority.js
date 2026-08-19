@@ -1,6 +1,10 @@
-// BE/FE-FIX-005.50.9 — Focal Blastoid Clinical Presentation Consolidation
+// BE/FE-FIX-005.50.24 — Terminal Canonical Presentation Contract Synchronization
 export const CANONICAL_CLINICAL_PRESENTATION_BASE_VERSION = "BE/FE-FIX-005.50.8";
-export const CANONICAL_CLINICAL_PRESENTATION_AUTHORITY_VERSION = "BE/FE-FIX-005.50.9";
+export const CANONICAL_CLINICAL_PRESENTATION_AUTHORITY_VERSION = "BE/FE-FIX-005.50.24";
+export const CANONICAL_CLINICAL_PRESENTATION_CONTRACT_SYNC_VERSION =
+  "BE/FE-FIX-005.50.24";
+export const CANONICAL_CLINICAL_PRESENTATION_FOCAL_SCOPE_UI_LOCK_VERSION =
+  "BE/FE-FIX-005.50.24";
 
 export const CANONICAL_CLINICAL_PRESENTATION_GATE_INHERITANCE_VERSION =
   "BE-FIX-005.50.22";
@@ -348,6 +352,10 @@ export function buildCanonicalClinicalPresentation(result = {}) {
         CANONICAL_CLINICAL_PRESENTATION_LAST_WRITER_VERSION,
       focalProvenanceVersion:
         CANONICAL_CLINICAL_PRESENTATION_FOCAL_PROVENANCE_VERSION,
+      contractSynchronizationVersion:
+        CANONICAL_CLINICAL_PRESENTATION_CONTRACT_SYNC_VERSION,
+      focalScopeUiLockVersion:
+        CANONICAL_CLINICAL_PRESENTATION_FOCAL_SCOPE_UI_LOCK_VERSION,
       legacyFieldsRetainedForCompatibility: true,
     },
     provenance: {
@@ -367,6 +375,10 @@ export function buildCanonicalClinicalPresentation(result = {}) {
         CANONICAL_CLINICAL_PRESENTATION_LAST_WRITER_VERSION,
       focalProvenanceVersion:
         CANONICAL_CLINICAL_PRESENTATION_FOCAL_PROVENANCE_VERSION,
+      contractSynchronizationVersion:
+        CANONICAL_CLINICAL_PRESENTATION_CONTRACT_SYNC_VERSION,
+      focalScopeUiLockVersion:
+        CANONICAL_CLINICAL_PRESENTATION_FOCAL_SCOPE_UI_LOCK_VERSION,
     },
   };
 }
