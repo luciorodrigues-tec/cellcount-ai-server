@@ -6,6 +6,8 @@ export const CANONICAL_CLINICAL_PRESENTATION_GATE_INHERITANCE_VERSION =
   "BE-FIX-005.50.22";
 export const CANONICAL_CLINICAL_PRESENTATION_LAST_WRITER_VERSION =
   "BE-FIX-005.50.22";
+export const CANONICAL_CLINICAL_PRESENTATION_FOCAL_PROVENANCE_VERSION =
+  "BE-FIX-005.50.23";
 
 const text = (v) => (typeof v === "string" ? v.trim() : "");
 const arr = (v) => (Array.isArray(v) ? v : []);
@@ -52,6 +54,10 @@ function evidenceState(value) {
 }
 
 function readMarrowPresentationScope(result = {}) {
+  const provenance = obj(
+    result.marrowFocalBlastoidAuthorityProvenance ||
+    result.rawResponse?.marrowFocalBlastoidAuthorityProvenance,
+  );
   const terminal = obj(result.marrowFocalBlastoidTerminalAuthority);
   const lock = obj(result.marrowPositiveCellLevelBlastoidScopeLock);
   const governance = obj(result.evidenceGovernance);
@@ -62,6 +68,7 @@ function readMarrowPresentationScope(result = {}) {
   const directBlast = obj(result.blastAssessment);
 
   const marrowContext =
+    Object.keys(provenance).length > 0 ||
     Object.keys(terminal).length > 0 ||
     Object.keys(lock).length > 0 ||
     Object.keys(recovery).length > 0 ||
@@ -109,12 +116,14 @@ function readMarrowPresentationScope(result = {}) {
     !independentPopulationEvidence;
 
   const focal =
+    (provenance.locked === true && provenance.focalCellLevelPositive === true) ||
     terminal.active === true ||
     lock.active === true ||
     globalPattern.focalBlastoidScopeAuthority?.active === true ||
     trustedRecoveryFocal;
 
   const cellLevelPositive =
+    (provenance.locked === true && provenance.focalCellLevelPositive === true) ||
     terminal.cellLevelPositiveBlastoidCytology === true ||
     lock.cellLevelPositiveBlastoidCytology === true ||
     globalPattern.marrowPositiveBlastoidCytology === true ||
@@ -131,8 +140,10 @@ function readMarrowPresentationScope(result = {}) {
       blastPercentageInferenceAllowed: false,
       populationEvidenceEstablished: false,
       source:
-        terminal.active === true
-          ? "TERMINAL_AUTHORITY"
+        provenance.locked === true && provenance.focalCellLevelPositive === true
+          ? "BE-FIX-005.50.23_MONOTONIC_PROVENANCE"
+          : terminal.active === true
+            ? "TERMINAL_AUTHORITY"
           : lock.active === true
             ? "FOCAL_SCOPE_LOCK"
             : globalPattern.focalBlastoidScopeAuthority?.active === true
@@ -335,6 +346,8 @@ export function buildCanonicalClinicalPresentation(result = {}) {
         CANONICAL_CLINICAL_PRESENTATION_GATE_INHERITANCE_VERSION,
       lastWriterVersion:
         CANONICAL_CLINICAL_PRESENTATION_LAST_WRITER_VERSION,
+      focalProvenanceVersion:
+        CANONICAL_CLINICAL_PRESENTATION_FOCAL_PROVENANCE_VERSION,
       legacyFieldsRetainedForCompatibility: true,
     },
     provenance: {
@@ -352,6 +365,8 @@ export function buildCanonicalClinicalPresentation(result = {}) {
         CANONICAL_CLINICAL_PRESENTATION_GATE_INHERITANCE_VERSION,
       lastWriterVersion:
         CANONICAL_CLINICAL_PRESENTATION_LAST_WRITER_VERSION,
+      focalProvenanceVersion:
+        CANONICAL_CLINICAL_PRESENTATION_FOCAL_PROVENANCE_VERSION,
     },
   };
 }

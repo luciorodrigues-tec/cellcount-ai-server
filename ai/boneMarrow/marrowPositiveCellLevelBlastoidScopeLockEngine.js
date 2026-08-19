@@ -26,6 +26,8 @@ export const MARROW_BLAST_PERCENTAGE_SCOPE_LOCK_VERSION =
   "BE-FIX-005.50.19";
 export const MARROW_TERMINAL_FOCAL_BLASTOID_PRESENTATION_COHERENCE_VERSION =
   "BE-FIX-005.50.19";
+export const MARROW_FOCAL_BLASTOID_PROVENANCE_CONSUMPTION_VERSION =
+  "BE-FIX-005.50.23";
 
 function obj(value) {
   return value && typeof value === "object" && !Array.isArray(value)
@@ -41,12 +43,32 @@ function unique(values = []) {
   return [...new Set(values.filter(Boolean))];
 }
 
+function readProvenance(result = {}) {
+  return obj(
+    result?.marrowFocalBlastoidAuthorityProvenance ||
+    result?.rawResponse?.marrowFocalBlastoidAuthorityProvenance,
+  );
+}
+
 function readOriginState(result = {}) {
+  const provenance = readProvenance(result);
+  if (provenance.locked === true && provenance.focalCellLevelPositive === true) {
+    return "FOCAL_SUSPICION";
+  }
+  if (
+    provenance.independentPopulationEvidenceState === "OBSERVED_POPULATION" ||
+    provenance.independentPopulationEvidenceState === "SUSPICIOUS_POPULATION"
+  ) {
+    return provenance.independentPopulationEvidenceState;
+  }
+
   const candidates = [
     result?.marrowTrueAmlPositiveCytomorphologyRecovery?.priorEvidenceState,
+    result?.rawResponse?.marrowTrueAmlPositiveCytomorphologyRecovery?.priorEvidenceState,
     result?.rawResponse?.blastAssessment?.evidenceState,
     result?.blastAssessment?.evidenceState,
     result?.visualMorphologyEvidenceAcquisition?.acquiredDomains?.blastPopulationEvidenceState,
+    result?.rawResponse?.visualMorphologyEvidenceAcquisition?.acquiredDomains?.blastPopulationEvidenceState,
     result?.marrowPositiveCytologyConsistency?.priorEvidenceState,
   ].map(upper).filter(Boolean);
 
@@ -73,12 +95,17 @@ function preExistingSuspiciousPopulation(result = {}) {
 }
 
 function positiveCellLevelBlastoidCytology(result = {}) {
-  const recovery = obj(result.marrowTrueAmlPositiveCytomorphologyRecovery);
+  const provenance = readProvenance(result);
+  const recovery = obj(
+    result.marrowTrueAmlPositiveCytomorphologyRecovery ||
+    result.rawResponse?.marrowTrueAmlPositiveCytomorphologyRecovery,
+  );
   const governance = obj(result.evidenceGovernance);
   const blast = obj(result.blastAssessment);
   const rawBlast = obj(result.rawResponse?.blastAssessment);
 
   return (
+    (provenance.locked === true && provenance.focalCellLevelPositive === true) ||
     recovery.cellLevelPositiveCytology === true ||
     governance.cellLevelPositiveBlastoidCytology === true ||
     blast.cellLevelPositiveBlastoidCytology === true ||
@@ -129,6 +156,9 @@ export function evaluateMarrowPositiveCellLevelBlastoidScopeLock(result = {}) {
       MARROW_BLAST_PERCENTAGE_SCOPE_LOCK_VERSION,
     terminalPresentationCoherenceVersion:
       MARROW_TERMINAL_FOCAL_BLASTOID_PRESENTATION_COHERENCE_VERSION,
+    provenanceConsumptionVersion:
+      MARROW_FOCAL_BLASTOID_PROVENANCE_CONSUMPTION_VERSION,
+    provenanceLocked: readProvenance(result).locked === true,
     active,
     originEvidenceState: originState || null,
     cellLevelPositiveBlastoidCytology: cellLevelPositive,

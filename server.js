@@ -5,6 +5,7 @@
 
 import {
   enforceBoneMarrowOutputContract,
+  MARROW_CONTEXT_AWARE_NARRATIVE_SANITIZATION_VERSION,
 } from "./ai/boneMarrow/boneMarrowOutputContract.js";
 
 import {
@@ -166,6 +167,14 @@ import {
   MARROW_FOCAL_BLASTOID_MONOTONIC_SCOPE_VERSION,
   MARROW_FOCAL_BLASTOID_TERMINAL_PRESENTATION_POLICY_VERSION,
 } from "./ai/boneMarrow/marrowFocalBlastoidTerminalAuthorityEngine.js";
+
+import {
+  applyMarrowFocalBlastoidAuthorityProvenance,
+  MARROW_FOCAL_BLASTOID_AUTHORITY_PROVENANCE_VERSION,
+  MARROW_FOCAL_BLASTOID_PROVENANCE_MONOTONIC_LOCK_VERSION,
+  MARROW_LEGACY_POPULATION_REPROMOTION_ELIMINATION_VERSION,
+  MARROW_FOCAL_BLASTOID_PROVENANCE_RECOVERY_VERSION,
+} from "./ai/boneMarrow/marrowFocalBlastoidAuthorityProvenanceEngine.js";
 
 import {
   MARROW_POSITIVE_CYTOLOGY_CONSISTENCY_VERSION,
@@ -383,6 +392,7 @@ import {
   CANONICAL_CLINICAL_PRESENTATION_AUTHORITY_VERSION,
   CANONICAL_CLINICAL_PRESENTATION_GATE_INHERITANCE_VERSION,
   CANONICAL_CLINICAL_PRESENTATION_LAST_WRITER_VERSION,
+  CANONICAL_CLINICAL_PRESENTATION_FOCAL_PROVENANCE_VERSION,
 } from "./ai/clinicalResultV2/canonicalClinicalPresentationAuthority.js";
 
 import {
@@ -448,6 +458,7 @@ import analyzeGlobalPattern, {
   MARROW_FOCAL_BLASTOID_POPULATION_SEMANTIC_NON_PROMOTION_VERSION,
   MARROW_TERMINAL_CLINICAL_AUTHORITY_CONVERGENCE_VERSION,
   MARROW_TERMINAL_GLOBAL_PATTERN_RECOMPUTATION_VERSION,
+  MARROW_FOCAL_BLASTOID_PROVENANCE_GLOBAL_PATTERN_VERSION,
 } from './ai/globalPatternEngine.js';
 
 import {
@@ -4941,7 +4952,16 @@ BE-FIX-005.31 — COERÊNCIA NARRATIVA-ESTRUTURA E RECUPERAÇÃO FISIOLÓGICA:
         ),
       );
 
+      // BE-FIX-005.50.23 — capture a provenance-qualified focal authority
+      // before normalization or any legacy writer can drop the 005.50.18
+      // recovery container.
+      parsed = applyMarrowFocalBlastoidAuthorityProvenance(parsed);
       parsed = applyMarrowPositiveCellLevelBlastoidScopeLock(parsed);
+
+      console.log(
+        "BE-FIX-005.50.23 — FOCAL BLASTOID AUTHORITY PROVENANCE CAPTURE",
+        JSON.stringify(parsed.marrowFocalBlastoidAuthorityProvenance || {}, null, 2),
+      );
 
       // BE-FIX-005.35 — preserve unresolved positive cytology as an epistemic
       // middle state before 005.34 projection and before LME/precursor scoring.
@@ -5059,6 +5079,15 @@ BE-FIX-005.31 — COERÊNCIA NARRATIVA-ESTRUTURA E RECUPERAÇÃO FISIOLÓGICA:
     // VME provenance must survive legacy normalization.
     mergedAnalysis.visualMorphologyEvidenceAcquisition =
       parsed.visualMorphologyEvidenceAcquisition;
+
+    // BE-FIX-005.50.23 — legacy normalizeMedicalResponse intentionally
+    // rebuilds the payload and would otherwise drop marrow authority objects.
+    // Rehydrate the immutable focal provenance from rawResponse immediately.
+    if (analysisType === "bone_marrow") {
+      mergedAnalysis = applyMarrowFocalBlastoidAuthorityProvenance(
+        mergedAnalysis,
+      );
+    }
     mergedAnalysis.visualEvidenceAcquisitionIncomplete =
       parsed.visualMorphologyEvidenceAcquisition?.complete === false;
 
@@ -5192,6 +5221,8 @@ if (
         applyMarrowPositiveBlastEvidenceSemanticSupersession(
           mergedAnalysis,
         );
+      mergedAnalysis =
+        applyMarrowFocalBlastoidAuthorityProvenance(mergedAnalysis);
       mergedAnalysis =
         applyMarrowPositiveCellLevelBlastoidScopeLock(mergedAnalysis);
       mergedAnalysis =
@@ -7240,6 +7271,20 @@ app.get("/runtime-version", (_req, res) => {
       CANONICAL_CLINICAL_PRESENTATION_GATE_INHERITANCE_VERSION,
     canonicalClinicalPresentationLastWriterVersion:
       CANONICAL_CLINICAL_PRESENTATION_LAST_WRITER_VERSION,
+    marrowFocalBlastoidAuthorityProvenanceVersion:
+      MARROW_FOCAL_BLASTOID_AUTHORITY_PROVENANCE_VERSION,
+    marrowFocalBlastoidProvenanceMonotonicLockVersion:
+      MARROW_FOCAL_BLASTOID_PROVENANCE_MONOTONIC_LOCK_VERSION,
+    marrowLegacyPopulationRepromotionEliminationVersion:
+      MARROW_LEGACY_POPULATION_REPROMOTION_ELIMINATION_VERSION,
+    marrowFocalBlastoidProvenanceRecoveryVersion:
+      MARROW_FOCAL_BLASTOID_PROVENANCE_RECOVERY_VERSION,
+    marrowFocalBlastoidProvenanceGlobalPatternVersion:
+      MARROW_FOCAL_BLASTOID_PROVENANCE_GLOBAL_PATTERN_VERSION,
+    canonicalClinicalPresentationFocalProvenanceVersion:
+      CANONICAL_CLINICAL_PRESENTATION_FOCAL_PROVENANCE_VERSION,
+    marrowContextAwareNarrativeSanitizationVersion:
+      MARROW_CONTEXT_AWARE_NARRATIVE_SANITIZATION_VERSION,
     marrowRepairEvidenceStateSemanticCanonicalizationVersion:
       MARROW_REPAIR_EVIDENCE_STATE_SEMANTIC_CANONICALIZATION_VERSION,
     marrowUnresolvedImmaturitySemanticRecoveryVersion:
@@ -9281,6 +9326,8 @@ if (specimenGate.analysisType === "bone_marrow") {
   finalResult =
     applyMarrowUnresolvedImmaturityFinalStateCoherence(finalResult);
   finalResult =
+    applyMarrowFocalBlastoidAuthorityProvenance(finalResult);
+  finalResult =
     applyMarrowPositiveCellLevelBlastoidScopeLock(finalResult);
   finalResult =
     applyMarrowFocalBlastoidTerminalAuthority(finalResult);
@@ -9424,6 +9471,8 @@ if (specimenGate.analysisType === "bone_marrow") {
   finalResult =
     applyMarrowUnresolvedImmaturityFinalStateCoherence(finalResult);
   finalResult =
+    applyMarrowFocalBlastoidAuthorityProvenance(finalResult);
+  finalResult =
     applyMarrowPositiveCellLevelBlastoidScopeLock(finalResult);
   finalResult =
     applyMarrowFocalBlastoidTerminalAuthority(finalResult);
@@ -9434,6 +9483,8 @@ if (specimenGate.analysisType === "bone_marrow") {
   // Reapply terminal authority once after Global Pattern so the terminal scope
   // container and the recomputed pattern are guaranteed to describe the same
   // evidence state before presentation is projected.
+  finalResult =
+    applyMarrowFocalBlastoidAuthorityProvenance(finalResult);
   finalResult =
     applyMarrowPositiveCellLevelBlastoidScopeLock(finalResult);
   finalResult =
@@ -9458,6 +9509,10 @@ if (specimenGate.analysisType === "bone_marrow") {
       MARROW_TERMINAL_GLOBAL_PATTERN_RECOMPUTATION_VERSION,
     focalAuthorityActive:
       finalResult?.marrowFocalBlastoidTerminalAuthority?.active === true,
+    focalProvenanceLocked:
+      finalResult?.marrowFocalBlastoidAuthorityProvenance?.locked === true,
+    focalProvenanceSource:
+      finalResult?.marrowFocalBlastoidAuthorityProvenance?.source || null,
     focalScopeLockActive:
       finalResult?.marrowPositiveCellLevelBlastoidScopeLock?.active === true,
     globalPattern:

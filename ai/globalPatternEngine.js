@@ -21,6 +21,8 @@ export const MARROW_TERMINAL_CLINICAL_AUTHORITY_CONVERGENCE_VERSION =
   "BE-FIX-005.50.22";
 export const MARROW_TERMINAL_GLOBAL_PATTERN_RECOMPUTATION_VERSION =
   "BE-FIX-005.50.22";
+export const MARROW_FOCAL_BLASTOID_PROVENANCE_GLOBAL_PATTERN_VERSION =
+  "BE-FIX-005.50.23";
 
 
 function asObject(value) {
@@ -79,6 +81,25 @@ function hasIndependentQualifiedPopulationEvidence(result = {}) {
 }
 
 function readFocalBlastoidScopeAuthority(result = {}) {
+  const provenance = asObject(
+    result?.marrowFocalBlastoidAuthorityProvenance ||
+    result?.rawResponse?.marrowFocalBlastoidAuthorityProvenance,
+  );
+  if (provenance.locked === true && provenance.focalCellLevelPositive === true) {
+    return {
+      active: true,
+      cellLevelPositiveBlastoidCytology: true,
+      populationInferenceAllowed: false,
+      populationPositiveAllowed: false,
+      blastPercentageInferenceAllowed: false,
+      effectiveEvidenceState: "FOCAL_SUSPICION",
+      source: "BE-FIX-005.50.23_MONOTONIC_PROVENANCE",
+      version: MARROW_FOCAL_BLASTOID_PROVENANCE_GLOBAL_PATTERN_VERSION,
+      convergenceVersion:
+        MARROW_TERMINAL_CLINICAL_AUTHORITY_CONVERGENCE_VERSION,
+    };
+  }
+
   const terminal = asObject(result?.marrowFocalBlastoidTerminalAuthority);
   if (terminal.active === true) {
     return {
@@ -366,6 +387,8 @@ export function analyzeGlobalPattern(result = {}) {
       MARROW_TERMINAL_CLINICAL_AUTHORITY_CONVERGENCE_VERSION,
     marrowTerminalGlobalPatternRecomputationVersion:
       MARROW_TERMINAL_GLOBAL_PATTERN_RECOMPUTATION_VERSION,
+    marrowFocalBlastoidProvenanceGlobalPatternVersion:
+      MARROW_FOCAL_BLASTOID_PROVENANCE_GLOBAL_PATTERN_VERSION,
     physiologicPrecursorPattern,
     pathologicMyeloidExpansionPattern,
     marrowPositiveBlastEvidenceSemanticSupersession:

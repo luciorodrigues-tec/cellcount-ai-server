@@ -3,6 +3,7 @@ export const MARROW_BLAST_POPULATION_CONTRACT_VERSION = "BE-FIX-005.24";
 export const MARROW_PRECURSOR_DISCRIMINATION_CONTRACT_VERSION = "BE-FIX-005.27";
 export const MARROW_DUAL_AXIS_BLAST_SCORING_CONTRACT_VERSION = "BE-FIX-005.27.2";
 export const MARROW_BLAST_EVIDENCE_RECONCILIATION_CONTRACT_VERSION = "BE-FIX-005.28";
+export const MARROW_CONTEXT_AWARE_NARRATIVE_SANITIZATION_VERSION = "BE-FIX-005.50.23";
 
 export const MarrowObservationStatus = Object.freeze({
   present: "present",
@@ -258,10 +259,32 @@ function sanitizeMarrowLanguage(value) {
       return current;
     }
 
-    let text = current;
+    // BE-FIX-005.50.23 — preserve meta-language that explicitly says a
+    // focal finding must NOT be converted into a negative blast conclusion.
+    // The previous global replacement corrupted phrases such as
+    // "não converter para ausência de blastos" by injecting a full limitation
+    // sentence inside the original sentence.
+    const protectedPhrases = [];
+    const protect = (match) => {
+      const token = `__CC_MARROW_PROTECTED_${protectedPhrases.length}__`;
+      protectedPhrases.push(match);
+      return token;
+    };
+
+    let text = current
+      .replace(/não converter para ausência de blastos/gi, protect)
+      .replace(/nao converter para ausencia de blastos/gi, protect)
+      .replace(/não converter para sem blastos/gi, protect)
+      .replace(/nao converter para sem blastos/gi, protect);
+
     for (const pattern of forbidden) {
       text = text.replace(pattern, replacement);
     }
+
+    protectedPhrases.forEach((phrase, index) => {
+      text = text.replace(`__CC_MARROW_PROTECTED_${index}__`, phrase);
+    });
+
     return text;
   };
 
