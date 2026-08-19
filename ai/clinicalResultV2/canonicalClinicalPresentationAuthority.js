@@ -2,6 +2,11 @@
 export const CANONICAL_CLINICAL_PRESENTATION_BASE_VERSION = "BE/FE-FIX-005.50.8";
 export const CANONICAL_CLINICAL_PRESENTATION_AUTHORITY_VERSION = "BE/FE-FIX-005.50.9";
 
+export const CANONICAL_CLINICAL_PRESENTATION_GATE_INHERITANCE_VERSION =
+  "BE-FIX-005.50.22";
+export const CANONICAL_CLINICAL_PRESENTATION_LAST_WRITER_VERSION =
+  "BE-FIX-005.50.22";
+
 const text = (v) => (typeof v === "string" ? v.trim() : "");
 const arr = (v) => (Array.isArray(v) ? v : []);
 const obj = (v) => (v && typeof v === "object" && !Array.isArray(v) ? v : {});
@@ -31,6 +36,156 @@ function firstUnique(candidates, used = []) {
 }
 function blastState(v2) { return text(v2?.criticalFindings?.blastLike?.state).toUpperCase(); }
 
+function boolOrNull(value) {
+  return typeof value === "boolean" ? value : null;
+}
+
+function firstBoolean(values = []) {
+  for (const value of values) {
+    if (typeof value === "boolean") return value;
+  }
+  return null;
+}
+
+function evidenceState(value) {
+  return text(value).toUpperCase();
+}
+
+function readMarrowPresentationScope(result = {}) {
+  const terminal = obj(result.marrowFocalBlastoidTerminalAuthority);
+  const lock = obj(result.marrowPositiveCellLevelBlastoidScopeLock);
+  const governance = obj(result.evidenceGovernance);
+  const globalPattern = obj(result.globalPattern);
+  const recovery = obj(result.marrowTrueAmlPositiveCytomorphologyRecovery);
+  const population = obj(result.marrowBlastPopulationEvidence);
+  const rawBlast = obj(result.rawResponse?.blastAssessment);
+  const directBlast = obj(result.blastAssessment);
+
+  const marrowContext =
+    Object.keys(terminal).length > 0 ||
+    Object.keys(lock).length > 0 ||
+    Object.keys(recovery).length > 0 ||
+    Object.keys(population).length > 0 ||
+    result.specimenType === "BONE_MARROW_ASPIRATE" ||
+    result.specimenType === "BONE_MARROW_BIOPSY" ||
+    result.specimenType === "HEMODILUTED_BONE_MARROW";
+
+  if (!marrowContext) {
+    return {
+      marrowContext: false,
+      focal: false,
+      cellLevelPositive: false,
+      populationInferenceAllowed: null,
+      populationPositiveAllowed: null,
+      blastPercentageInferenceAllowed: null,
+      populationEvidenceEstablished: false,
+      source: null,
+    };
+  }
+
+  const rawState = evidenceState(rawBlast.evidenceState);
+  const directState = evidenceState(directBlast.evidenceState);
+  const projectedState = evidenceState(population.evidenceState);
+
+  const independentPopulationEvidence =
+    rawState === "OBSERVED_POPULATION" ||
+    rawState === "SUSPICIOUS_POPULATION" ||
+    directState === "OBSERVED_POPULATION" ||
+    directState === "SUSPICIOUS_POPULATION" ||
+    population.observedPopulation === true ||
+    (
+      projectedState === "SUSPICIOUS_POPULATION" &&
+      population.suspiciousPopulation === true
+    );
+
+  const trustedRecoveryFocal =
+    recovery.active === true &&
+    recovery.directCellLevelPositive === true &&
+    recovery.cellLevelPositiveCytology === true &&
+    evidenceState(recovery.recoveredEvidenceState) === "FOCAL_SUSPICION" &&
+    recovery.preExistingArchitectureQualified !== true &&
+    recovery.populationPositiveFabricated === false &&
+    recovery.populationPromotionAllowedByThisEngine === false &&
+    !independentPopulationEvidence;
+
+  const focal =
+    terminal.active === true ||
+    lock.active === true ||
+    globalPattern.focalBlastoidScopeAuthority?.active === true ||
+    trustedRecoveryFocal;
+
+  const cellLevelPositive =
+    terminal.cellLevelPositiveBlastoidCytology === true ||
+    lock.cellLevelPositiveBlastoidCytology === true ||
+    globalPattern.marrowPositiveBlastoidCytology === true ||
+    recovery.cellLevelPositiveCytology === true ||
+    result.findings?.cellLevelPositiveBlastoidCytology === true;
+
+  if (focal) {
+    return {
+      marrowContext: true,
+      focal: true,
+      cellLevelPositive: true,
+      populationInferenceAllowed: false,
+      populationPositiveAllowed: false,
+      blastPercentageInferenceAllowed: false,
+      populationEvidenceEstablished: false,
+      source:
+        terminal.active === true
+          ? "TERMINAL_AUTHORITY"
+          : lock.active === true
+            ? "FOCAL_SCOPE_LOCK"
+            : globalPattern.focalBlastoidScopeAuthority?.active === true
+              ? "GLOBAL_PATTERN_SCOPE_AUTHORITY"
+              : "TRUSTED_005_50_18_CELL_LEVEL_RECOVERY",
+    };
+  }
+
+  if (independentPopulationEvidence) {
+    return {
+      marrowContext: true,
+      focal: false,
+      cellLevelPositive,
+      populationInferenceAllowed:
+        firstBoolean([
+          terminal.populationInferenceAllowed,
+          lock.populationInferenceAllowed,
+          globalPattern.populationInferenceAllowed,
+          governance.populationInferenceAllowed,
+        ]) ?? true,
+      populationPositiveAllowed:
+        firstBoolean([
+          terminal.populationPositiveAllowed,
+          lock.populationPositiveAllowed,
+          globalPattern.populationPositiveAllowed,
+          governance.populationPositiveAllowed,
+        ]) ?? true,
+      blastPercentageInferenceAllowed:
+        firstBoolean([
+          terminal.blastPercentageInferenceAllowed,
+          lock.blastPercentageInferenceAllowed,
+          globalPattern.blastPercentageInferenceAllowed,
+          governance.blastPercentageInferenceAllowed,
+        ]) ?? true,
+      populationEvidenceEstablished: true,
+      source: "INDEPENDENT_QUALIFIED_POPULATION_EVIDENCE",
+    };
+  }
+
+  // Absence of focality is NOT evidence that population inference is allowed.
+  // For marrow, permissions must be earned by qualified population evidence.
+  return {
+    marrowContext: true,
+    focal: false,
+    cellLevelPositive,
+    populationInferenceAllowed: false,
+    populationPositiveAllowed: false,
+    blastPercentageInferenceAllowed: false,
+    populationEvidenceEstablished: false,
+    source: "NO_QUALIFIED_POPULATION_AUTHORITY",
+  };
+}
+
 export function buildCanonicalClinicalPresentation(result = {}) {
   const v2 = obj(result.clinicalResultV2);
   const presentation = obj(v2.presentation);
@@ -41,12 +196,12 @@ export function buildCanonicalClinicalPresentation(result = {}) {
   const focalCardinality = obj(result.peripheralFocalBlastoidCardinalityAuthority);
   const marrowFocalScopeLock = obj(result.marrowPositiveCellLevelBlastoidScopeLock);
   const marrowTerminalFocalAuthority = obj(result.marrowFocalBlastoidTerminalAuthority);
+  const marrowPresentationScope = readMarrowPresentationScope(result);
   const focalBlastoidOnly =
-    marrowTerminalFocalAuthority.active === true ||
+    marrowPresentationScope.focal === true ||
     (focalCardinality.active === true &&
       focalCardinality.focalOnly === true &&
-      focalCardinality.populationEvidenceEstablished !== true) ||
-    marrowFocalScopeLock.active === true;
+      focalCardinality.populationEvidenceEstablished !== true);
   const polychromasia = v2.lineages?.erythrocytes?.positiveMorphology?.polychromasia === true;
   const limited = v2.scope?.limitedField === true || result.fieldAdequacy?.limitedField === true;
 
@@ -148,12 +303,38 @@ export function buildCanonicalClinicalPresentation(result = {}) {
       singleLimitation: true,
       singleRecommendation: true,
       findingSeverityIndependentFromGlobalCriticality: true,
-      focalBlastoidFindingDoesNotEstablishPopulation: focalBlastoidOnly,
-      blastPercentageInferenceAllowed: focalBlastoidOnly ? false : true,
-      populationInferenceAllowed: focalBlastoidOnly ? false : true,
-      populationPositiveAllowed: focalBlastoidOnly ? false : true,
+      focalBlastoidFindingDoesNotEstablishPopulation:
+        marrowPresentationScope.marrowContext
+          ? marrowPresentationScope.focal
+          : focalBlastoidOnly,
+      blastPercentageInferenceAllowed:
+        marrowPresentationScope.marrowContext
+          ? marrowPresentationScope.blastPercentageInferenceAllowed
+          : (focalBlastoidOnly ? false : true),
+      populationInferenceAllowed:
+        marrowPresentationScope.marrowContext
+          ? marrowPresentationScope.populationInferenceAllowed
+          : (focalBlastoidOnly ? false : true),
+      populationPositiveAllowed:
+        marrowPresentationScope.marrowContext
+          ? marrowPresentationScope.populationPositiveAllowed
+          : (focalBlastoidOnly ? false : true),
       cellLevelPositiveBlastoidCytology:
-        marrowFocalScopeLock.active === true || undefined,
+        marrowPresentationScope.marrowContext
+          ? (marrowPresentationScope.cellLevelPositive || undefined)
+          : (marrowFocalScopeLock.active === true || undefined),
+      populationEvidenceEstablished:
+        marrowPresentationScope.marrowContext
+          ? marrowPresentationScope.populationEvidenceEstablished
+          : undefined,
+      marrowScopeAuthoritySource:
+        marrowPresentationScope.marrowContext
+          ? marrowPresentationScope.source
+          : undefined,
+      gateInheritanceVersion:
+        CANONICAL_CLINICAL_PRESENTATION_GATE_INHERITANCE_VERSION,
+      lastWriterVersion:
+        CANONICAL_CLINICAL_PRESENTATION_LAST_WRITER_VERSION,
       legacyFieldsRetainedForCompatibility: true,
     },
     provenance: {
@@ -167,6 +348,10 @@ export function buildCanonicalClinicalPresentation(result = {}) {
         marrowFocalScopeLock.version || null,
       marrowFocalBlastoidTerminalAuthorityVersion:
         marrowTerminalFocalAuthority.version || null,
+      gateInheritanceVersion:
+        CANONICAL_CLINICAL_PRESENTATION_GATE_INHERITANCE_VERSION,
+      lastWriterVersion:
+        CANONICAL_CLINICAL_PRESENTATION_LAST_WRITER_VERSION,
     },
   };
 }

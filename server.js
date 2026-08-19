@@ -381,6 +381,8 @@ import {
 import {
   applyCanonicalClinicalPresentationAuthority,
   CANONICAL_CLINICAL_PRESENTATION_AUTHORITY_VERSION,
+  CANONICAL_CLINICAL_PRESENTATION_GATE_INHERITANCE_VERSION,
+  CANONICAL_CLINICAL_PRESENTATION_LAST_WRITER_VERSION,
 } from "./ai/clinicalResultV2/canonicalClinicalPresentationAuthority.js";
 
 import {
@@ -444,6 +446,8 @@ import analyzeGlobalPattern, {
   MARROW_FOCAL_BLASTOID_SCOPE_GLOBAL_PATTERN_PROPAGATION_VERSION,
   MARROW_FOCAL_BLASTOID_GLOBAL_PATTERN_SEMANTIC_COHERENCE_VERSION,
   MARROW_FOCAL_BLASTOID_POPULATION_SEMANTIC_NON_PROMOTION_VERSION,
+  MARROW_TERMINAL_CLINICAL_AUTHORITY_CONVERGENCE_VERSION,
+  MARROW_TERMINAL_GLOBAL_PATTERN_RECOMPUTATION_VERSION,
 } from './ai/globalPatternEngine.js';
 
 import {
@@ -7228,6 +7232,14 @@ app.get("/runtime-version", (_req, res) => {
       MARROW_FOCAL_BLASTOID_MONOTONIC_SCOPE_VERSION,
     marrowFocalBlastoidTerminalPresentationPolicyVersion:
       MARROW_FOCAL_BLASTOID_TERMINAL_PRESENTATION_POLICY_VERSION,
+    marrowTerminalClinicalAuthorityConvergenceVersion:
+      MARROW_TERMINAL_CLINICAL_AUTHORITY_CONVERGENCE_VERSION,
+    marrowTerminalGlobalPatternRecomputationVersion:
+      MARROW_TERMINAL_GLOBAL_PATTERN_RECOMPUTATION_VERSION,
+    canonicalClinicalPresentationGateInheritanceVersion:
+      CANONICAL_CLINICAL_PRESENTATION_GATE_INHERITANCE_VERSION,
+    canonicalClinicalPresentationLastWriterVersion:
+      CANONICAL_CLINICAL_PRESENTATION_LAST_WRITER_VERSION,
     marrowRepairEvidenceStateSemanticCanonicalizationVersion:
       MARROW_REPAIR_EVIDENCE_STATE_SEMANTIC_CANONICALIZATION_VERSION,
     marrowUnresolvedImmaturitySemanticRecoveryVersion:
@@ -9400,22 +9412,14 @@ if (specimenGate.analysisType === "bone_marrow") {
 }
 
 // ============================================================================
-// BE/FE-FIX-005.50.9 — CANONICAL CLINICAL PRESENTATION / FOCAL CARDINALITY LOCK
-// Presentation-only projection. It must not rewrite morphology, evidence,
-// maturation state, negative-finding authority or clinical criticality.
+// BE-FIX-005.50.22 — TERMINAL CLINICAL AUTHORITY CONVERGENCE
+//
+// All marrow state writers converge BEFORE canonical presentation.
+// The global pattern is recomputed from the converged terminal state.
+// Canonical presentation is then the final user-facing writer and inherits
+// explicit scope permissions; it may never manufacture permission=true from
+// the mere absence of focality.
 // ============================================================================
-if (specimenGate.analysisType === "bone_marrow") {
-  finalResult = applyMarrowFocalBlastoidTerminalAuthority(finalResult);
-}
-finalResult =
-  applyCanonicalClinicalPresentationAuthority(
-    finalResult,
-  );
-
-// BE-FIX-005.50.17 — presentation is the last user-facing writer. Reapply the
-// unresolved-immaturity lock after 005.50.9 so no canonical presentation can
-// re-enable blast percentage inference, emit a reassuring normal pattern, or
-// expose internal BE-FIX labels in clinical prose.
 if (specimenGate.analysisType === "bone_marrow") {
   finalResult =
     applyMarrowUnresolvedImmaturityFinalStateCoherence(finalResult);
@@ -9423,10 +9427,67 @@ if (specimenGate.analysisType === "bone_marrow") {
     applyMarrowPositiveCellLevelBlastoidScopeLock(finalResult);
   finalResult =
     applyMarrowFocalBlastoidTerminalAuthority(finalResult);
+
+  finalResult.globalPattern =
+    analyzeGlobalPattern(finalResult);
+
+  // Reapply terminal authority once after Global Pattern so the terminal scope
+  // container and the recomputed pattern are guaranteed to describe the same
+  // evidence state before presentation is projected.
+  finalResult =
+    applyMarrowPositiveCellLevelBlastoidScopeLock(finalResult);
+  finalResult =
+    applyMarrowFocalBlastoidTerminalAuthority(finalResult);
+
+  // Recompute once more only if a scope lock became active during terminal
+  // reapplication. This prevents a stale MARROW_POSITIVE_* pattern from
+  // surviving beside an active focal authority.
+  if (
+    finalResult?.marrowFocalBlastoidTerminalAuthority?.active === true ||
+    finalResult?.marrowPositiveCellLevelBlastoidScopeLock?.active === true ||
+    finalResult?.marrowTrueAmlPositiveCytomorphologyRecovery
+      ?.cellLevelPositiveCytology === true
+  ) {
+    finalResult.globalPattern =
+      analyzeGlobalPattern(finalResult);
+  }
+
+  finalResult.marrowTerminalClinicalAuthorityConvergence = {
+    version: MARROW_TERMINAL_CLINICAL_AUTHORITY_CONVERGENCE_VERSION,
+    globalPatternRecomputationVersion:
+      MARROW_TERMINAL_GLOBAL_PATTERN_RECOMPUTATION_VERSION,
+    focalAuthorityActive:
+      finalResult?.marrowFocalBlastoidTerminalAuthority?.active === true,
+    focalScopeLockActive:
+      finalResult?.marrowPositiveCellLevelBlastoidScopeLock?.active === true,
+    globalPattern:
+      finalResult?.globalPattern?.dominantPattern || null,
+    populationInferenceAllowed:
+      finalResult?.globalPattern?.populationInferenceAllowed ?? null,
+    populationPositiveAllowed:
+      finalResult?.globalPattern?.populationPositiveAllowed ?? null,
+    blastPercentageInferenceAllowed:
+      finalResult?.globalPattern?.blastPercentageInferenceAllowed ?? null,
+  };
 }
 
+// BE-FIX-005.50.22 — canonical presentation MUST be the last clinical writer.
+finalResult =
+  applyCanonicalClinicalPresentationAuthority(
+    finalResult,
+  );
+
 console.log(
-  "BE-FIX-005.50.9 — CANONICAL CLINICAL PRESENTATION",
+  "BE-FIX-005.50.22 — TERMINAL CLINICAL AUTHORITY CONVERGENCE",
+  JSON.stringify(
+    finalResult.marrowTerminalClinicalAuthorityConvergence || {},
+    null,
+    2,
+  ),
+);
+
+console.log(
+  "BE-FIX-005.50.9 / 005.50.22 — CANONICAL CLINICAL PRESENTATION LAST WRITER",
   JSON.stringify(finalResult.clinicalPresentation || {}, null, 2),
 );
 

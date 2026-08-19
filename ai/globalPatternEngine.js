@@ -17,9 +17,65 @@ export const MARROW_FOCAL_BLASTOID_GLOBAL_PATTERN_SEMANTIC_COHERENCE_VERSION =
 export const MARROW_FOCAL_BLASTOID_POPULATION_SEMANTIC_NON_PROMOTION_VERSION =
   "BE-FIX-005.50.20";
 
+export const MARROW_TERMINAL_CLINICAL_AUTHORITY_CONVERGENCE_VERSION =
+  "BE-FIX-005.50.22";
+export const MARROW_TERMINAL_GLOBAL_PATTERN_RECOMPUTATION_VERSION =
+  "BE-FIX-005.50.22";
+
 
 function asObject(value) {
   return value && typeof value === "object" && !Array.isArray(value) ? value : {};
+}
+
+function normalizeEvidenceState(value) {
+  return String(value || "").trim().toUpperCase();
+}
+
+function hasIndependentQualifiedPopulationEvidence(result = {}) {
+  const rawBlast = asObject(result?.rawResponse?.blastAssessment);
+  const directBlast = asObject(result?.blastAssessment);
+  const lmeBlast = asObject(
+    result?.localMorphologyEvidence?.marrow?.blastPopulationEvidence,
+  );
+  const projected = asObject(result?.marrowBlastPopulationEvidence);
+
+  const states = [
+    rawBlast.evidenceState,
+    directBlast.evidenceState,
+    lmeBlast.evidenceState,
+  ].map(normalizeEvidenceState);
+
+  if (
+    states.includes("OBSERVED_POPULATION") ||
+    states.includes("SUSPICIOUS_POPULATION")
+  ) {
+    return true;
+  }
+
+  // Projected population booleans alone are not enough when a trusted
+  // 005.50.18 focal cell-level authority explicitly says that architecture
+  // was not established. This is the late-writer re-promotion case.
+  const recovery = asObject(
+    result?.marrowTrueAmlPositiveCytomorphologyRecovery,
+  );
+  const focalRecovery =
+    recovery.active === true &&
+    recovery.cellLevelPositiveCytology === true &&
+    normalizeEvidenceState(recovery.recoveredEvidenceState) ===
+      "FOCAL_SUSPICION" &&
+    recovery.preExistingArchitectureQualified !== true &&
+    recovery.populationPromotionAllowedByThisEngine === false;
+
+  if (focalRecovery) return false;
+
+  return (
+    projected.observedPopulation === true ||
+    (
+      projected.suspiciousPopulation === true &&
+      normalizeEvidenceState(projected.evidenceState) ===
+        "SUSPICIOUS_POPULATION"
+    )
+  );
 }
 
 function readFocalBlastoidScopeAuthority(result = {}) {
@@ -32,13 +88,16 @@ function readFocalBlastoidScopeAuthority(result = {}) {
       populationPositiveAllowed: false,
       blastPercentageInferenceAllowed: false,
       effectiveEvidenceState: "FOCAL_SUSPICION",
+      source: "BE-FIX-005.50.21_TERMINAL_AUTHORITY",
       version: terminal.version || "BE-FIX-005.50.21",
+      convergenceVersion:
+        MARROW_TERMINAL_CLINICAL_AUTHORITY_CONVERGENCE_VERSION,
     };
   }
 
   const lock = asObject(result?.marrowPositiveCellLevelBlastoidScopeLock);
   const governance = asObject(result?.evidenceGovernance);
-  const active =
+  const lockActive =
     lock.active === true &&
     lock.cellLevelPositiveBlastoidCytology === true &&
     (
@@ -48,14 +107,69 @@ function readFocalBlastoidScopeAuthority(result = {}) {
       governance.populationPositiveAllowed === false
     );
 
+  if (lockActive) {
+    return {
+      active: true,
+      cellLevelPositiveBlastoidCytology: true,
+      populationInferenceAllowed: false,
+      populationPositiveAllowed: false,
+      blastPercentageInferenceAllowed: false,
+      effectiveEvidenceState: "FOCAL_SUSPICION",
+      source: "BE-FIX-005.50.19_SCOPE_LOCK",
+      version:
+        lock.version ||
+        MARROW_FOCAL_BLASTOID_SCOPE_GLOBAL_PATTERN_PROPAGATION_VERSION,
+      convergenceVersion:
+        MARROW_TERMINAL_CLINICAL_AUTHORITY_CONVERGENCE_VERSION,
+    };
+  }
+
+  // BE-FIX-005.50.22 — terminal convergence recovery.
+  // 005.50.18 is an upstream cell-level acquisition authority. If it explicitly
+  // preserved positive blastoid cytology as FOCAL_SUSPICION and explicitly
+  // denied population promotion, later rebuilt containers are not allowed to
+  // erase that scope. This fallback is disabled when an independent qualified
+  // population state exists.
+  const recovery = asObject(
+    result?.marrowTrueAmlPositiveCytomorphologyRecovery,
+  );
+  const trustedFocalRecovery =
+    recovery.active === true &&
+    recovery.cellLevelPositiveCytology === true &&
+    recovery.directCellLevelPositive === true &&
+    normalizeEvidenceState(recovery.recoveredEvidenceState) ===
+      "FOCAL_SUSPICION" &&
+    recovery.preExistingArchitectureQualified !== true &&
+    recovery.populationPositiveFabricated === false &&
+    recovery.populationPromotionAllowedByThisEngine === false &&
+    !hasIndependentQualifiedPopulationEvidence(result);
+
+  if (trustedFocalRecovery) {
+    return {
+      active: true,
+      cellLevelPositiveBlastoidCytology: true,
+      populationInferenceAllowed: false,
+      populationPositiveAllowed: false,
+      blastPercentageInferenceAllowed: false,
+      effectiveEvidenceState: "FOCAL_SUSPICION",
+      source: "BE-FIX-005.50.18_TRUSTED_CELL_LEVEL_RECOVERY",
+      version: MARROW_TERMINAL_CLINICAL_AUTHORITY_CONVERGENCE_VERSION,
+      convergenceVersion:
+        MARROW_TERMINAL_CLINICAL_AUTHORITY_CONVERGENCE_VERSION,
+    };
+  }
+
   return {
-    active,
-    cellLevelPositiveBlastoidCytology: active,
-    populationInferenceAllowed: active ? false : null,
-    populationPositiveAllowed: active ? false : null,
-    blastPercentageInferenceAllowed: active ? false : null,
-    effectiveEvidenceState: active ? "FOCAL_SUSPICION" : null,
+    active: false,
+    cellLevelPositiveBlastoidCytology: false,
+    populationInferenceAllowed: null,
+    populationPositiveAllowed: null,
+    blastPercentageInferenceAllowed: null,
+    effectiveEvidenceState: null,
+    source: null,
     version: MARROW_FOCAL_BLASTOID_SCOPE_GLOBAL_PATTERN_PROPAGATION_VERSION,
+    convergenceVersion:
+      MARROW_TERMINAL_CLINICAL_AUTHORITY_CONVERGENCE_VERSION,
   };
 }
 
@@ -248,6 +362,10 @@ export function analyzeGlobalPattern(result = {}) {
       MARROW_FOCAL_BLASTOID_GLOBAL_PATTERN_SEMANTIC_COHERENCE_VERSION,
     marrowFocalBlastoidPopulationSemanticNonPromotionVersion:
       MARROW_FOCAL_BLASTOID_POPULATION_SEMANTIC_NON_PROMOTION_VERSION,
+    marrowTerminalClinicalAuthorityConvergenceVersion:
+      MARROW_TERMINAL_CLINICAL_AUTHORITY_CONVERGENCE_VERSION,
+    marrowTerminalGlobalPatternRecomputationVersion:
+      MARROW_TERMINAL_GLOBAL_PATTERN_RECOMPUTATION_VERSION,
     physiologicPrecursorPattern,
     pathologicMyeloidExpansionPattern,
     marrowPositiveBlastEvidenceSemanticSupersession:
