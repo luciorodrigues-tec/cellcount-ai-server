@@ -355,6 +355,32 @@ export class AnalysisSessionStore {
     });
   }
 
+  async renewExecutionLease(analysisId, userId, leaseToken, { leaseTtlMs = this.leaseTtlMs } = {}) {
+    const normalizedId = safeKey(analysisId);
+    if (!normalizedId) throw new Error('analysisId is required');
+    return this.#withLock(`analysis-${normalizedId}`, async () => {
+      const session = await this.#readOwned(normalizedId, userId);
+      if (!session) throw new Error('analysis session not found');
+      if (session.status !== ANALYSIS_SESSION_STATES.processing) {
+        const error = new Error('analysis execution lease is not active');
+        error.code = 'ANALYSIS_SESSION_LEASE_LOST';
+        throw error;
+      }
+      this.#assertLease(session, leaseToken);
+      const expiresAtMs = isoMs(session.leaseExpiresAt);
+      if (expiresAtMs == null || expiresAtMs <= Date.now()) {
+        const error = new Error('analysis execution lease expired');
+        error.code = 'ANALYSIS_SESSION_LEASE_LOST';
+        throw error;
+      }
+      const nowMs = Date.now();
+      session.updatedAt = toIso(nowMs);
+      session.leaseExpiresAt = toIso(nowMs + positiveInt(leaseTtlMs, this.leaseTtlMs));
+      await this.#write(session);
+      return clone(session);
+    });
+  }
+
   async prepareRetry(analysisId, userId) {
     const normalizedId = safeKey(analysisId);
     if (!normalizedId) {

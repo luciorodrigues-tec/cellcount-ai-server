@@ -281,6 +281,31 @@ import {
 } from "./services/analysisSessionStoreFactory.js";
 
 import {
+  CLINICAL_ANALYSIS_EXECUTION_BOUNDARY_VERSION,
+  createClinicalAnalysisExecutionBoundary,
+} from "./services/clinicalAnalysisExecutionBoundary.js";
+
+import {
+  INF_SCALE_001_2B_VERSION,
+} from "./services/postgresAnalysisJobQueue.js";
+
+import {
+  ANALYSIS_EXECUTION_MODES,
+  createAnalysisJobQueue,
+  resolveAnalysisJobQueueConfig,
+} from "./services/analysisJobQueueFactory.js";
+
+import {
+  encodeAnalysisJobPayload,
+} from "./services/analysisJobPayloadCodec.js";
+
+import {
+  INF_SCALE_001_2C_VERSION,
+  createAnalysisWorkerPool,
+  resolveAnalysisWorkerPoolConfig,
+} from "./services/analysisWorkerPool.js";
+
+import {
   bootstrapRuntime,
 } from "./bootstrap/runtimeBootstrap.js";
 
@@ -524,6 +549,12 @@ const {
 const analysisSessionStore =
   createAnalysisSessionStore();
 
+const analysisJobQueueConfig =
+  resolveAnalysisJobQueueConfig();
+
+const analysisJobQueue =
+  createAnalysisJobQueue();
+
 // ============================================================================
 // OPENAI
 // ============================================================================
@@ -531,6 +562,28 @@ const analysisSessionStore =
 const openai = new OpenAI({
   apiKey: openAIApiKey,
 });
+
+const clinicalAnalysisExecutionBoundary =
+  createClinicalAnalysisExecutionBoundary({
+    executor: analyzeWithOpenAI,
+  });
+
+const analysisWorkerPoolConfig =
+  resolveAnalysisWorkerPoolConfig();
+
+const analysisWorkerPool =
+  analysisJobQueueConfig.executionMode === ANALYSIS_EXECUTION_MODES.queued && analysisJobQueue
+    ? createAnalysisWorkerPool({
+        queue: analysisJobQueue,
+        sessionStore: analysisSessionStore,
+        executionBoundary: clinicalAnalysisExecutionBoundary,
+        config: analysisWorkerPoolConfig,
+      })
+    : null;
+
+if (analysisWorkerPool) {
+  analysisWorkerPool.start();
+}
 
 
 const morphologyKnowledgeRegistry =
@@ -7389,9 +7442,47 @@ app.get("/runtime-version", (_req, res) => {
     analysisRecoveryOrchestrationVersion:
       ANALYSIS_RECOVERY_ORCHESTRATION_VERSION,
     globalClinicalScalabilityArchitectureVersion:
+      INF_SCALE_001_2C_VERSION,
+    analysisSessionStorageArchitectureVersion:
       INF_SCALE_001_1_VERSION,
     analysisSessionStorage:
       analysisSessionStore.scalabilityMetadata ?? null,
+    clinicalAnalysisExecutionBoundaryVersion:
+      CLINICAL_ANALYSIS_EXECUTION_BOUNDARY_VERSION,
+    clinicalAnalysisExecutionBoundary:
+      clinicalAnalysisExecutionBoundary.scalabilityMetadata,
+    durableAnalysisJobQueueVersion:
+      INF_SCALE_001_2B_VERSION,
+    durableAnalysisJobQueue:
+      analysisJobQueue
+        ? analysisJobQueue.scalabilityMetadata
+        : {
+            architectureVersion: INF_SCALE_001_2B_VERSION,
+            provider: analysisJobQueueConfig.provider,
+            durable: true,
+            distributed: true,
+            executionMode: analysisJobQueueConfig.executionMode,
+            queueEnabled: false,
+            workerRequired: false,
+            productionActivationReady: false,
+          },
+    analysisExecutionMode:
+      analysisJobQueueConfig.executionMode,
+    distributedAnalysisWorkerPoolVersion:
+      INF_SCALE_001_2C_VERSION,
+    distributedAnalysisWorkerPool:
+      analysisWorkerPool
+        ? analysisWorkerPool.scalabilityMetadata
+        : {
+            architectureVersion: INF_SCALE_001_2C_VERSION,
+            distributedWorkerSafe: true,
+            dualLeaseHeartbeat: true,
+            productionActivationReady: true,
+            concurrency: analysisWorkerPoolConfig.concurrency,
+            maxQueueDepth: analysisWorkerPoolConfig.maxQueueDepth,
+            running: false,
+            activationMode: "queued_only",
+          },
     vmeContract: "VME-1.0",
     model: OPENAI_MODEL,
     defaults: {
@@ -7935,6 +8026,82 @@ app.post(
       );
 
       // ====================================================================
+      // INF-SCALE-001.2B — DURABLE JOB ENQUEUE
+      // Queued mode is deliberately opt-in until 001.2C provides the
+      // production worker. The HTTP process persists the exact execution
+      // input and returns 202 without acquiring the clinical execution lease.
+      // ====================================================================
+
+      if (analysisJobQueueConfig.executionMode === ANALYSIS_EXECUTION_MODES.queued) {
+        if (!analysisJobQueue || !activeAnalysisSession) {
+          return res.status(400).json({
+            success: false,
+            errorCode: "ANALYSIS_IDEMPOTENCY_REQUIRED_FOR_QUEUED_EXECUTION",
+            error:
+              "Execução assíncrona requer analysisId/idempotencyKey para uma sessão durável.",
+            contractVersion: ANALYSIS_SESSION_CONTRACT_VERSION,
+          });
+        }
+
+        try {
+          await analysisJobQueue.assertEnqueueCapacity({
+            analysisId: activeAnalysisSession.analysisId,
+            maxQueueDepth: analysisWorkerPoolConfig.maxQueueDepth,
+          });
+        } catch (backpressureError) {
+          if (backpressureError?.code === "ANALYSIS_QUEUE_BACKPRESSURE") {
+            return res.status(503).json({
+              success: false,
+              pending: false,
+              errorCode: "ANALYSIS_QUEUE_BACKPRESSURE",
+              error: backpressureError.message,
+              retryAfterMs: backpressureError.retryAfterMs || 5000,
+              queue: backpressureError.snapshot || null,
+              analysisId: activeAnalysisSession.analysisId,
+              contractVersion: ANALYSIS_SESSION_CONTRACT_VERSION,
+            });
+          }
+          throw backpressureError;
+        }
+
+        const durablePayload =
+          encodeAnalysisJobPayload({
+            images: uploadedFiles,
+            analysisSource,
+            manualCounts,
+            analysisType,
+            specimenType,
+            specimenDecision: specimenGate.decision,
+            specimenReviewRequired: specimenGate.reviewRequired,
+          });
+
+        const queued =
+          await analysisJobQueue.enqueue({
+            analysisId: activeAnalysisSession.analysisId,
+            userId,
+            payload: durablePayload,
+          });
+
+        return res.status(202).json({
+          success: true,
+          pending: true,
+          queued: true,
+          analysisId: activeAnalysisSession.analysisId,
+          session: activeAnalysisSession,
+          job: {
+            jobId: queued.job.jobId,
+            analysisId: queued.job.analysisId,
+            status: queued.job.status,
+            attempt: queued.job.attempt,
+            reused: queued.reused,
+            queueVersion: INF_SCALE_001_2B_VERSION,
+          },
+          retryAfterMs: 3000,
+          contractVersion: ANALYSIS_SESSION_CONTRACT_VERSION,
+        });
+      }
+
+      // ====================================================================
       // BE/FE-FIX-006.2 — IDEMPOTENT EXECUTION CLAIM
       // Exactly one request may cross this gate for a durable analysisId.
       // ====================================================================
@@ -7999,24 +8166,32 @@ app.post(
       // ====================================================================
 
       const structured =
-        await analyzeWithOpenAI({
+        await clinicalAnalysisExecutionBoundary.execute({
+          input: {
+            images:
+              uploadedFiles,
 
-          images:
-            uploadedFiles,
+            analysisSource,
 
-          analysisSource,
+            manualCounts,
 
-          manualCounts,
+            analysisType,
 
-          analysisType,
+            specimenType,
 
-          specimenType,
+            specimenDecision:
+              specimenGate.decision,
 
-          specimenDecision:
-            specimenGate.decision,
-
-          specimenReviewRequired:
-            specimenGate.reviewRequired,
+            specimenReviewRequired:
+              specimenGate.reviewRequired,
+          },
+          context: {
+            analysisId: activeAnalysisSession?.analysisId ?? null,
+            userId,
+            attempt: activeAnalysisSession?.attempt ?? null,
+            leaseToken: activeAnalysisExecutionLeaseToken,
+            source: "analyze-slide",
+          },
         });
 
       // ====================================================================
@@ -10528,6 +10703,14 @@ app.listen(
       "🚀 PIPELINE ENTERPRISE V6 SAFE HYBRID ONLINE",
       ` | ${PRODUCTION_VME_ENFORCEMENT_VERSION} / VME-1.0 | ${LOCAL_MORPHOLOGY_ACQUISITION_RECOVERY_VERSION}`,
     );
+
+    if (analysisWorkerPool) {
+      console.log(
+        "⚙️ INF-SCALE-001.2C WORKER POOL ONLINE",
+        `| concurrency=${analysisWorkerPoolConfig.concurrency}`,
+        `| maxQueueDepth=${analysisWorkerPoolConfig.maxQueueDepth}`,
+      );
+    }
   },
 );
 
