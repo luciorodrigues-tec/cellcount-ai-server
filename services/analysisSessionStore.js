@@ -11,7 +11,7 @@ import {
 } from 'fs/promises';
 import path from 'path';
 
-export const ANALYSIS_SESSION_CONTRACT_VERSION = 'BE/FE-FIX-006.5';
+export const ANALYSIS_SESSION_CONTRACT_VERSION = 'BE/FE-FIX-006.6';
 
 export const ANALYSIS_SESSION_STATES = Object.freeze({
   queued: 'QUEUED',
@@ -33,6 +33,15 @@ export const ANALYSIS_EXECUTION_CLAIM_REASONS = Object.freeze({
 });
 
 export const ANALYSIS_RETRY_POLICY_VERSION = 'BE/FE-FIX-006.5';
+export const ANALYSIS_RECOVERY_ORCHESTRATION_VERSION = 'BE/FE-FIX-006.6';
+
+export const ANALYSIS_RECOVERY_ACTIONS = Object.freeze({
+  wait: 'WAIT',
+  deliverResult: 'DELIVER_RESULT',
+  retrySameSession: 'RETRY_SAME_SESSION',
+  terminalFailure: 'TERMINAL_FAILURE',
+  expired: 'EXPIRED',
+});
 export const DEFAULT_ANALYSIS_MAX_ATTEMPTS = Number(
   process.env.ANALYSIS_SESSION_MAX_ATTEMPTS || 3,
 );
@@ -206,6 +215,49 @@ export class AnalysisSessionStore {
       if (!session) return null;
       return clone(await this.#refreshLifecycle(session));
     });
+  }
+
+  async getRecoverySnapshot(analysisId, userId) {
+    const session = await this.get(analysisId, userId);
+    if (!session) return null;
+
+    let action = ANALYSIS_RECOVERY_ACTIONS.wait;
+    let retryAfterMs = 3000;
+
+    if (
+      session.status === ANALYSIS_SESSION_STATES.completed &&
+      session.result
+    ) {
+      action = ANALYSIS_RECOVERY_ACTIONS.deliverResult;
+      retryAfterMs = 0;
+    } else if (session.status === ANALYSIS_SESSION_STATES.retryEligible) {
+      action = ANALYSIS_RECOVERY_ACTIONS.retrySameSession;
+      retryAfterMs = 0;
+    } else if (session.status === ANALYSIS_SESSION_STATES.expired) {
+      action = ANALYSIS_RECOVERY_ACTIONS.expired;
+      retryAfterMs = 0;
+    } else if (session.status === ANALYSIS_SESSION_STATES.failed) {
+      action = ANALYSIS_RECOVERY_ACTIONS.terminalFailure;
+      retryAfterMs = 0;
+    } else if (session.status === ANALYSIS_SESSION_STATES.processing) {
+      const remainingLeaseMs =
+        isoMs(session.leaseExpiresAt) == null
+          ? 3000
+          : Math.max(1000, isoMs(session.leaseExpiresAt) - Date.now());
+      retryAfterMs = Math.min(5000, remainingLeaseMs);
+    }
+
+    return {
+      orchestrationVersion: ANALYSIS_RECOVERY_ORCHESTRATION_VERSION,
+      action,
+      retryAfterMs,
+      serverTime: new Date().toISOString(),
+      analysisId: session.analysisId,
+      idempotencyKey: session.idempotencyKey,
+      attempt: Number(session.attempt || 0),
+      maxAttempts: Number(session.maxAttempts || 0),
+      session: clone(session),
+    };
   }
 
   async findByIdempotencyKey(userId, idempotencyKey) {
@@ -479,11 +531,22 @@ export class AnalysisSessionStore {
 
   #isSessionExpired(session, nowMs = Date.now()) {
     const expiresAtMs = isoMs(session.expiresAt);
-    return (
-      expiresAtMs !== null &&
-      nowMs >= expiresAtMs &&
-      session.status !== ANALYSIS_SESSION_STATES.completed
-    );
+
+    // BE/FE-FIX-006.6.3 — execution lease outranks active-session TTL.
+    //
+    // A session that is already PROCESSING has an execution lease and must be
+    // governed by leaseExpiresAt, not by the general session TTL. Otherwise a
+    // valid in-flight execution can be converted to EXPIRED immediately before
+    // markCompleted(), losing an authoritative result. COMPLETED is permanent
+    // and is never invalidated by the active-session TTL.
+    if (
+      session.status === ANALYSIS_SESSION_STATES.processing ||
+      session.status === ANALYSIS_SESSION_STATES.completed
+    ) {
+      return false;
+    }
+
+    return expiresAtMs !== null && nowMs >= expiresAtMs;
   }
 
   async #refreshLifecycle(session) {

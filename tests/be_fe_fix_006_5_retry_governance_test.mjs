@@ -10,6 +10,25 @@ import {
   AnalysisSessionStore,
 } from '../services/analysisSessionStore.js';
 
+const MINIMUM_COMPATIBLE_CONTRACT_MINOR = 5;
+
+function assertCompatible0065Contract(version) {
+  const match = /^BE\/FE-FIX-006\.(\d+)$/.exec(String(version || ''));
+
+  assert.ok(
+    match,
+    `Unexpected analysis-session contract version: ${version}`,
+  );
+
+  const minor = Number(match[1]);
+
+  assert.ok(
+    Number.isInteger(minor) &&
+      minor >= MINIMUM_COMPATIBLE_CONTRACT_MINOR,
+    `Expected BE/FE-FIX-006.${MINIMUM_COMPATIBLE_CONTRACT_MINOR}+ compatibility, got ${version}`,
+  );
+}
+
 async function fixture(options, fn) {
   const root = await mkdtemp(path.join(os.tmpdir(), 'cellcount-0065-'));
   try {
@@ -38,7 +57,7 @@ test('006.5 retryable failure preserves analysisId and authorizes fresh lease', 
       { leaseToken: first.leaseToken },
     );
 
-    assert.equal(ANALYSIS_SESSION_CONTRACT_VERSION, 'BE/FE-FIX-006.5');
+    assertCompatible0065Contract(ANALYSIS_SESSION_CONTRACT_VERSION);
     assert.equal(failed.status, ANALYSIS_SESSION_STATES.retryEligible);
     assert.equal(failed.retryEligible, true);
     assert.equal(failed.attempt, 1);

@@ -272,6 +272,7 @@ import crypto from "crypto";
 
 import {
   ANALYSIS_SESSION_CONTRACT_VERSION,
+  ANALYSIS_RECOVERY_ORCHESTRATION_VERSION,
   AnalysisSessionStore,
 } from "./services/analysisSessionStore.js";
 
@@ -7381,6 +7382,8 @@ app.get("/runtime-version", (_req, res) => {
       CLINICAL_RESULT_COHERENCE_ENGINE_VERSION,
     resilientAnalysisSessionContractVersion:
       ANALYSIS_SESSION_CONTRACT_VERSION,
+    analysisRecoveryOrchestrationVersion:
+      ANALYSIS_RECOVERY_ORCHESTRATION_VERSION,
     vmeContract: "VME-1.0",
     model: OPENAI_MODEL,
     defaults: {
@@ -7577,7 +7580,7 @@ Retorne somente JSON:
 );
 
 // ============================================================================
-// BE/FE-FIX-006.5 — RESILIENT SESSION + RETRY GOVERNANCE CONTRACT
+// BE/FE-FIX-006.6 — PRODUCTION RECOVERY ORCHESTRATION CONTRACT
 // ============================================================================
 
 app.post(
@@ -7654,6 +7657,47 @@ app.get(
         error: "Erro ao recuperar sessão de análise.",
         detail: error.message,
         contractVersion: ANALYSIS_SESSION_CONTRACT_VERSION,
+      });
+    }
+  },
+);
+
+app.get(
+  "/analysis-sessions/:analysisId/recovery",
+  auth,
+  async (req, res) => {
+    try {
+      const { userId } = getUser(req);
+      const recovery = await analysisSessionStore.getRecoverySnapshot(
+        req.params.analysisId,
+        userId,
+      );
+
+      if (!recovery) {
+        return res.status(404).json({
+          success: false,
+          errorCode: "ANALYSIS_SESSION_NOT_FOUND",
+          error: "Sessão de análise não encontrada.",
+          contractVersion: ANALYSIS_SESSION_CONTRACT_VERSION,
+          orchestrationVersion: ANALYSIS_RECOVERY_ORCHESTRATION_VERSION,
+        });
+      }
+
+      return res.json({
+        success: true,
+        recovery,
+        contractVersion: ANALYSIS_SESSION_CONTRACT_VERSION,
+        orchestrationVersion: ANALYSIS_RECOVERY_ORCHESTRATION_VERSION,
+      });
+    } catch (error) {
+      console.error("ANALYSIS SESSION RECOVERY SNAPSHOT ERROR:", error);
+      return res.status(500).json({
+        success: false,
+        errorCode: "ANALYSIS_RECOVERY_SNAPSHOT_FAILED",
+        error: "Erro ao consultar a orquestração de recuperação.",
+        detail: error.message,
+        contractVersion: ANALYSIS_SESSION_CONTRACT_VERSION,
+        orchestrationVersion: ANALYSIS_RECOVERY_ORCHESTRATION_VERSION,
       });
     }
   },
