@@ -7681,6 +7681,7 @@ app.post(
 
     let activeAnalysisSession = null;
     let activeAnalysisSessionUserId = null;
+    let activeAnalysisExecutionLeaseToken = null;
 
     try {
 
@@ -7724,11 +7725,28 @@ app.post(
         if (activeAnalysisSession.status === "COMPLETED") {
           return res.json(activeAnalysisSession.result);
         }
-        activeAnalysisSession =
-          await analysisSessionStore.markProcessing(
-            activeAnalysisSession.analysisId,
-            userId,
-          );
+
+        if (activeAnalysisSession.status === "FAILED") {
+          return res.status(409).json({
+            success: false,
+            errorCode: "ANALYSIS_SESSION_FAILED",
+            error:
+              "A sessão de análise já terminou com falha. Crie uma nova sessão para uma nova tentativa.",
+            session: activeAnalysisSession,
+            contractVersion: ANALYSIS_SESSION_CONTRACT_VERSION,
+          });
+        }
+
+        if (activeAnalysisSession.status === "PROCESSING") {
+          return res.status(202).json({
+            success: true,
+            pending: true,
+            errorCode: "ANALYSIS_SESSION_IN_PROGRESS",
+            session: activeAnalysisSession,
+            retryAfterMs: 3000,
+            contractVersion: ANALYSIS_SESSION_CONTRACT_VERSION,
+          });
+        }
       }
 
       const uploadedFiles =
@@ -7800,6 +7818,48 @@ app.post(
       );
 
       // ====================================================================
+      // BE/FE-FIX-006.2 — IDEMPOTENT EXECUTION CLAIM
+      // Exactly one request may cross this gate for a durable analysisId.
+      // ====================================================================
+
+      if (activeAnalysisSession) {
+        const executionClaim =
+          await analysisSessionStore.claimExecution(
+            activeAnalysisSession.analysisId,
+            userId,
+          );
+
+        activeAnalysisSession = executionClaim.session;
+        activeAnalysisExecutionLeaseToken = executionClaim.leaseToken;
+
+        if (!executionClaim.acquired) {
+          if (executionClaim.reason === "COMPLETED") {
+            return res.json(executionClaim.session.result);
+          }
+
+          if (executionClaim.reason === "FAILED") {
+            return res.status(409).json({
+              success: false,
+              errorCode: "ANALYSIS_SESSION_FAILED",
+              error:
+                "A sessão de análise já terminou com falha. Crie uma nova sessão para uma nova tentativa.",
+              session: executionClaim.session,
+              contractVersion: ANALYSIS_SESSION_CONTRACT_VERSION,
+            });
+          }
+
+          return res.status(202).json({
+            success: true,
+            pending: true,
+            errorCode: "ANALYSIS_SESSION_IN_PROGRESS",
+            session: executionClaim.session,
+            retryAfterMs: 3000,
+            contractVersion: ANALYSIS_SESSION_CONTRACT_VERSION,
+          });
+        }
+      }
+
+      // ====================================================================
       // AI ANALYSIS
       // ====================================================================
 
@@ -7836,6 +7896,21 @@ app.post(
         )
       ) {
         // BE-FIX-005.21.1 — failed acquisition cannot enter clinical governors.
+        if (activeAnalysisSession) {
+          activeAnalysisSession =
+            await analysisSessionStore.markFailed(
+              activeAnalysisSession.analysisId,
+              userId,
+              {
+                code: structured?.errorCode || "VISUAL_ACQUISITION_FAILED",
+                message:
+                  structured?.error ||
+                  "Falha na aquisição de evidência morfológica visual.",
+                statusCode: 422,
+              },
+              { leaseToken: activeAnalysisExecutionLeaseToken },
+            );
+        }
         return res.status(422).json(structured);
       }
 
@@ -7851,6 +7926,19 @@ app.post(
       if (
         !validation.valid
       ) {
+        if (activeAnalysisSession) {
+          activeAnalysisSession =
+            await analysisSessionStore.markFailed(
+              activeAnalysisSession.analysisId,
+              userId,
+              {
+                code: "ANALYSIS_VALIDATION_FAILED",
+                message: validation.error,
+                statusCode: 500,
+              },
+              { leaseToken: activeAnalysisExecutionLeaseToken },
+            );
+        }
 
         return res.status(500).json({
 
@@ -9761,6 +9849,7 @@ if (activeAnalysisSession) {
       activeAnalysisSession.analysisId,
       userId,
       responsePayload,
+      { leaseToken: activeAnalysisExecutionLeaseToken },
     );
 }
 
@@ -9783,6 +9872,7 @@ return res.json(responsePayload);
               message: error.message,
               statusCode: 500,
             },
+            { leaseToken: activeAnalysisExecutionLeaseToken },
           );
         } catch (sessionError) {
           console.error("ANALYSIS SESSION FAILURE PERSISTENCE ERROR:", sessionError);
