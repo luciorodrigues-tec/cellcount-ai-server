@@ -7577,7 +7577,7 @@ Retorne somente JSON:
 );
 
 // ============================================================================
-// BE/FE-FIX-006.1 — PERSISTENT ANALYSIS SESSION CONTRACT
+// BE/FE-FIX-006.5 — RESILIENT SESSION + RETRY GOVERNANCE CONTRACT
 // ============================================================================
 
 app.post(
@@ -7659,6 +7659,56 @@ app.get(
   },
 );
 
+app.post(
+  "/analysis-sessions/:analysisId/retry",
+  auth,
+  jsonBodyParser({ limit: "64kb" }),
+  async (req, res) => {
+    try {
+      const { userId } = getUser(req);
+      const retry = await analysisSessionStore.prepareRetry(
+        req.params.analysisId,
+        userId,
+      );
+
+      if (!retry.accepted) {
+        const status = retry.session?.status;
+        const httpStatus =
+          status === "EXPIRED"
+            ? 410
+            : status === "COMPLETED"
+              ? 409
+              : 409;
+
+        return res.status(httpStatus).json({
+          success: false,
+          errorCode: "ANALYSIS_SESSION_RETRY_NOT_ALLOWED",
+          error:
+            "A sessão não está elegível para nova tentativa controlada.",
+          session: retry.session,
+          contractVersion: ANALYSIS_SESSION_CONTRACT_VERSION,
+        });
+      }
+
+      return res.json({
+        success: true,
+        retryPrepared: true,
+        session: retry.session,
+        contractVersion: ANALYSIS_SESSION_CONTRACT_VERSION,
+      });
+    } catch (error) {
+      console.error("ANALYSIS SESSION RETRY PREPARE ERROR:", error);
+      return res.status(500).json({
+        success: false,
+        errorCode: "ANALYSIS_SESSION_RETRY_PREPARE_FAILED",
+        error: "Erro ao preparar nova tentativa da sessão.",
+        detail: error.message,
+        contractVersion: ANALYSIS_SESSION_CONTRACT_VERSION,
+      });
+    }
+  },
+);
+
 // ============================================================================
 // ANALYZE
 // ============================================================================
@@ -7726,17 +7776,32 @@ app.post(
           return res.json(activeAnalysisSession.result);
         }
 
-        if (activeAnalysisSession.status === "FAILED") {
-          return res.status(409).json({
+        if (activeAnalysisSession.status === "EXPIRED") {
+          return res.status(410).json({
             success: false,
-            errorCode: "ANALYSIS_SESSION_FAILED",
+            errorCode: "ANALYSIS_SESSION_EXPIRED",
             error:
-              "A sessão de análise já terminou com falha. Crie uma nova sessão para uma nova tentativa.",
+              "A sessão de análise expirou e não pode mais ser reprocessada.",
             session: activeAnalysisSession,
             contractVersion: ANALYSIS_SESSION_CONTRACT_VERSION,
           });
         }
 
+        if (activeAnalysisSession.status === "FAILED") {
+          return res.status(409).json({
+            success: false,
+            errorCode: "ANALYSIS_SESSION_FAILED",
+            error:
+              activeAnalysisSession.terminalReason === "MAX_ATTEMPTS_EXHAUSTED"
+                ? "A sessão atingiu o limite seguro de tentativas."
+                : "A sessão terminou com falha não recuperável.",
+            session: activeAnalysisSession,
+            contractVersion: ANALYSIS_SESSION_CONTRACT_VERSION,
+          });
+        }
+
+        // RETRY_ELIGIBLE and QUEUED are intentionally allowed to continue.
+        // claimExecution will issue a fresh lease while preserving analysisId.
         if (activeAnalysisSession.status === "PROCESSING") {
           return res.status(202).json({
             success: true,
@@ -7837,12 +7902,30 @@ app.post(
             return res.json(executionClaim.session.result);
           }
 
-          if (executionClaim.reason === "FAILED") {
+          if (
+            executionClaim.reason === "FAILED" ||
+            executionClaim.reason === "MAX_ATTEMPTS_EXHAUSTED"
+          ) {
             return res.status(409).json({
               success: false,
-              errorCode: "ANALYSIS_SESSION_FAILED",
+              errorCode:
+                executionClaim.reason === "MAX_ATTEMPTS_EXHAUSTED"
+                  ? "ANALYSIS_SESSION_MAX_ATTEMPTS_EXHAUSTED"
+                  : "ANALYSIS_SESSION_FAILED",
               error:
-                "A sessão de análise já terminou com falha. Crie uma nova sessão para uma nova tentativa.",
+                executionClaim.reason === "MAX_ATTEMPTS_EXHAUSTED"
+                  ? "A sessão atingiu o limite seguro de tentativas."
+                  : "A sessão terminou com falha não recuperável.",
+              session: executionClaim.session,
+              contractVersion: ANALYSIS_SESSION_CONTRACT_VERSION,
+            });
+          }
+
+          if (executionClaim.reason === "EXPIRED") {
+            return res.status(410).json({
+              success: false,
+              errorCode: "ANALYSIS_SESSION_EXPIRED",
+              error: "A sessão de análise expirou.",
               session: executionClaim.session,
               contractVersion: ANALYSIS_SESSION_CONTRACT_VERSION,
             });
