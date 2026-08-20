@@ -273,8 +273,12 @@ import crypto from "crypto";
 import {
   ANALYSIS_SESSION_CONTRACT_VERSION,
   ANALYSIS_RECOVERY_ORCHESTRATION_VERSION,
-  AnalysisSessionStore,
 } from "./services/analysisSessionStore.js";
+
+import {
+  INF_SCALE_001_1_VERSION,
+  createAnalysisSessionStore,
+} from "./services/analysisSessionStoreFactory.js";
 
 import {
   bootstrapRuntime,
@@ -518,7 +522,7 @@ const {
 });
 
 const analysisSessionStore =
-  new AnalysisSessionStore();
+  createAnalysisSessionStore();
 
 // ============================================================================
 // OPENAI
@@ -7384,6 +7388,10 @@ app.get("/runtime-version", (_req, res) => {
       ANALYSIS_SESSION_CONTRACT_VERSION,
     analysisRecoveryOrchestrationVersion:
       ANALYSIS_RECOVERY_ORCHESTRATION_VERSION,
+    globalClinicalScalabilityArchitectureVersion:
+      INF_SCALE_001_1_VERSION,
+    analysisSessionStorage:
+      analysisSessionStore.scalabilityMetadata ?? null,
     vmeContract: "VME-1.0",
     model: OPENAI_MODEL,
     defaults: {
