@@ -277,7 +277,14 @@ export class PostgresAnalysisJobQueue {
       `SELECT
          COUNT(*) FILTER (WHERE status IN ('QUEUED','RETRY_ELIGIBLE'))::int AS waiting,
          COUNT(*) FILTER (WHERE status='PROCESSING')::int AS processing,
-         COUNT(*) FILTER (WHERE status IN ('QUEUED','RETRY_ELIGIBLE','PROCESSING'))::int AS active
+         COUNT(*) FILTER (WHERE status IN ('QUEUED','RETRY_ELIGIBLE','PROCESSING'))::int AS active,
+         MIN(created_at) FILTER (WHERE status IN ('QUEUED','RETRY_ELIGIBLE')) AS oldest_waiting_at,
+         COALESCE(
+           EXTRACT(EPOCH FROM (
+             NOW() - MIN(created_at) FILTER (WHERE status IN ('QUEUED','RETRY_ELIGIBLE'))
+           )) * 1000,
+           0
+         )::bigint AS oldest_waiting_age_ms
        FROM cellcount_analysis_jobs`,
     );
     const row = result.rows[0] || {};
@@ -290,6 +297,11 @@ export class PostgresAnalysisJobQueue {
       active,
       maxQueueDepth: limit,
       saturated: active >= limit,
+      oldestWaitingAt:
+        row.oldest_waiting_at instanceof Date
+          ? row.oldest_waiting_at.toISOString()
+          : (row.oldest_waiting_at || null),
+      oldestWaitingAgeMs: Math.max(0, Number(row.oldest_waiting_age_ms || 0)),
     });
   }
 

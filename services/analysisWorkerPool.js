@@ -97,6 +97,14 @@ export class AnalysisWorkerPool {
       pollIntervalMs: this.config.pollIntervalMs,
       maxQueueDepth: this.config.maxQueueDepth,
       running: this.running,
+      metrics: Object.freeze({
+        claimed: this.metrics.claimed,
+        completed: this.metrics.completed,
+        failed: this.metrics.failed,
+        retried: this.metrics.retried,
+        leaseRenewals: this.metrics.leaseRenewals,
+        leaseRenewalFailures: this.metrics.leaseRenewalFailures,
+      }),
     });
   }
 

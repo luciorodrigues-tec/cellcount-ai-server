@@ -306,6 +306,14 @@ import {
 } from "./services/analysisWorkerPool.js";
 
 import {
+  INF_SCALE_001_2H_VERSION,
+  ADAPTIVE_ADMISSION_POLICY_VERSION,
+  AUTOSCALING_READINESS_VERSION,
+  ADMISSION_DECISIONS,
+  createAdaptiveAnalysisAdmissionController,
+} from "./services/adaptiveAnalysisAdmissionController.js";
+
+import {
   bootstrapRuntime,
 } from "./bootstrap/runtimeBootstrap.js";
 
@@ -570,6 +578,14 @@ const clinicalAnalysisExecutionBoundary =
 
 const analysisWorkerPoolConfig =
   resolveAnalysisWorkerPoolConfig();
+
+const adaptiveAnalysisAdmissionController =
+  analysisJobQueueConfig.executionMode === ANALYSIS_EXECUTION_MODES.queued && analysisJobQueue
+    ? createAdaptiveAnalysisAdmissionController({
+        queue: analysisJobQueue,
+        workerPoolConfig: analysisWorkerPoolConfig,
+      })
+    : null;
 
 const analysisWorkerPool =
   analysisJobQueueConfig.executionMode === ANALYSIS_EXECUTION_MODES.queued && analysisJobQueue
@@ -7137,6 +7153,40 @@ registerOperationalStatusRoutes({
 
 
 // ============================================================================
+// INF-SCALE-001.2H-B — AUTOSCALING READINESS / ADMISSION OBSERVABILITY
+// Read-only operational signal endpoint. It never changes worker count.
+// ============================================================================
+app.get("/operational/admission-control", auth, async (_req, res) => {
+  if (!adaptiveAnalysisAdmissionController) {
+    return res.status(409).json({
+      success: false,
+      errorCode: "ADAPTIVE_ADMISSION_NOT_ACTIVE",
+      error: "Adaptive admission control is only available in queued execution mode.",
+      architectureVersion: INF_SCALE_001_2H_VERSION,
+    });
+  }
+
+  try {
+    const snapshot =
+      await adaptiveAnalysisAdmissionController.operationalSnapshot();
+
+    return res.json({
+      success: true,
+      ...snapshot,
+      workerPool:
+        analysisWorkerPool?.scalabilityMetadata ?? null,
+    });
+  } catch (error) {
+    return res.status(503).json({
+      success: false,
+      errorCode: "ADAPTIVE_ADMISSION_OBSERVABILITY_UNAVAILABLE",
+      error: String(error?.message || error),
+      architectureVersion: INF_SCALE_001_2H_VERSION,
+    });
+  }
+});
+
+// ============================================================================
 // BE-FIX-005.9 — PUBLIC RUNTIME FINGERPRINT
 // ============================================================================
 app.get("/runtime-version", (_req, res) => {
@@ -7482,6 +7532,23 @@ app.get("/runtime-version", (_req, res) => {
             maxQueueDepth: analysisWorkerPoolConfig.maxQueueDepth,
             running: false,
             activationMode: "queued_only",
+          },
+    adaptiveAdmissionArchitectureVersion:
+      INF_SCALE_001_2H_VERSION,
+    adaptiveAdmissionPolicyVersion:
+      ADAPTIVE_ADMISSION_POLICY_VERSION,
+    autoscalingReadinessVersion:
+      AUTOSCALING_READINESS_VERSION,
+    adaptiveAdmissionControl:
+      adaptiveAnalysisAdmissionController
+        ? adaptiveAnalysisAdmissionController.scalabilityMetadata
+        : {
+            architectureVersion: INF_SCALE_001_2H_VERSION,
+            policyVersion: ADAPTIVE_ADMISSION_POLICY_VERSION,
+            autoscalingReadinessVersion: AUTOSCALING_READINESS_VERSION,
+            enabled: false,
+            mutatesWorkerCount: false,
+            recommendationOnly: true,
           },
     vmeContract: "VME-1.0",
     model: OPENAI_MODEL,
@@ -8043,6 +8110,44 @@ app.post(
           });
         }
 
+        if (adaptiveAnalysisAdmissionController) {
+          const admission =
+            await adaptiveAnalysisAdmissionController.assess({
+              analysisId: activeAnalysisSession.analysisId,
+            });
+
+          if (admission.decision === ADMISSION_DECISIONS.defer) {
+            return res.status(503).json({
+              success: false,
+              pending: false,
+              errorCode: "ANALYSIS_ADMISSION_DEFERRED",
+              error:
+                "Capacidade de análise temporariamente sob pressão. Tente novamente em instantes.",
+              retryAfterMs: admission.retryAfterMs || 5000,
+              admission,
+              analysisId: activeAnalysisSession.analysisId,
+              contractVersion: ANALYSIS_SESSION_CONTRACT_VERSION,
+            });
+          }
+
+          if (admission.decision === ADMISSION_DECISIONS.backpressure) {
+            return res.status(503).json({
+              success: false,
+              pending: false,
+              errorCode: "ANALYSIS_QUEUE_BACKPRESSURE",
+              error:
+                "Fila de análises temporariamente saturada. Tente novamente em instantes.",
+              retryAfterMs: admission.retryAfterMs || 5000,
+              queue: admission.snapshot || null,
+              admission,
+              analysisId: activeAnalysisSession.analysisId,
+              contractVersion: ANALYSIS_SESSION_CONTRACT_VERSION,
+            });
+          }
+        }
+
+        // INF-SCALE-001.2C remains the final atomic queue-capacity authority.
+        // The adaptive controller is advisory/preemptive and cannot weaken it.
         try {
           await analysisJobQueue.assertEnqueueCapacity({
             analysisId: activeAnalysisSession.analysisId,
@@ -10709,6 +10814,15 @@ app.listen(
         "⚙️ INF-SCALE-001.2C WORKER POOL ONLINE",
         `| concurrency=${analysisWorkerPoolConfig.concurrency}`,
         `| maxQueueDepth=${analysisWorkerPoolConfig.maxQueueDepth}`,
+      );
+    }
+
+    if (adaptiveAnalysisAdmissionController) {
+      console.log(
+        "📈 INF-SCALE-001.2H ADAPTIVE ADMISSION READY",
+        `| softPressure=${adaptiveAnalysisAdmissionController.scalabilityMetadata.softQueuePressure}`,
+        `| hardPressure=${adaptiveAnalysisAdmissionController.scalabilityMetadata.hardQueuePressure}`,
+        "| autoscaling=recommendation-only",
       );
     }
   },
