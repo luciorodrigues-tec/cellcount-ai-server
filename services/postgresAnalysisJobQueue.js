@@ -4,6 +4,7 @@ import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
 
 export const INF_SCALE_001_2B_VERSION = 'INF-SCALE-001.2B.2';
+export const INF_SCALE_001_2F_2_ATTRIBUTION_VERSION = 'INF-SCALE-001.2F.2';
 export const ANALYSIS_JOB_QUEUE_SCHEMA_VERSION = 1;
 export const ANALYSIS_JOB_QUEUE_SCHEMA_ADVISORY_LOCK_KEY = 510001002;
 
@@ -59,6 +60,10 @@ CREATE TABLE IF NOT EXISTS cellcount_analysis_jobs (
   created_at timestamptz NOT NULL,
   updated_at timestamptz NOT NULL,
   schema_version integer NOT NULL DEFAULT ${ANALYSIS_JOB_QUEUE_SCHEMA_VERSION},
+  last_worker_id varchar(160),
+  last_leased_at timestamptz,
+  last_lease_expires_at timestamptz,
+  last_lease_released_at timestamptz,
   CONSTRAINT cellcount_analysis_jobs_analysis_uq UNIQUE (analysis_id)
 );
 CREATE INDEX IF NOT EXISTS cellcount_analysis_jobs_claim_idx
@@ -66,6 +71,10 @@ CREATE INDEX IF NOT EXISTS cellcount_analysis_jobs_claim_idx
 CREATE INDEX IF NOT EXISTS cellcount_analysis_jobs_lease_idx
   ON cellcount_analysis_jobs (lease_expires_at)
   WHERE status = 'PROCESSING';
+ALTER TABLE cellcount_analysis_jobs ADD COLUMN IF NOT EXISTS last_worker_id varchar(160);
+ALTER TABLE cellcount_analysis_jobs ADD COLUMN IF NOT EXISTS last_leased_at timestamptz;
+ALTER TABLE cellcount_analysis_jobs ADD COLUMN IF NOT EXISTS last_lease_expires_at timestamptz;
+ALTER TABLE cellcount_analysis_jobs ADD COLUMN IF NOT EXISTS last_lease_released_at timestamptz;
 `;
 }
 
@@ -90,6 +99,10 @@ function rowToJob(row) {
     lastError: clone(row.last_error),
     createdAt: row.created_at instanceof Date ? row.created_at.toISOString() : row.created_at,
     updatedAt: row.updated_at instanceof Date ? row.updated_at.toISOString() : row.updated_at,
+    lastWorkerId: row.last_worker_id || null,
+    lastLeasedAt: row.last_leased_at instanceof Date ? row.last_leased_at.toISOString() : row.last_leased_at,
+    lastLeaseExpiresAt: row.last_lease_expires_at instanceof Date ? row.last_lease_expires_at.toISOString() : row.last_lease_expires_at,
+    lastLeaseReleasedAt: row.last_lease_released_at instanceof Date ? row.last_lease_released_at.toISOString() : row.last_lease_released_at,
   };
 }
 
@@ -138,6 +151,8 @@ export class PostgresAnalysisJobQueue {
       claimAuthority: 'postgres_for_update_skip_locked',
       payloadAuthority: 'postgres_jsonb_transitional',
       payloadRedactionOnCompletion: true,
+      durableWorkerAttributionVersion: INF_SCALE_001_2F_2_ATTRIBUTION_VERSION,
+      durableWorkerAttribution: true,
     });
   }
 
@@ -222,7 +237,9 @@ export class PostgresAnalysisJobQueue {
         `UPDATE cellcount_analysis_jobs
          SET status='PROCESSING', attempt=attempt+1, worker_id=$2, lease_token=$3,
              leased_at=NOW(), lease_expires_at=NOW() + ($4::bigint * INTERVAL '1 millisecond'),
-             updated_at=NOW()
+             last_worker_id=$2, last_leased_at=NOW(),
+             last_lease_expires_at=NOW() + ($4::bigint * INTERVAL '1 millisecond'),
+             last_lease_released_at=NULL, updated_at=NOW()
          WHERE job_id=$1::uuid
          RETURNING *`,
         [row.job_id, safe(workerId), token, positiveInt(leaseTtlMs, this.leaseTtlMs)],
@@ -239,7 +256,8 @@ export class PostgresAnalysisJobQueue {
     await this.ensureSchema();
     const result = await this.pool.query(
       `UPDATE cellcount_analysis_jobs
-       SET lease_expires_at=NOW() + ($3::bigint * INTERVAL '1 millisecond'), updated_at=NOW()
+       SET lease_expires_at=NOW() + ($3::bigint * INTERVAL '1 millisecond'),
+           last_lease_expires_at=NOW() + ($3::bigint * INTERVAL '1 millisecond'), updated_at=NOW()
        WHERE job_id=$1::uuid AND status='PROCESSING' AND lease_token=$2
          AND lease_expires_at > NOW()
        RETURNING *`,
@@ -302,6 +320,10 @@ export class PostgresAnalysisJobQueue {
     const result = await this.pool.query(
       `UPDATE cellcount_analysis_jobs
        SET status='COMPLETED', completed_at=NOW(), updated_at=NOW(), payload='{}'::jsonb,
+           last_worker_id=COALESCE(last_worker_id, worker_id),
+           last_leased_at=COALESCE(last_leased_at, leased_at),
+           last_lease_expires_at=COALESCE(last_lease_expires_at, lease_expires_at),
+           last_lease_released_at=NOW(),
            lease_token=NULL, worker_id=NULL, leased_at=NULL, lease_expires_at=NULL
        WHERE job_id=$1::uuid AND status='PROCESSING' AND lease_token=$2
        RETURNING *`,
@@ -331,7 +353,12 @@ export class PostgresAnalysisJobQueue {
          SET status=$3, last_error=$4::jsonb,
              available_at=CASE WHEN $5 THEN NOW() + ($6::bigint * INTERVAL '1 millisecond') ELSE available_at END,
              failed_at=CASE WHEN $5 THEN NULL ELSE NOW() END,
-             updated_at=NOW(), lease_token=NULL, worker_id=NULL, leased_at=NULL, lease_expires_at=NULL
+             updated_at=NOW(),
+             last_worker_id=COALESCE(last_worker_id, worker_id),
+             last_leased_at=COALESCE(last_leased_at, leased_at),
+             last_lease_expires_at=COALESCE(last_lease_expires_at, lease_expires_at),
+             last_lease_released_at=NOW(),
+             lease_token=NULL, worker_id=NULL, leased_at=NULL, lease_expires_at=NULL
          WHERE job_id=$1::uuid AND lease_token=$2
          RETURNING *`,
         [safe(jobId), String(leaseToken || ''), status, JSON.stringify(normalizedError(error)), canRetry, Math.max(0, Number(retryDelayMs) || 0)],
