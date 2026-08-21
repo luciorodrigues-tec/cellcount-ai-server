@@ -1,0 +1,18 @@
+INF-SCALE-001.2H-E — Multi-Level Production Calibration & Autoscaling Policy Lock
+
+Adds sequential real-production calibration at levels 25, 50 and 100 and consolidates a fail-stop autoscaling policy lock.
+Safety invariant: automaticScalingAllowed=false. This sprint never mutates worker count.
+
+Validation:
+node --check services\multiLevelAutoscalingPolicyLock.js
+node --check scripts\certifyMultiLevelProductionCalibration.mjs
+node --check server.js
+node --test tests\inf_scale_001_2h_e_multi_level_policy_lock_test.mjs tests\inf_scale_001_2h_e_server_integration_test.mjs
+
+Production certification (real clinical load):
+set CELLCOUNT_MULTI_CALIBRATION_API_TOKEN=<TOKEN>
+set CELLCOUNT_MULTI_CALIBRATION_IMAGE=<IMAGE_PATH>
+set CELLCOUNT_MULTI_CALIBRATION_SPECIMEN_TYPE=PERIPHERAL_BLOOD
+set CELLCOUNT_MULTI_CALIBRATION_EXPECTED_WORKERS=4
+set CELLCOUNT_MULTI_CALIBRATION_CONFIRM=I_UNDERSTAND_25_50_100_PRODUCTION_CALIBRATION
+node scripts\certifyMultiLevelProductionCalibration.mjs

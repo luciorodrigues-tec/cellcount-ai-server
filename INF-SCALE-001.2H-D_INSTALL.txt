@@ -1,0 +1,56 @@
+INF-SCALE-001.2H-D — Production Capacity Calibration & Autoscaling Decision Validation
+
+OBJECTIVE
+---------
+Validate the 2H-B/2H-C autoscaling recommendations against real queued production load.
+This sprint remains recommendation-only and NEVER changes worker count.
+
+FILES
+-----
+services/productionCapacityCalibration.js
+services/adaptiveAnalysisAdmissionController.js
+scripts/certifyProductionCapacityCalibration.mjs
+scripts/certifyHighVolumeBackpressure.mjs
+server.js
+.env.example
+tests/inf_scale_001_2h_d_production_capacity_calibration_test.mjs
+tests/inf_scale_001_2h_d_server_integration_test.mjs
+
+SAFETY INVARIANTS
+-----------------
+- recommendationOnly=true
+- mutatesWorkerCount=false
+- no automatic Render scaling
+- no clinical pipeline mutation
+- no BE-FIX-005.50.x mutation
+- no session/queue schema mutation
+- no idempotency or lease authority changes
+
+LOCAL VALIDATION
+----------------
+node --check services\productionCapacityCalibration.js
+node --check services\adaptiveAnalysisAdmissionController.js
+node --check scripts\certifyProductionCapacityCalibration.mjs
+node --check scripts\certifyHighVolumeBackpressure.mjs
+node --check server.js
+
+node --test tests\inf_scale_001_2h_d_production_capacity_calibration_test.mjs tests\inf_scale_001_2h_d_server_integration_test.mjs tests\inf_scale_001_2h_c_capacity_envelope_test.mjs tests\inf_scale_001_2h_adaptive_admission_controller_test.mjs tests\inf_scale_001_2h_autoscaling_readiness_signals_test.mjs tests\inf_scale_001_2h_server_integration_test.mjs tests\inf_scale_001_2h_high_volume_compatibility_test.mjs
+
+PRODUCTION CERTIFICATION
+------------------------
+Run one level at a time. Start with 25. Do not run 50 or 100 until the prior gate passes.
+
+set "CELLCOUNT_CALIBRATION_API_TOKEN=YOUR_REAL_TOKEN"
+set "CELLCOUNT_CALIBRATION_IMAGE=C:\path\to\validation.jpg"
+set "CELLCOUNT_CALIBRATION_SPECIMEN_TYPE=PERIPHERAL_BLOOD"
+set "CELLCOUNT_CALIBRATION_EXPECTED_WORKERS=4"
+set "CELLCOUNT_CALIBRATION_LEVEL=25"
+set "CELLCOUNT_CALIBRATION_CONFIRM=I_UNDERSTAND_PRODUCTION_CAPACITY_CALIBRATION"
+node scripts\certifyProductionCapacityCalibration.mjs
+
+The harness samples /operational/admission-control while the real queued load is running and compares:
+- recommendation vs measured pressure
+- stable hysteresis recommendation
+- predicted drain vs observed remaining drain
+- completion/accounting integrity
+- worker mutation safety

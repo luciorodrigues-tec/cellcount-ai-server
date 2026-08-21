@@ -133,7 +133,7 @@ function applyTerminal(record, session, submitStartedAt, recoveredBy) {
   return true;
 }
 
-async function runOne({ baseUrl, apiToken, image, imagePath, specimenType, pollMs, timeoutMs, pollRequestTimeoutMs, stageId, ordinal }) {
+export async function runOne({ baseUrl, apiToken, image, imagePath, specimenType, pollMs, timeoutMs, pollRequestTimeoutMs, stageId, ordinal }) {
   const userId = `inf-scale-001-2g-${stageId}-${ordinal}-${crypto.randomUUID()}`;
   const idempotencyKey = `inf-scale-001.2g-${stageId}-${ordinal}-${crypto.randomUUID()}`;
   const headers = { Authorization: `Bearer ${apiToken}`, 'x-user-id': userId };

@@ -2,6 +2,8 @@ export const INF_SCALE_001_2H_VERSION = 'INF-SCALE-001.2H';
 export const ADAPTIVE_ADMISSION_POLICY_VERSION = 'INF-SCALE-001.2H-A';
 export const AUTOSCALING_READINESS_VERSION = 'INF-SCALE-001.2H-B';
 export const CAPACITY_ENVELOPE_CERTIFICATION_VERSION = 'INF-SCALE-001.2H-C';
+export const PRODUCTION_CAPACITY_CALIBRATION_VERSION = 'INF-SCALE-001.2H-D';
+export const MULTI_LEVEL_AUTOSCALING_POLICY_LOCK_VERSION = 'INF-SCALE-001.2H-E';
 
 export const ADMISSION_DECISIONS = Object.freeze({
   admit: 'ADMIT',
@@ -231,6 +233,7 @@ export class AdaptiveAnalysisAdmissionController {
       policyVersion: ADAPTIVE_ADMISSION_POLICY_VERSION,
       autoscalingReadinessVersion: AUTOSCALING_READINESS_VERSION,
       capacityEnvelopeVersion: CAPACITY_ENVELOPE_CERTIFICATION_VERSION,
+      productionCapacityCalibrationVersion: PRODUCTION_CAPACITY_CALIBRATION_VERSION,
       enabled: this.config.enabled,
       decisions: Object.values(ADMISSION_DECISIONS),
       mutatesWorkerCount: false,

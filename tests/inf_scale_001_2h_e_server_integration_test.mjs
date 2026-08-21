@@ -1,0 +1,4 @@
+import test from 'node:test'; import assert from 'node:assert/strict'; import fs from 'node:fs';
+const server=fs.readFileSync(new URL('../server.js',import.meta.url),'utf8'); const harness=fs.readFileSync(new URL('../scripts/certifyMultiLevelProductionCalibration.mjs',import.meta.url),'utf8');
+test('INF-SCALE-001.2H-E runtime keeps autoscaling policy explicitly locked',()=>{assert.match(server,/MULTI_LEVEL_AUTOSCALING_POLICY_LOCK_VERSION/);assert.match(server,/autoscalingPolicyStatus: "LOCKED_SAFE"/);assert.match(server,/automaticScalingAllowed: false/);});
+test('INF-SCALE-001.2H-E harness executes 25 50 100 sequential production calibration',()=>{assert.match(harness,/REQUIRED_LEVELS/);assert.match(harness,/evaluateMultiLevelAutoscalingPolicy/);assert.match(harness,/CELLCOUNT_MULTI_CALIBRATION_CONFIRM/);assert.match(harness,/collectOperationalSamples/);});

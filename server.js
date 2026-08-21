@@ -310,6 +310,8 @@ import {
   ADAPTIVE_ADMISSION_POLICY_VERSION,
   AUTOSCALING_READINESS_VERSION,
   CAPACITY_ENVELOPE_CERTIFICATION_VERSION,
+  PRODUCTION_CAPACITY_CALIBRATION_VERSION,
+  MULTI_LEVEL_AUTOSCALING_POLICY_LOCK_VERSION,
   ADMISSION_DECISIONS,
   createAdaptiveAnalysisAdmissionController,
 } from "./services/adaptiveAnalysisAdmissionController.js";
@@ -7174,6 +7176,12 @@ app.get("/operational/admission-control", auth, async (_req, res) => {
     return res.json({
       success: true,
       ...snapshot,
+      productionCapacityCalibrationVersion:
+        PRODUCTION_CAPACITY_CALIBRATION_VERSION,
+      multiLevelAutoscalingPolicyLockVersion:
+        MULTI_LEVEL_AUTOSCALING_POLICY_LOCK_VERSION,
+      autoscalingPolicyStatus: "LOCKED_SAFE",
+      automaticScalingAllowed: false,
       workerPool:
         analysisWorkerPool?.scalabilityMetadata ?? null,
     });
@@ -7542,6 +7550,12 @@ app.get("/runtime-version", (_req, res) => {
       AUTOSCALING_READINESS_VERSION,
     capacityEnvelopeCertificationVersion:
       CAPACITY_ENVELOPE_CERTIFICATION_VERSION,
+    productionCapacityCalibrationVersion:
+      PRODUCTION_CAPACITY_CALIBRATION_VERSION,
+    multiLevelAutoscalingPolicyLockVersion:
+      MULTI_LEVEL_AUTOSCALING_POLICY_LOCK_VERSION,
+    autoscalingPolicyStatus: "LOCKED_SAFE",
+    automaticScalingAllowed: false,
     adaptiveAdmissionControl:
       adaptiveAnalysisAdmissionController
         ? adaptiveAnalysisAdmissionController.scalabilityMetadata
