@@ -309,6 +309,7 @@ import {
   INF_SCALE_001_2H_VERSION,
   ADAPTIVE_ADMISSION_POLICY_VERSION,
   AUTOSCALING_READINESS_VERSION,
+  CAPACITY_ENVELOPE_CERTIFICATION_VERSION,
   ADMISSION_DECISIONS,
   createAdaptiveAnalysisAdmissionController,
 } from "./services/adaptiveAnalysisAdmissionController.js";
@@ -7539,6 +7540,8 @@ app.get("/runtime-version", (_req, res) => {
       ADAPTIVE_ADMISSION_POLICY_VERSION,
     autoscalingReadinessVersion:
       AUTOSCALING_READINESS_VERSION,
+    capacityEnvelopeCertificationVersion:
+      CAPACITY_ENVELOPE_CERTIFICATION_VERSION,
     adaptiveAdmissionControl:
       adaptiveAnalysisAdmissionController
         ? adaptiveAnalysisAdmissionController.scalabilityMetadata

@@ -1,0 +1,16 @@
+INF-SCALE-001.2H-C — Capacity Envelope & Scale Recommendation Certification
+
+Adds quantitative recommendation-only capacity envelope signals:
+- capacityHeadroom
+- estimatedDrainMinutes
+- currentWorkers / recommendedWorkers
+- queuePressure / workerUtilization / waitingPerWorker / oldestWaitingAgeMs
+
+Adds recommendation hysteresis to the read-only operational snapshot. No automatic worker mutation is introduced.
+
+Validation:
+node --check services\adaptiveAnalysisAdmissionController.js
+node --check scripts\certifyCapacityEnvelope.mjs
+node --check server.js
+node --test tests\inf_scale_001_2h_adaptive_admission_controller_test.mjs tests\inf_scale_001_2h_autoscaling_readiness_signals_test.mjs tests\inf_scale_001_2h_server_integration_test.mjs tests\inf_scale_001_2h_high_volume_compatibility_test.mjs tests\inf_scale_001_2h_c_capacity_envelope_test.mjs
+node scripts\certifyCapacityEnvelope.mjs

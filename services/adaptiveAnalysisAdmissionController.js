@@ -1,6 +1,7 @@
 export const INF_SCALE_001_2H_VERSION = 'INF-SCALE-001.2H';
 export const ADAPTIVE_ADMISSION_POLICY_VERSION = 'INF-SCALE-001.2H-A';
 export const AUTOSCALING_READINESS_VERSION = 'INF-SCALE-001.2H-B';
+export const CAPACITY_ENVELOPE_CERTIFICATION_VERSION = 'INF-SCALE-001.2H-C';
 
 export const ADMISSION_DECISIONS = Object.freeze({
   admit: 'ADMIT',
@@ -50,6 +51,9 @@ export function resolveAdaptiveAdmissionConfig(env = process.env, workerPoolConf
     autoscaleMinWorkers: positiveInt(env.ANALYSIS_AUTOSCALE_MIN_WORKERS, 1, { max: 64 }),
     autoscaleMaxWorkers: positiveInt(env.ANALYSIS_AUTOSCALE_MAX_WORKERS, 16, { max: 64 }),
     autoscaleScaleInUtilization: numberInRange(env.ANALYSIS_AUTOSCALE_SCALE_IN_UTILIZATION, 0.20, { min: 0, max: 0.8 }),
+    autoscaleDrainTargetMinutes: numberInRange(env.ANALYSIS_AUTOSCALE_DRAIN_TARGET_MINUTES, 5, { min: 0.5, max: 120 }),
+    autoscaleHysteresisWorkers: positiveInt(env.ANALYSIS_AUTOSCALE_HYSTERESIS_WORKERS, 1, { min: 1, max: 8 }),
+    autoscaleHysteresisObservations: positiveInt(env.ANALYSIS_AUTOSCALE_HYSTERESIS_OBSERVATIONS, 2, { min: 1, max: 20 }),
   });
 }
 
@@ -101,8 +105,16 @@ export function deriveAutoscalingReadiness(snapshot = {}, config = {}) {
     recommendedWorkers = Math.max(minWorkers, Math.min(maxWorkers, Math.max(workers, recommendedWorkers)));
   }
 
+  const capacityPerWorker = targetActivePerWorker;
+  const currentCapacity = workers * capacityPerWorker;
+  const capacityHeadroom = Math.max(0, currentCapacity - active);
+  const estimatedDrainMinutes = waiting > 0
+    ? Number((waiting / Math.max(1, workers * capacityPerWorker) * Number(config.autoscaleDrainTargetMinutes || 5)).toFixed(3))
+    : 0;
+
   return Object.freeze({
     version: AUTOSCALING_READINESS_VERSION,
+    capacityEnvelopeVersion: CAPACITY_ENVELOPE_CERTIFICATION_VERSION,
     actionOnly: false,
     recommendationOnly: true,
     currentWorkers: workers,
@@ -118,7 +130,26 @@ export function deriveAutoscalingReadiness(snapshot = {}, config = {}) {
       workerUtilization: Number(workerUtilization.toFixed(4)),
       waitingPerWorker: Number(waitingPerWorker.toFixed(4)),
       oldestWaitingAgeMs: Math.max(0, Number(snapshot.oldestWaitingAgeMs || 0)),
+      capacityHeadroom,
+      estimatedDrainMinutes,
     },
+  });
+}
+
+
+export function stabilizeAutoscalingRecommendation(previousState = {}, current = {}, config = {}) {
+  const required = Math.max(1, Number(config.autoscaleHysteresisObservations || 2));
+  const candidate = String(current.recommendation || 'HOLD');
+  const previousCandidate = String(previousState.candidate || '');
+  const consecutive = candidate === previousCandidate ? Number(previousState.consecutive || 0) + 1 : 1;
+  const immediate = candidate === 'AT_MAX_CAPACITY';
+  const stableRecommendation = immediate || consecutive >= required ? candidate : 'HOLD';
+  return Object.freeze({
+    candidate,
+    consecutive,
+    requiredObservations: required,
+    stableRecommendation,
+    hysteresisActive: stableRecommendation !== candidate,
   });
 }
 
@@ -191,6 +222,7 @@ export class AdaptiveAnalysisAdmissionController {
     }
     this.queue = queue;
     this.config = resolveAdaptiveAdmissionConfig(env, workerPoolConfig);
+    this.autoscalingHysteresisState = Object.freeze({ candidate: '', consecutive: 0 });
   }
 
   get scalabilityMetadata() {
@@ -198,6 +230,7 @@ export class AdaptiveAnalysisAdmissionController {
       architectureVersion: INF_SCALE_001_2H_VERSION,
       policyVersion: ADAPTIVE_ADMISSION_POLICY_VERSION,
       autoscalingReadinessVersion: AUTOSCALING_READINESS_VERSION,
+      capacityEnvelopeVersion: CAPACITY_ENVELOPE_CERTIFICATION_VERSION,
       enabled: this.config.enabled,
       decisions: Object.values(ADMISSION_DECISIONS),
       mutatesWorkerCount: false,
@@ -206,6 +239,7 @@ export class AdaptiveAnalysisAdmissionController {
       maxQueueDepth: this.config.maxQueueDepth,
       softQueuePressure: this.config.softQueuePressure,
       hardQueuePressure: this.config.hardQueuePressure,
+      hysteresisObservations: this.config.autoscaleHysteresisObservations,
     });
   }
 
@@ -239,6 +273,8 @@ export class AdaptiveAnalysisAdmissionController {
       maxQueueDepth: this.config.maxQueueDepth,
     });
     const admission = evaluateAdmissionSnapshot(snapshot, this.config);
+    const hysteresis = stabilizeAutoscalingRecommendation(this.autoscalingHysteresisState, admission.autoscaling, this.config);
+    this.autoscalingHysteresisState = Object.freeze({ candidate: hysteresis.candidate, consecutive: hysteresis.consecutive });
     return Object.freeze({
       architectureVersion: INF_SCALE_001_2H_VERSION,
       policyVersion: ADAPTIVE_ADMISSION_POLICY_VERSION,
@@ -248,7 +284,7 @@ export class AdaptiveAnalysisAdmissionController {
         reason: admission.reason,
         retryAfterMs: admission.retryAfterMs,
       },
-      autoscaling: admission.autoscaling,
+      autoscaling: Object.freeze({ ...admission.autoscaling, hysteresis }),
     });
   }
 }
