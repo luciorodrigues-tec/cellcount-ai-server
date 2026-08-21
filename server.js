@@ -317,6 +317,12 @@ import {
 } from "./services/adaptiveAnalysisAdmissionController.js";
 
 import {
+  AUTOSCALING_ACTIVATION_SAFETY_GATE_VERSION,
+  createControlledAutoscalingActivation,
+  resolveControlledAutoscalingConfig,
+} from "./services/controlledAutoscalingActivation.js";
+
+import {
   bootstrapRuntime,
 } from "./bootstrap/runtimeBootstrap.js";
 
@@ -582,6 +588,11 @@ const clinicalAnalysisExecutionBoundary =
 const analysisWorkerPoolConfig =
   resolveAnalysisWorkerPoolConfig();
 
+const controlledAutoscalingConfig =
+  resolveControlledAutoscalingConfig(process.env, analysisWorkerPoolConfig);
+
+let controlledAutoscalingActivation = null;
+
 const adaptiveAnalysisAdmissionController =
   analysisJobQueueConfig.executionMode === ANALYSIS_EXECUTION_MODES.queued && analysisJobQueue
     ? createAdaptiveAnalysisAdmissionController({
@@ -602,6 +613,15 @@ const analysisWorkerPool =
 
 if (analysisWorkerPool) {
   analysisWorkerPool.start();
+
+  controlledAutoscalingActivation =
+    createControlledAutoscalingActivation({
+      workerPool: analysisWorkerPool,
+      admissionController: adaptiveAnalysisAdmissionController,
+      config: controlledAutoscalingConfig,
+    });
+
+  controlledAutoscalingActivation.start();
 }
 
 
@@ -7180,8 +7200,22 @@ app.get("/operational/admission-control", auth, async (_req, res) => {
         PRODUCTION_CAPACITY_CALIBRATION_VERSION,
       multiLevelAutoscalingPolicyLockVersion:
         MULTI_LEVEL_AUTOSCALING_POLICY_LOCK_VERSION,
-      autoscalingPolicyStatus: "LOCKED_SAFE",
-      automaticScalingAllowed: false,
+    autoscalingActivationSafetyGateVersion:
+      AUTOSCALING_ACTIVATION_SAFETY_GATE_VERSION,
+    controlledAutoscaling:
+      controlledAutoscalingActivation?.metadata ?? {
+        version: AUTOSCALING_ACTIVATION_SAFETY_GATE_VERSION,
+        status: controlledAutoscalingConfig.killSwitch
+          ? "KILL_SWITCH_ACTIVE"
+          : "LOCKED_SAFE",
+        automaticScalingAllowed: false,
+        scaleOutOnly: true,
+        scaleInEnabled: false,
+      },
+      autoscalingPolicyStatus:
+      controlledAutoscalingActivation?.status ?? "LOCKED_SAFE",
+    automaticScalingAllowed:
+      controlledAutoscalingActivation?.automaticScalingAllowed ?? false,
       workerPool:
         analysisWorkerPool?.scalabilityMetadata ?? null,
     });
@@ -7554,8 +7588,22 @@ app.get("/runtime-version", (_req, res) => {
       PRODUCTION_CAPACITY_CALIBRATION_VERSION,
     multiLevelAutoscalingPolicyLockVersion:
       MULTI_LEVEL_AUTOSCALING_POLICY_LOCK_VERSION,
-    autoscalingPolicyStatus: "LOCKED_SAFE",
-    automaticScalingAllowed: false,
+    autoscalingActivationSafetyGateVersion:
+      AUTOSCALING_ACTIVATION_SAFETY_GATE_VERSION,
+    controlledAutoscaling:
+      controlledAutoscalingActivation?.metadata ?? {
+        version: AUTOSCALING_ACTIVATION_SAFETY_GATE_VERSION,
+        status: controlledAutoscalingConfig.killSwitch
+          ? "KILL_SWITCH_ACTIVE"
+          : "LOCKED_SAFE",
+        automaticScalingAllowed: false,
+        scaleOutOnly: true,
+        scaleInEnabled: false,
+      },
+    autoscalingPolicyStatus:
+      controlledAutoscalingActivation?.status ?? "LOCKED_SAFE",
+    automaticScalingAllowed:
+      controlledAutoscalingActivation?.automaticScalingAllowed ?? false,
     adaptiveAdmissionControl:
       adaptiveAnalysisAdmissionController
         ? adaptiveAnalysisAdmissionController.scalabilityMetadata

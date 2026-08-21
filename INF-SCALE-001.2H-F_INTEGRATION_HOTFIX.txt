@@ -1,0 +1,39 @@
+INF-SCALE-001.2H-F — INTEGRATION HOTFIX
+
+Motivo:
+O instalador inicial procurava a declaração de analysisWorkerPoolConfig em uma única linha.
+O server.js real usa declaração multilinha. O instalador abortou corretamente sem modificar
+o arquivo. Este hotfix usa matching tolerante a whitespace e valida as duas superfícies:
+  - /operational/admission-control
+  - /runtime-version
+
+1. Substituir:
+   scripts\installInfScale0012HF.mjs
+
+2. Adicionar:
+   tests\inf_scale_001_2h_f_server_integration_test.mjs
+
+3. NÃO restaurar server.pre_INF_SCALE_001_2H_F_backup.js.
+   O instalador anterior abortou antes de gravar o server.js.
+
+4. Rodar:
+   node --check scripts\installInfScale0012HF.mjs
+   node scripts\installInfScale0012HF.mjs
+   node --check server.js
+   node --check services\analysisWorkerPool.js
+   node --check services\controlledAutoscalingActivation.js
+
+5. Testes:
+   node --test tests\inf_scale_001_2h_f_autoscaling_activation_safety_gate_test.mjs tests\inf_scale_001_2h_f_server_integration_test.mjs tests\inf_scale_001_2h_e_multi_level_policy_lock_test.mjs tests\inf_scale_001_2h_d_production_capacity_calibration_test.mjs
+
+6. Confirmar integração:
+   findstr /N /I "AUTOSCALING_ACTIVATION_SAFETY_GATE_VERSION controlledAutoscalingActivation controlledAutoscalingConfig autoscalingActivationSafetyGateVersion controlledAutoscaling automaticScalingAllowed" server.js
+
+7. NÃO ativar ainda em produção.
+Primeiro deploy:
+   CELLCOUNT_AUTOSCALING_ENABLED=false
+   CELLCOUNT_AUTOSCALING_KILL_SWITCH=true
+   CELLCOUNT_AUTOSCALING_2H_E_CERTIFIED=false
+
+Objetivo do primeiro deploy:
+Expor e certificar a 2H-F em modo fail-closed, sem qualquer mutação automática.

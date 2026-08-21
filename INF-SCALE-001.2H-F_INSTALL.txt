@@ -1,0 +1,56 @@
+INF-SCALE-001.2H-F — Autoscaling Activation Safety Gate & Controlled Production Rollout
+
+PURPOSE
+- Add real runtime worker scale-out behind explicit fail-closed safety gates.
+- Preserve PostgreSQL queue, leases, idempotency and all clinical pipeline behavior.
+- NO automatic scale-in in this sprint.
+- Default deployment remains locked.
+
+INSTALL (from backend root)
+1. Back up:
+   copy server.js server.pre_INF_SCALE_001_2H_F_backup.js
+   copy services\analysisWorkerPool.js services\analysisWorkerPool.pre_2H_F_backup.js
+
+2. Copy package folders services, scripts, tests into backend (overwrite analysisWorkerPool.js).
+
+3. Append ENV_2H_F_APPEND.txt values to .env.example.
+
+4. Patch server:
+   node scripts\installInfScale0012HF.mjs
+
+5. Syntax:
+   node --check services\analysisWorkerPool.js
+   node --check services\controlledAutoscalingActivation.js
+   node --check scripts\installInfScale0012HF.mjs
+   node --check server.js
+
+6. Tests:
+   node --test tests\inf_scale_001_2h_f_autoscaling_activation_safety_gate_test.mjs
+   node --test tests\inf_scale_001_2h_e_multi_level_policy_lock_test.mjs tests\inf_scale_001_2h_d_production_capacity_calibration_test.mjs
+
+FIRST PRODUCTION DEPLOY — MUST REMAIN LOCKED
+CELLCOUNT_AUTOSCALING_ENABLED=false
+CELLCOUNT_AUTOSCALING_KILL_SWITCH=true
+CELLCOUNT_AUTOSCALING_2H_E_CERTIFIED=false
+
+Verify /runtime-version:
+autoscalingActivationSafetyGateVersion = INF-SCALE-001.2H-F
+automaticScalingAllowed = false
+controlledAutoscaling.scaleOutOnly = true
+controlledAutoscaling.scaleInEnabled = false
+
+CONTROLLED CANARY (only after locked deploy validation)
+CELLCOUNT_AUTOSCALING_ENABLED=true
+CELLCOUNT_AUTOSCALING_KILL_SWITCH=false
+CELLCOUNT_AUTOSCALING_2H_E_CERTIFIED=true
+CELLCOUNT_AUTOSCALING_MIN_WORKERS=4
+CELLCOUNT_AUTOSCALING_MAX_WORKERS=5
+CELLCOUNT_AUTOSCALING_MAX_STEP_UP=1
+
+Expected first rollout: 4 -> 5 only after sustained stable SCALE_OUT evidence.
+Emergency rollback: CELLCOUNT_AUTOSCALING_KILL_SWITCH=true and redeploy.
+
+IMPORTANT
+The 2H-E certification was previously demonstrated as PASS at 25/50/100 with zero terminal failures,
+zero unexpected errors, zero duplicate analysis IDs and complete accounting. 2H-F does not modify
+hematology/morphology code or clinical results.
