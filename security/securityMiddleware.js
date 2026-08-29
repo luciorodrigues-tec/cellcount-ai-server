@@ -1,6 +1,6 @@
 // ============================================================================
 // CELLCOUNT ENTERPRISE — SECURITY MIDDLEWARE
-// MP-SEC-000001A
+// MP-SEC-000001A + CLEANUP-001.1 R1
 // ============================================================================
 
 import crypto from "crypto";
@@ -43,7 +43,69 @@ export function createBearerAuth(apiToken) {
       });
     }
 
+    req.auth = Object.freeze({
+      kind: "legacy-api-token",
+    });
+
     return next();
+  };
+}
+
+export function createCompositeAuth({
+  apiToken,
+  allowLegacyApiToken = false,
+  sessionTokenService,
+} = {}) {
+  if (!sessionTokenService?.verify) {
+    throw new Error(
+      "createCompositeAuth requer sessionTokenService configurado.",
+    );
+  }
+
+  if (allowLegacyApiToken && !apiToken) {
+    throw new Error(
+      "API_TOKEN é obrigatório enquanto ALLOW_LEGACY_API_TOKEN estiver habilitado.",
+    );
+  }
+
+  return function compositeAuth(req, res, next) {
+    const receivedToken = normalizeBearerToken(
+      req.headers.authorization,
+    );
+    const deviceId = String(
+      req.headers["x-device-id"] || "",
+    ).trim();
+
+    if (receivedToken && deviceId) {
+      const verification =
+        sessionTokenService.verify(
+          receivedToken,
+          { deviceId },
+        );
+
+      if (verification.valid) {
+        req.auth = verification;
+        return next();
+      }
+    }
+
+    if (
+      allowLegacyApiToken &&
+      constantTimeTokenEquals(
+        receivedToken,
+        apiToken,
+      )
+    ) {
+      req.auth = Object.freeze({
+        kind: "legacy-api-token",
+      });
+      return next();
+    }
+
+    return res.status(401).json({
+      success: false,
+      error: "Não autorizado.",
+    });
   };
 }
 
@@ -62,7 +124,12 @@ export function createCorsOptions(allowedOrigins) {
       callback(new Error("Origem não autorizada pela política CORS."));
     },
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization", "x-user-id"],
+    allowedHeaders: [
+      "Content-Type",
+      "Authorization",
+      "x-user-id",
+      "x-device-id",
+    ],
     credentials: false,
     maxAge: 600,
   });
