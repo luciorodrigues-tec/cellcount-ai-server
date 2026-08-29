@@ -331,6 +331,10 @@ import {
 } from "./bootstrap/httpFoundation.js";
 
 import {
+  validateAnalysisIdBoundary,
+} from "./security/analysisIdBoundary.js";
+
+import {
   registerSystemRoutes,
 } from "./routes/systemRoutes.js";
 
@@ -7865,8 +7869,18 @@ app.get(
   async (req, res) => {
     try {
       const { userId } = getUser(req);
+      const analysisIdBoundary =
+        validateAnalysisIdBoundary(req.params.analysisId);
+      if (!analysisIdBoundary.valid) {
+        return res.status(400).json({
+          success: false,
+          errorCode: analysisIdBoundary.errorCode,
+          error: analysisIdBoundary.error,
+          contractVersion: ANALYSIS_SESSION_CONTRACT_VERSION,
+        });
+      }
       const session = await analysisSessionStore.get(
-        req.params.analysisId,
+        analysisIdBoundary.analysisId,
         userId,
       );
       if (!session) {
@@ -7899,8 +7913,19 @@ app.get(
   async (req, res) => {
     try {
       const { userId } = getUser(req);
+      const analysisIdBoundary =
+        validateAnalysisIdBoundary(req.params.analysisId);
+      if (!analysisIdBoundary.valid) {
+        return res.status(400).json({
+          success: false,
+          errorCode: analysisIdBoundary.errorCode,
+          error: analysisIdBoundary.error,
+          contractVersion: ANALYSIS_SESSION_CONTRACT_VERSION,
+          orchestrationVersion: ANALYSIS_RECOVERY_ORCHESTRATION_VERSION,
+        });
+      }
       const recovery = await analysisSessionStore.getRecoverySnapshot(
-        req.params.analysisId,
+        analysisIdBoundary.analysisId,
         userId,
       );
 
@@ -7941,8 +7966,18 @@ app.post(
   async (req, res) => {
     try {
       const { userId } = getUser(req);
+      const analysisIdBoundary =
+        validateAnalysisIdBoundary(req.params.analysisId);
+      if (!analysisIdBoundary.valid) {
+        return res.status(400).json({
+          success: false,
+          errorCode: analysisIdBoundary.errorCode,
+          error: analysisIdBoundary.error,
+          contractVersion: ANALYSIS_SESSION_CONTRACT_VERSION,
+        });
+      }
       const retry = await analysisSessionStore.prepareRetry(
-        req.params.analysisId,
+        analysisIdBoundary.analysisId,
         userId,
       );
 
@@ -8023,8 +8058,21 @@ app.post(
         String(req.body?.idempotencyKey || "").trim();
 
       if (requestedAnalysisId) {
+        const analysisIdBoundary =
+          validateAnalysisIdBoundary(requestedAnalysisId);
+        if (!analysisIdBoundary.valid) {
+          return res.status(400).json({
+            success: false,
+            errorCode: analysisIdBoundary.errorCode,
+            error: analysisIdBoundary.error,
+            contractVersion: ANALYSIS_SESSION_CONTRACT_VERSION,
+          });
+        }
         activeAnalysisSession =
-          await analysisSessionStore.get(requestedAnalysisId, userId);
+          await analysisSessionStore.get(
+            analysisIdBoundary.analysisId,
+            userId,
+          );
         if (!activeAnalysisSession) {
           return res.status(404).json({
             success: false,
